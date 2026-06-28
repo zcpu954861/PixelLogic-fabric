@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "pixel-logic",
+  "version": "${version}",
+  "name": "PixelLogic",
+  "description": "Visual logic flow mod for Minecraft servers.",
+  "authors": [
+    "PixelLogic contributors"
+  ],
+  "contact": {
+    "sources": "https://github.com/zcpu954861/PixelLogic-fabric"
+  },
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.pixelmc.pixellogic.PixelLogicMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "minecraft": "1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

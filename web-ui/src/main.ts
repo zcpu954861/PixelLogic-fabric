@@ -453,8 +453,8 @@ function renderApp(): void {
         <section class="quick-start">
           <div class="panel-title"><span>当前版本</span></div>
           <button type="button">Committed ${escapeHtml(shortFingerprint(state.committedGraph?.fingerprint ?? graph.fingerprint))}</button>
-          <button type="button">${state.hasDraft ? '存在未提交草稿' : '无未提交草稿'}</button>
-          <button type="button">${state.dirty ? '有未保存改动' : '无本地改动'}</button>
+          <button type="button" data-draft-status>${state.hasDraft ? '存在未提交草稿' : '无未提交草稿'}</button>
+          <button type="button" data-dirty-status>${state.dirty ? '有未保存改动' : '无本地改动'}</button>
         </section>
       </aside>
 
@@ -495,15 +495,15 @@ function renderApp(): void {
         </section>
         <section class="validation-card">
           <b>最后动作</b>
-          <p>${escapeHtml(state.lastAction)}</p>
+          <p data-last-action>${escapeHtml(state.lastAction)}</p>
         </section>
         ${state.error ? `<section class="api-error" role="alert">${escapeHtml(state.error)}</section>` : ''}
       </aside>
 
       <footer class="bottom-dock" aria-label="验证问题和执行记录">
         <section>
-          <div class="panel-title"><span>验证与草稿</span><b>${validationTitle()}</b></div>
-          <ul class="issue-list">
+          <div class="panel-title"><span>验证与草稿</span><b data-validation-title>${validationTitle()}</b></div>
+          <ul class="issue-list" data-issue-list>
             <li><span class="${state.apiStatus === 'online' ? 'ok' : 'warn'}"></span>${escapeHtml(state.statusMessage)}</li>
             ${uncommittedNotice() ? `<li><span class="warn"></span>${escapeHtml(uncommittedNotice())}</li>` : ''}
             ${validationItems}
@@ -772,7 +772,35 @@ function updateSelectedNode(inputEl: HTMLInputElement): void {
   state.dirty = true;
   state.validation = null;
   state.lastAction = '草稿已修改，尚未保存。';
-  renderApp();
+  refreshDraftIndicators();
+}
+
+function refreshDraftIndicators(): void {
+  const draftStatus = document.querySelector<HTMLElement>('[data-draft-status]');
+  const dirtyStatus = document.querySelector<HTMLElement>('[data-dirty-status]');
+  const lastAction = document.querySelector<HTMLElement>('[data-last-action]');
+  const validationTitleEl = document.querySelector<HTMLElement>('[data-validation-title]');
+  const issueList = document.querySelector<HTMLElement>('[data-issue-list]');
+
+  if (draftStatus) {
+    draftStatus.textContent = state.hasDraft ? '存在未提交草稿' : '无未提交草稿';
+  }
+  if (dirtyStatus) {
+    dirtyStatus.textContent = state.dirty ? '有未保存改动' : '无本地改动';
+  }
+  if (lastAction) {
+    lastAction.textContent = state.lastAction;
+  }
+  if (validationTitleEl) {
+    validationTitleEl.textContent = validationTitle();
+  }
+  if (issueList) {
+    issueList.innerHTML = `
+      <li><span class="${state.apiStatus === 'online' ? 'ok' : 'warn'}"></span>${escapeHtml(state.statusMessage)}</li>
+      ${uncommittedNotice() ? `<li><span class="warn"></span>${escapeHtml(uncommittedNotice())}</li>` : ''}
+      ${validationList()}
+    `;
+  }
 }
 
 async function loadGraph(): Promise<void> {

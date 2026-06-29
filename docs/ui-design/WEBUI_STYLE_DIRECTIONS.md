@@ -1,51 +1,33 @@
-# PixelLogic WebUI Style Directions
+# PixelLogic WebUI 风格方向
 
-## A. Clean Admin
+## 已放弃作为主方向：自由节点图
 
-Clean, restrained, professional.
+上一版 Card Studio 仍然太像传统节点编辑器：
 
-Pros:
+- 节点散落在画布上。
+- 细曲线承载流程。
+- 大屏下卡片显小。
+- pass / fail / done 等含义更像调试标注。
 
-- Best readability.
-- Strong fit for server management.
-- Low risk for accessibility and performance.
+这不够像“人能自然拼逻辑”的图形化编程界面。
 
-Cons:
+## 当前推荐方向：横向积木流
 
-- Can feel generic.
-- May not communicate Minecraft or visual programming strongly enough.
+横向积木流保留 PixelLogic 的 Graph / Card / Direct Edge 核心，但表达方式更像拼图：
 
-## B. Pixel Craft
+- 大卡片。
+- 横向推进。
+- 短而粗的连接。
+- 条件卡片上下分支。
+- 端口文字属于卡片自身。
 
-Minecraft-adjacent with light pixel geometry and craft texture.
+## 美术取向
 
-Pros:
+当前实现继续保持克制的 Pixel Craft 氛围：淡网格、积木边框、清楚状态色，不做幼稚化像素皮肤。
 
-- Stronger product personality.
-- Easier to connect to Minecraft server context.
+仍待用户确认：
 
-Cons:
-
-- Can become childish if overdone.
-- Pixel-heavy visuals can make dense editing harder to scan.
-
-## C. Card Studio
-
-Closer to Scratch, Figma, and node editors: cards, ports, direct edges, calm layers.
-
-Pros:
-
-- Best fit for graph-first logic authoring.
-- Makes Trigger / Condition / Action relationships easy to understand.
-- Supports future editor interactions without a heavy visual reset.
-
-Cons:
-
-- Needs careful density control.
-- A full editor will need stronger zoom, selection, and keyboard interaction design later.
-
-## Recommendation
-
-Prototype C: **Card Studio with light Pixel Craft accents**.
-
-It keeps the editing model clear while leaving enough Minecraft flavor to feel like PixelLogic. Final style choice must be confirmed by the user.
+- 是否继续保持克制。
+- 是否更像 Minecraft。
+- 是否更专业、更管理后台。
+- 是否更大胆、更像积木玩具。

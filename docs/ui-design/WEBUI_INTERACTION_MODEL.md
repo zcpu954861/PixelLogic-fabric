@@ -1,42 +1,39 @@
-# PixelLogic WebUI Interaction Model
+# PixelLogic WebUI 交互模型
 
-## App Shell
+## 工作台结构
 
-- Top bar: product name, current project, save state, test run, settings.
-- Left rail: graph list, node library, first-use actions.
-- Center: graph canvas with cards and direct edges.
-- Right rail: selected card details.
-- Bottom dock: validation errors and execution trace.
+- 顶部栏：PixelLogic、当前图名称、保存状态、测试运行、适应视图、回到中心、设置。
+- 左侧栏：流程列表、节点库、快捷创建、模板入口。
+- 中心：逻辑画布，承载横向积木流。
+- 右侧栏：只编辑选中积木字段。
+- 底部栏：验证问题、执行记录、调试日志。
 
-## Graph Editing Mental Model
+## 横向积木流
 
-Users should understand flow by reading:
+逻辑默认从左到右推进。每个积木都有固定输入口和输出口，连接从端口直接发出，不把“通过 / 失败 / 完成 / 错误”漂浮在线上。
 
-1. The visible card type.
-2. The card name and summary.
-3. The input/output ports.
-4. The direct edge label.
-5. The validation and trace feedback.
+## 条件卡片
 
-## Card Rules
+条件判断是更高的独立卡片：
 
-- Trigger cards start flows.
-- Condition cards are standalone and must show pass/fail outputs.
-- Action cards use typed fields and must show done/error outputs.
-- Timer cards are explicit waits, not hidden delays.
-- Debug Log cards are visible diagnostic endpoints.
+- 左侧中部：输入。
+- 右侧上方：通过。
+- 右侧下方：失败。
 
-## Property Panel Rule
+影响流程分支的逻辑必须在画布上可见，不能只藏在右侧属性面板。
 
-The right panel edits only the selected card details. It must not hide flow-critical logic. Any branch that changes execution must remain visible on the graph canvas.
+## 动作卡片
 
-## First-Use Flow
+动作类积木保留“完成 / 错误”出口。错误出口可以弱化或显示为未连接，但不能让错误路径完全消失。
 
-The first-use state should offer:
+## 画布交互
 
-- Create the first Graph.
-- Start from a template.
-- Create a Trigger manually.
-- View an example.
+本轮静态原型已真实实现：
 
-These are static in this prototype.
+- 鼠标拖拽空白处平移。
+- 滚轮缩放。
+- 适应视图。
+- 回到中心。
+- 聚焦选中。
+- 悬停连接时高亮上下游。
+- 选中卡片时高亮相关连接。

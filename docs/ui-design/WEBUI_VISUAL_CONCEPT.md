@@ -1,40 +1,36 @@
-# PixelLogic WebUI Visual Concept
+# PixelLogic WebUI 视觉概念
 
-This is a design-only static prototype for user review. It does not implement backend runtime, saving, execution, storage, permissions, or Java-generated WebUI.
+本轮原型方向改为 **Horizontal Block Flow / 横向积木流**。
 
-## Implemented Direction
+它不是传统自由节点图。目标是让普通服主像拼积木一样从左到右理解逻辑：
 
-Recommended prototype: **Card Studio with light Pixel Craft accents**.
+```text
+命令触发 -> 条件判断
+              上方通过 -> 发送消息 -> 状态动作 -> 计时器
+              下方失败 -> 调试记录
+```
 
-Reason:
+## 本轮修正
 
-- PixelLogic is a graph-first logic workbench, so card readability and direct edges matter more than decorative theme.
-- Server owners need a professional tool, not a toy-like editor.
-- A small pixel/craft accent can signal Minecraft context without turning the UI into a game skin.
+- 卡片更大，1920x1080 下仍然清楚。
+- 普通 UI 文案改为中文。
+- 连接从细长曲线改为粗短、结构化的横向连接。
+- 条件判断是高卡片，上方“通过”、下方“失败”。
+- 端口文字直接贴在卡片边缘。
+- 中心画布支持拖拽平移、滚轮缩放、适应视图、回到中心、聚焦选中。
 
-Final visual direction remains a user decision.
+## 非目标
 
-## Included States
+- 不实现后端 runtime。
+- 不实现真实保存 API。
+- 不实现真实图执行。
+- 不修改 Java 后端。
+- 不引入 React / Vue / Svelte / 图形库。
 
-- App shell with top project/status/actions.
-- Left rail with graph list, node library, and first-use actions.
-- Graph canvas with Command Trigger, Condition, Message Action, State Action, Timer, and Debug Log cards.
-- Typed edges for trigger, pass, fail, done, and completed paths.
-- Right selected-card property panel for a Condition node.
-- Bottom validation errors and mock execution trace.
+## 用户仍需确认
 
-## Non-Goals
-
-- No real graph persistence.
-- No real runtime execution.
-- No backend API calls.
-- No Java backend changes.
-- No React/Vue/Svelte or large UI framework.
-
-## Quality Notes
-
-- The primary user flow is visible as cards and edges.
-- Condition is an independent card with pass/fail outputs.
-- Action cards expose done/error outputs.
-- Normal-user UI does not include a Channel entry point.
-- The current prototype prioritizes 1366px and wider desktop review. Small screens stack panels for rough usability, but mobile editing needs a later dedicated design pass.
+- 横向积木流是否比自由连线更直观。
+- 卡片是否够大、够清楚。
+- 条件上下双出口是否符合直觉。
+- 是否还需要更强 Minecraft 质感。
+- 是否继续以此方向深化真实编辑器。

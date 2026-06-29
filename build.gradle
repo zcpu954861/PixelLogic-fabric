@@ -47,7 +47,20 @@ tasks.register('manualSimulationSelfCheck', JavaExec) {
 	classpath = sourceSets.main.runtimeClasspath
 }
 
+tasks.register('apiWebUiSelfCheck', JavaExec) {
+	dependsOn classes
+	mainClass = 'com.pixelmc.pixellogic.server.api.ApiWebUiSelfCheck'
+	classpath = sourceSets.main.runtimeClasspath
+}
+
+tasks.register('apiWebUiDevServer', JavaExec) {
+	dependsOn classes
+	mainClass = 'com.pixelmc.pixellogic.server.api.ApiWebUiDevServer'
+	classpath = sourceSets.main.runtimeClasspath
+}
+
 check.dependsOn tasks.named('manualSimulationSelfCheck')
+check.dependsOn tasks.named('apiWebUiSelfCheck')
 
 java {
 	withSourcesJar()

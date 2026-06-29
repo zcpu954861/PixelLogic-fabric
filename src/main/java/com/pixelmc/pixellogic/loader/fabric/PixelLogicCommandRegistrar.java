@@ -61,7 +61,7 @@ public final class PixelLogicCommandRegistrar {
         }
 
         FabricPixelLogicBootstrap.service(source.getServer()).resetPlayer(player.getUuid());
-        source.sendFeedback(() -> Text.literal("PixelLogic 测试状态已重置：PLAYER.started 已清除。"), false);
+        source.sendFeedback(() -> Text.literal("PixelLogic 测试状态已重置：PLAYER.started / PLAYER.start_count 已清除。"), false);
         return 1;
     }
 

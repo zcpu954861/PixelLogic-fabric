@@ -13,7 +13,17 @@ The v1 manual simulation spike now adds the first backend runtime path:
 - In-memory demo `GraphDefinition`, validation, compiled graph, state, trace, and wall-clock timer.
 - Timer due callbacks hand runtime continuation back to the Minecraft server thread.
 
-It still does not implement gameplay items, blocks, old TZZ systems, Region, persistent graph storage, WebUI API integration, or Java-generated WebUI.
+It still does not implement gameplay items, blocks, old TZZ systems, Region, persistent graph storage, full graph editing, or Java-generated WebUI.
+
+The v1 API + WebUI test-run checkpoint adds a localhost-only spike API:
+
+- JDK `HttpServer` under `server/api`.
+- API lifecycle owned by the Fabric server adapter.
+- Runtime actions handed to the Minecraft server executor before state/trace mutation.
+- Vite dev proxy from `/api` to `127.0.0.1:18111`.
+- WebUI renders real status, reset, test run, latest trace, and recent trace responses.
+
+It still does not implement persistent graph storage, arbitrary graph editing APIs, Region, old TZZ adapters, or Java-generated WebUI.
 
 ## Future Module Boundaries
 

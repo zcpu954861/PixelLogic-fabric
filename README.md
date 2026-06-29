@@ -34,6 +34,20 @@ The v1 manual simulation spike is exposed under `/pixellogic` only:
 
 `/pixellogic test start` runs the in-memory demo graph for the executing player. Console execution returns a Chinese error because the spike uses PLAYER state.
 
+## Current Spike API
+
+The WebUI test-run integration exposes a localhost-only spike API:
+
+```text
+GET  /api/pixellogic/status
+POST /api/pixellogic/test/reset
+POST /api/pixellogic/test/start
+GET  /api/pixellogic/traces/latest
+GET  /api/pixellogic/traces
+```
+
+This API is bound to `127.0.0.1:18111`, uses the fixed `WebUI 模拟玩家` actor, and is not the final graph save/load API.
+
 ## v1 Specs
 
 - [PixelLogic v1 Product Spec](docs/specs/NEW_LOGIC_MOD_PRODUCT_SPEC.md)
@@ -54,6 +68,14 @@ WebUI build:
 cd web-ui
 npm install
 npm run build
+```
+
+Local WebUI/API self-test:
+
+```powershell
+.\gradlew.bat apiWebUiDevServer
+cd web-ui
+npm run dev
 ```
 
 The Gradle build does not require Node. WebUI build output is intentionally separate for this bootstrap.

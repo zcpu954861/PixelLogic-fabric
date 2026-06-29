@@ -37,6 +37,8 @@ The spike command root is `/pixellogic`; no `/pl` root is registered. The curren
 
 The current timer uses `ScheduledExecutorService` for wall-clock delay. The due callback only schedules runtime continuation back onto the Minecraft server thread through the Fabric adapter service.
 
+The API + WebUI test-run checkpoint adds a localhost-only spike API for the same demo graph. The API uses a fixed `WebUI 模拟玩家` actor for PLAYER-scoped browser simulation and does not implement graph save/load.
+
 ## Layer Boundaries
 
 ### Core
@@ -437,6 +439,27 @@ POST   /api/graphs/{id}/simulate
 GET    /api/traces
 GET    /api/events/stream
 ```
+
+### Implemented Spike API
+
+The first implemented API is deliberately smaller than the draft:
+
+```text
+GET  /api/pixellogic/status
+POST /api/pixellogic/test/reset
+POST /api/pixellogic/test/start
+GET  /api/pixellogic/traces/latest
+GET  /api/pixellogic/traces
+```
+
+Rules:
+
+- It is bound to `127.0.0.1:18111`.
+- It serves the in-memory `demo-start-flow` only.
+- It uses the fixed `WebUI 模拟玩家` actor.
+- It returns JSON success/error envelopes.
+- It is not the final project/graph persistence API.
+- It does not introduce Channel, Region, or old TZZ concepts.
 
 API rules:
 

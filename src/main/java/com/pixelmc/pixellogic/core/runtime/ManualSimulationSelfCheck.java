@@ -11,6 +11,7 @@ import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.state.StateKey;
 import com.pixelmc.pixellogic.core.state.StateValue;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
+import com.pixelmc.pixellogic.core.timer.WallClockTimerScheduler;
 import com.pixelmc.pixellogic.core.trace.BoundedTraceBuffer;
 import com.pixelmc.pixellogic.core.trace.ExecutionTrace;
 
@@ -18,6 +19,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class ManualSimulationSelfCheck {
@@ -103,6 +105,17 @@ public final class ManualSimulationSelfCheck {
         conflictingState.set(StateKey.of(StateScope.PLAYER, conflictPlayer.toString(), "started"), StateValue.bool(false));
         RuntimeResult conflict = conflictingRuntime.start(new TriggerEvent(DemoGraphFactory.TRIGGER_TYPE, "/pixellogic test start", conflictPlayer, "self-check"));
         require(!conflict.success(), "State Set should not change an existing key type");
+
+        try (WallClockTimerScheduler fullScheduler = new WallClockTimerScheduler(0)) {
+            boolean rejected = false;
+            try {
+                fullScheduler.schedule(Duration.ofSeconds(1), new TimerContinuation("g", "n", "t", playerId, "s", 1), ignored -> {
+                });
+            } catch (RejectedExecutionException exception) {
+                rejected = true;
+            }
+            require(rejected && fullScheduler.pendingTimers() == 0, "timer scheduler should reject over capacity without leaking pending count");
+        }
     }
 
     private static void require(boolean condition, String message) {

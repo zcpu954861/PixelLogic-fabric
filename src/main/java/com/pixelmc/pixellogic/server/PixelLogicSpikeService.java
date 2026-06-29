@@ -44,7 +44,16 @@ public final class PixelLogicSpikeService implements AutoCloseable {
             Consumer<Runnable> serverThreadExecutor,
             Consumer<String> debugLogger
     ) {
-        this.demoGraph = DemoGraphFactory.create(Duration.ofSeconds(30));
+        this(playerMessenger, serverThreadExecutor, debugLogger, Duration.ofSeconds(30));
+    }
+
+    public PixelLogicSpikeService(
+            BiConsumer<UUID, String> playerMessenger,
+            Consumer<Runnable> serverThreadExecutor,
+            Consumer<String> debugLogger,
+            Duration timerDuration
+    ) {
+        this.demoGraph = DemoGraphFactory.create(timerDuration);
         this.validationIssues = List.copyOf(validator.validate(demoGraph));
         if (validator.hasErrors(validationIssues)) {
             this.runtime = null;
@@ -95,10 +104,19 @@ public final class PixelLogicSpikeService implements AutoCloseable {
 
     public void resetPlayer(UUID playerId) {
         stateStore.remove(StateKey.of(com.pixelmc.pixellogic.core.model.StateScope.PLAYER, playerId.toString(), "started"));
+        stateStore.remove(StateKey.of(com.pixelmc.pixellogic.core.model.StateScope.PLAYER, playerId.toString(), "start_count"));
     }
 
     public Optional<ExecutionTrace> latestTrace() {
         return traces.latest();
+    }
+
+    public Optional<ExecutionTrace> trace(String traceId) {
+        return traces.get(traceId);
+    }
+
+    public List<ExecutionTrace> recentTraces() {
+        return traces.recent();
     }
 
     public String status() {

@@ -1,6 +1,7 @@
 package com.pixelmc.pixellogic.core.trace;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -33,6 +34,10 @@ public final class BoundedTraceBuffer {
 
     public synchronized Optional<ExecutionTrace> latest() {
         return latestTraceId == null ? Optional.empty() : get(latestTraceId);
+    }
+
+    public synchronized List<ExecutionTrace> recent() {
+        return List.copyOf(traces.values());
     }
 
     public void add(String traceId, String nodeId, String message) {

@@ -1,6 +1,6 @@
 # PixelLogic v1 Minimal Vertical Spike Plan
 
-This plan defines the first end-to-end proof for PixelLogic v1. The initial runtime spike is implemented on `feature/v1-manual-simulation-spike`; WebUI integration remains deferred.
+This plan defines the first end-to-end proof for PixelLogic v1. The initial runtime spike is implemented on `feature/v1-manual-simulation-spike`; the API-backed WebUI test-run checkpoint is implemented on `feature/v1-api-webui-test-run`.
 
 ## Goal
 
@@ -260,17 +260,28 @@ Current spike implementation:
 
 - Command root is `/pixellogic` only.
 - Available commands: `/pixellogic status`, `/pixellogic test start`, `/pixellogic test reset`, `/pixellogic trace last`.
-- Manual trigger is command-only for now; WebUI/API test-run integration is deferred.
+- Manual trigger is available through `/pixellogic` commands and the API-backed WebUI test-run button.
 - Demo graph is in-memory and built as `GraphDefinition`, then validated and compiled before execution.
 - Runtime follows `triggerType -> entry` and `nodeId + slotId -> outgoing edges`; it does not use Channel routing.
 - Timer is in-memory wall-clock scheduling with server-thread handoff before runtime continuation.
 - State store and trace buffer are in-memory and bounded for this spike.
 
+## API + WebUI Test Run Checkpoint
+
+`feature/v1-api-webui-test-run` connects the accepted runtime spike to the WebUI:
+
+- Local spike API bound to `127.0.0.1:18111`.
+- WebUI calls real status, reset, start, latest trace, and recent trace endpoints.
+- WebUI uses the fixed `WebUI 模拟玩家` identity for PLAYER state.
+- Vite proxies `/api` to the local API server during development.
+- The UI remains slot-based horizontal block flow and does not become a free wire editor.
+- This checkpoint still does not implement graph save/load or draft commit.
+
 ## Next After Spike
 
 After this spike is confirmed:
 
-1. Review the manual simulation spike in Minecraft.
-2. Decide the persisted Project / Graph JSON schema.
-3. Decide whether WebUI gets a mock-only or real API-backed test-run button next.
-4. Add persistent graph save/load only after the in-memory runtime shape is accepted.
+1. User review API-backed WebUI test-run behavior.
+2. Decide merge readiness for `feature/v1-api-webui-test-run`.
+3. Decide the persisted Project / Graph JSON schema.
+4. Add persistent graph save/load only after the API-backed runtime shape is accepted.

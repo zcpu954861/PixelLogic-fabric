@@ -8,12 +8,12 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Active Checkpoint Branch
 
-`feature/v1-slot-flow-drag-insert`
+`refactor/webui-structure-split`
 
 ## Next
 
-1. User review the slot flow drag/insert interaction checkpoint on `feature/v1-slot-flow-drag-insert`.
-2. Run audit/merge readiness before merging to `mc-1.21.11`.
+1. User review the WebUI structure split on `refactor/webui-structure-split`.
+2. Run audit/merge readiness before merging the drag/insert and structure split work to `mc-1.21.11`.
 3. Decide whether the next implementation target is graph editor polish, trace polish, or P2 state/timer capacity cleanup.
 4. Keep Region, old TZZ migration, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
 
@@ -30,6 +30,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - Block editor modal UX moves selected-block fields out of the right panel: clicking a block opens an animated editor with unsaved-close confirmation.
 - Block editor humanized form UX hides internal enum strings from normal UI, uses Chinese labels and compact controls, and keeps graph JSON/runtime semantics unchanged.
 - Slot flow drag/insert UX adds block-library creation, free drag, downstream chain drag, Condition branch drag, insert-into-connection, minimal disconnect/delete actions, position metadata persistence, and trace display polish.
+- WebUI structure split moves the large frontend entry and stylesheet into responsibility-based TypeScript and CSS modules without changing behavior.
 
 ## Follow-Ups
 

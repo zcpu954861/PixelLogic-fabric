@@ -37,7 +37,7 @@ POST /api/pixellogic/graphs/demo-start-flow/validate
 POST /api/pixellogic/graphs/demo-start-flow/commit
 ```
 
-The UI renders the graph as the confirmed Slot-Based horizontal block flow. Clicking a block opens a focused editor modal for selected-block fields such as display name, message text, state key/value, and timer seconds.
+The UI renders the graph as the confirmed Slot-Based horizontal block flow. Single click selects a block, and double-clicking opens a focused editor modal for selected-block fields such as display name, message text, state key/value, and timer seconds.
 
 Important user semantics:
 
@@ -78,6 +78,24 @@ The slot-based canvas now supports a minimal direct-manipulation graph editing l
 - Insert success shifts the target block and local downstream chain rightward to keep puzzle blocks from overlapping.
 - The right panel remains informational, but now also shows selected-block connections plus minimal `断开输入` and `删除积木` controls.
 - Trace text is humanized in the WebUI display layer only; runtime trace payloads remain unchanged.
+
+## Frontend Structure
+
+The WebUI remains Vanilla TypeScript. `main.ts` is a bootstrap entry that imports `styles/index.css` and starts `ui/app.ts`.
+
+Current responsibility boundaries:
+
+- `api/`: localhost PixelLogic API client and connection/content-type errors.
+- `model/`: graph/API types, seeded demo graph, pure graph layout, connection, and cloning helpers.
+- `state/`: mutable app state and canvas world dimensions.
+- `ui/app.ts`: orchestration, app shell assembly, event binding, autosave, undo/redo, and API actions.
+- `ui/canvas/`: puzzle block view, block constants, and drag/insert graph rules.
+- `ui/editor/`: editor modal shell and humanized form controls.
+- `ui/sidebar/`: selected-block summary and connection actions.
+- `ui/trace/`: trace rendering.
+- `ui/humanize/`: labels and trace message humanization.
+- `ui/validation/`: validation/draft status copy.
+- `styles/`: split CSS modules imported by `styles/index.css`; `styles.css` is a tiny compatibility import.
 
 ## Boundary
 

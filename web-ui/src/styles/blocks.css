@@ -1,0 +1,180 @@
+.logic-block {
+  --tab: 18px;
+  --block-outline: var(--outline);
+  --accent: var(--outline);
+  --fill: #ffffff;
+  position: absolute;
+  z-index: 5;
+  overflow: visible;
+  padding: 18px 38px 18px 38px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: grab;
+  filter: drop-shadow(7px 7px 0 rgba(23, 33, 29, 0.14));
+  pointer-events: none;
+  touch-action: none;
+  user-select: none;
+  transition:
+    color 180ms ease,
+    filter 180ms ease,
+    transform 180ms ease;
+}
+
+.logic-block.trigger {
+  --accent: var(--green-deep);
+  --block-outline: var(--green-deep);
+}
+
+.logic-block.condition {
+  --accent: var(--blue);
+  --block-outline: var(--blue);
+}
+
+.logic-block.action {
+  --accent: #f97316;
+  --block-outline: #f97316;
+}
+
+.logic-block.state {
+  --accent: #0891b2;
+  --block-outline: #0891b2;
+}
+
+.logic-block.timer {
+  --accent: var(--amber);
+  --block-outline: var(--amber);
+}
+
+.logic-block.debug {
+  --accent: #7c3aed;
+  --block-outline: #7c3aed;
+}
+
+.puzzle-shape {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.puzzle-shape .block-body {
+  fill: var(--fill);
+  stroke: var(--block-outline);
+  stroke-width: 4;
+  stroke-linejoin: miter;
+  vector-effect: non-scaling-stroke;
+  pointer-events: visiblePainted;
+}
+
+.puzzle-shape .branch-tab {
+  fill: none;
+  stroke: var(--block-outline);
+  stroke-width: 4;
+  stroke-linejoin: miter;
+  vector-effect: non-scaling-stroke;
+  pointer-events: visibleStroke;
+}
+
+.puzzle-shape .branch-tab-fill {
+  stroke: none;
+  pointer-events: visiblePainted;
+}
+
+.puzzle-shape .branch-tab-fill.pass {
+  fill: var(--green);
+}
+
+.puzzle-shape .branch-tab-fill.fail {
+  fill: var(--red);
+}
+
+.block-topline,
+.logic-block h3,
+.logic-block p {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.logic-block.selected {
+  filter:
+    drop-shadow(0 0 0 rgba(45, 111, 159, 0.16))
+    drop-shadow(7px 7px 0 rgba(45, 111, 159, 0.22));
+}
+
+.logic-block.is-related,
+.logic-block:hover {
+  filter: drop-shadow(9px 9px 0 rgba(35, 132, 95, 0.16));
+}
+
+.logic-block.is-chain-dragging {
+  z-index: 7400 !important;
+  cursor: grabbing;
+  filter:
+    drop-shadow(0 0 0 rgba(22, 163, 74, 0.15))
+    drop-shadow(13px 15px 0 rgba(23, 33, 29, 0.2));
+  transition: none;
+}
+
+.logic-block.is-drag-root {
+  z-index: 7800 !important;
+}
+
+.logic-block.is-insert-split-left {
+  transform: translateX(-32px);
+  filter:
+    drop-shadow(0 0 16px rgba(22, 163, 74, 0.14))
+    drop-shadow(7px 7px 0 rgba(23, 33, 29, 0.14));
+}
+
+.logic-block.is-insert-split-right {
+  transform: translateX(32px);
+  filter:
+    drop-shadow(0 0 16px rgba(22, 163, 74, 0.14))
+    drop-shadow(7px 7px 0 rgba(23, 33, 29, 0.14));
+}
+
+.logic-block.newly-added {
+  animation: new-block-pop 780ms ease-out both;
+}
+
+.block-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.logic-block h3 {
+  margin: 13px 0 8px;
+  color: var(--ink);
+  font-size: 1.32rem;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.logic-block p {
+  max-width: 22ch;
+  margin: 0;
+  color: #40534a;
+  font-size: 1rem;
+  line-height: 1.42;
+}
+
+.logic-block.condition {
+  padding-top: var(--condition-content-top, 145px);
+  padding-right: 54px;
+}
+
+.logic-block.condition h3 {
+  margin-top: 13px;
+  font-size: 1.55rem;
+}

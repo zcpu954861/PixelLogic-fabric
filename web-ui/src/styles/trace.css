@@ -1,0 +1,64 @@
+.bottom-dock {
+  grid-area: dock;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.bottom-dock section {
+  min-width: 0;
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px 12px;
+}
+
+.issue-list,
+.trace-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.issue-list li,
+.trace-list li {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #33443c;
+  font-size: 0.92rem;
+  line-height: 1.25;
+}
+
+.issue-list span {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.issue-list .warn {
+  background: var(--amber);
+}
+
+.issue-list .ok {
+  background: var(--green);
+}
+
+.trace-list {
+  font-family: "Cascadia Mono", "Microsoft YaHei UI", Consolas, monospace;
+}
+
+.trace-list .trace-empty {
+  color: var(--muted);
+  font-family:
+    "Source Han Sans SC",
+    "Microsoft YaHei UI",
+    "Aptos",
+    "Segoe UI",
+    sans-serif;
+}

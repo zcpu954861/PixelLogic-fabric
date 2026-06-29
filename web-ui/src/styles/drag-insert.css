@@ -1,0 +1,173 @@
+.slot-join {
+  position: absolute;
+  z-index: 3;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: transparent;
+  box-shadow: none;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.slot-join::before,
+.slot-join::after {
+  display: none;
+}
+
+.slot-join::before {
+  left: -4px;
+  border-right: 0;
+  clip-path: polygon(0 0, 100% 0, 60% 32%, 100% 50%, 60% 68%, 100% 100%, 0 100%);
+}
+
+.slot-join::after {
+  right: -4px;
+  border-left: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 40% 68%, 0 50%, 40% 32%);
+}
+
+.slot-join.pass {
+  color: transparent;
+  background: transparent;
+  border-color: transparent;
+}
+
+.slot-join.fail {
+  color: transparent;
+  background: transparent;
+  border-color: transparent;
+}
+
+.slot-join:hover,
+.slot-join.is-related {
+  background: transparent;
+  border-color: transparent;
+  color: transparent;
+  box-shadow: none;
+}
+
+.slot-join.fail:hover,
+.slot-join.fail.is-related {
+  background: transparent;
+  border-color: transparent;
+  color: transparent;
+}
+
+.slot-join.insert-target,
+.slot-join.insert-invalid {
+  z-index: 7600;
+  width: 86px !important;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  transform: translate(-40px, -23px);
+  border: 0;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.82) 0 24%, rgba(22, 163, 74, 0.24) 25% 52%, rgba(22, 163, 74, 0.08) 53% 72%, transparent 73%);
+  color: transparent;
+  box-shadow:
+    0 0 0 9px rgba(22, 163, 74, 0.09),
+    0 0 34px rgba(22, 163, 74, 0.32),
+    0 0 72px rgba(22, 163, 74, 0.24);
+  animation: slot-pulse 760ms ease-in-out infinite alternate;
+}
+
+.slot-join.insert-invalid {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.82) 0 24%, rgba(220, 38, 38, 0.2) 25% 52%, rgba(220, 38, 38, 0.08) 53% 72%, transparent 73%);
+  color: transparent;
+  box-shadow:
+    0 0 0 8px rgba(220, 38, 38, 0.08),
+    0 0 36px rgba(220, 38, 38, 0.2);
+  animation: none;
+}
+
+.slot-join.insert-target::before {
+  display: block;
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(22, 163, 74, 0.18);
+  clip-path: none;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 8px rgba(22, 163, 74, 0.08),
+    0 0 24px rgba(22, 163, 74, 0.44);
+}
+
+.slot-join.insert-target::after,
+.slot-join.insert-invalid::after {
+  display: none;
+}
+
+
+.drag-hint {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 8200;
+  max-width: min(420px, calc(100% - 32px));
+  min-height: 38px;
+  display: none;
+  align-items: center;
+  border: 1px solid #8fa89a;
+  border-radius: 8px;
+  background: rgba(251, 252, 248, 0.96);
+  color: #40534a;
+  padding: 0 12px;
+  font-weight: 900;
+  box-shadow: 0 14px 34px rgba(23, 33, 29, 0.16);
+}
+
+.drag-hint.active,
+.drag-hint.valid,
+.drag-hint.invalid {
+  display: flex;
+}
+
+.drag-hint.valid {
+  border-color: rgba(22, 163, 74, 0.55);
+  background: #e0f4e6;
+  color: #166534;
+}
+
+.drag-hint.invalid {
+  border-color: rgba(220, 38, 38, 0.48);
+  background: #fff1f1;
+  color: #991b1b;
+}
+
+@keyframes slot-pulse {
+  from {
+    box-shadow:
+      0 0 0 4px rgba(22, 163, 74, 0.14),
+      0 12px 28px rgba(23, 33, 29, 0.16);
+  }
+  to {
+    box-shadow:
+      0 0 0 9px rgba(22, 163, 74, 0.22),
+      0 16px 34px rgba(23, 33, 29, 0.2);
+  }
+}
+
+@keyframes new-block-pop {
+  from {
+    opacity: 0.5;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

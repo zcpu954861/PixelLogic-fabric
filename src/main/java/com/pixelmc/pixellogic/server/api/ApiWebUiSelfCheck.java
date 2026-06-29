@@ -49,6 +49,10 @@ public final class ApiWebUiSelfCheck {
             String missing = send(client, "GET", base + "/api/pixellogic/missing");
             require(missing.contains("\"ok\":false") && missing.contains("\"error\"") && missing.contains("NOT_FOUND"),
                     "missing endpoint should return JSON error shape");
+
+            String apiRoot = send(client, "GET", base + "/api");
+            require(apiRoot.contains("\"ok\":false") && apiRoot.contains("\"error\"") && apiRoot.contains("NOT_FOUND"),
+                    "api root should return JSON error shape");
         }
     }
 

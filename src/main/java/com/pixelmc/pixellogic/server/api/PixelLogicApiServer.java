@@ -48,7 +48,7 @@ public final class PixelLogicApiServer implements AutoCloseable {
     ) throws IOException {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress(InetAddress.getByName(host), port), 0);
         PixelLogicApiServer apiServer = new PixelLogicApiServer(service, serverThreadExecutor, httpServer);
-        httpServer.createContext("/api/pixellogic", apiServer::handle);
+        httpServer.createContext("/api", apiServer::handle);
         httpServer.setExecutor(null);
         httpServer.start();
         return apiServer;

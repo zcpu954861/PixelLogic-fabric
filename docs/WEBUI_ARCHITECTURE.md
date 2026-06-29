@@ -7,7 +7,7 @@ The WebUI is an independent Vite + TypeScript project.
 - Vanilla TypeScript.
 - No React, Vue, or Svelte until the user confirms a framework.
 - No graph editor implementation yet.
-- App shell communicates the product direction: graph/node/edge first, channel hidden by default, card-based human interaction.
+- App shell communicates the product direction: graph/node/edge first, direct edges by default, card-based human interaction.
 
 ## Boundary
 

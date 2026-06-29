@@ -46,7 +46,7 @@ if (app) {
           .join('')}
       </section>
       <footer class="notes">
-        <span>Channel hidden by default</span>
+        <span>Direct edges by default</span>
         <span>Human-centered card interaction</span>
       </footer>
     </section>

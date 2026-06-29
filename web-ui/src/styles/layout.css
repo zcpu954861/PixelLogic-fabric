@@ -1,0 +1,352 @@
+.workspace {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 252px minmax(720px, 1fr) 320px;
+  grid-template-rows: 66px minmax(0, 1fr) 142px;
+  grid-template-areas:
+    "top top top"
+    "left stage right"
+    "left dock right";
+  gap: 10px;
+  padding: 10px;
+  background:
+    linear-gradient(90deg, rgba(23, 33, 29, 0.04) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(23, 33, 29, 0.04) 1px, transparent 1px),
+    #e7efe8;
+  background-size: 28px 28px;
+}
+
+.topbar,
+.left-rail,
+.right-panel,
+.bottom-dock,
+.graph-stage {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(251, 252, 248, 0.96);
+  box-shadow: var(--shadow);
+}
+
+.topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.brand,
+.top-actions,
+.panel-title,
+.canvas-tools,
+.bottom-dock {
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  min-width: 0;
+  gap: 12px;
+}
+
+.brand strong {
+  display: block;
+  color: var(--ink);
+  font-size: 1.1rem;
+  line-height: 1.1;
+}
+
+.brand small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.mark {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, transparent 46%, var(--ink) 46% 54%, transparent 54%),
+    linear-gradient(0deg, transparent 46%, var(--ink) 46% 54%, transparent 54%),
+    #98d9b2;
+  box-shadow: 4px 4px 0 #d8b35c;
+}
+
+.top-actions {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.api-pill,
+.actor-chip {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #f6faf3;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
+.api-pill.online {
+  border-color: rgba(22, 163, 74, 0.55);
+  background: #e0f4e6;
+  color: #166534;
+}
+
+.api-pill.offline {
+  border-color: rgba(220, 38, 38, 0.48);
+  background: #fff1f1;
+  color: #991b1b;
+}
+
+.api-pill.checking {
+  border-color: rgba(245, 158, 11, 0.52);
+  background: #fff8e9;
+  color: #92400e;
+}
+
+.ghost-button,
+.run-button,
+.icon-button,
+.tiny-button,
+.graph-item,
+.library-grid button,
+.quick-start button,
+.canvas-tools button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.ghost-button,
+.run-button,
+.canvas-tools button {
+  min-height: 40px;
+  padding: 0 14px;
+  font-weight: 800;
+}
+
+.run-button {
+  border-color: #1f6f51;
+  background: var(--green);
+  color: #ffffff;
+}
+
+.run-button.danger {
+  border-color: #991b1b;
+  background: var(--red);
+}
+
+.icon-button {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.icon-button svg {
+  fill: currentColor;
+}
+
+button:hover:not(:disabled) {
+  border-color: #7d998a;
+  background: #eef5ee;
+}
+
+.run-button:hover:not(:disabled) {
+  background: #1f7655;
+}
+
+.left-rail {
+  grid-area: left;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: auto;
+  padding: 14px;
+}
+
+.panel-title {
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.panel-title b {
+  color: var(--ink);
+}
+
+.tiny-button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-weight: 800;
+}
+
+.graph-item {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 0 12px;
+  text-align: left;
+  font-size: 1rem;
+}
+
+.graph-item small {
+  color: var(--muted);
+}
+
+.graph-item.active {
+  border-color: #1f6f51;
+  background: #e0f4e6;
+  box-shadow: inset 5px 0 0 var(--green);
+  font-weight: 900;
+}
+
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.library-grid button {
+  min-height: 50px;
+  font-weight: 900;
+  font-size: 1rem;
+}
+
+.quick-start {
+  margin-top: auto;
+  padding: 12px;
+  border: 1px dashed #91a99a;
+  border-radius: 8px;
+  background: #f7fbf5;
+}
+
+.quick-start button {
+  width: 100%;
+  min-height: 36px;
+  margin-top: 7px;
+  padding: 0 10px;
+  text-align: left;
+  font-weight: 700;
+}
+
+.graph-stage {
+  grid-area: stage;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 14px;
+}
+
+.stage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.eyebrow {
+  margin: 0 0 5px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+h1 {
+  margin: 0;
+  color: #102019;
+  font-size: 2.35rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.canvas-tools {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.canvas-tools span {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f6faf3;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.canvas-tools b {
+  color: var(--ink);
+}
+
+.canvas-viewport {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: 2px solid #9eb4a4;
+  border-radius: 8px;
+  cursor: grab;
+  background:
+    radial-gradient(circle at 14px 14px, rgba(23, 33, 29, 0.13) 1.4px, transparent 1.5px),
+    linear-gradient(90deg, rgba(35, 132, 95, 0.07) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(35, 132, 95, 0.07) 1px, transparent 1px),
+    #fbfcf8;
+  background-size:
+    28px 28px,
+    56px 56px,
+    56px 56px,
+    auto;
+}
+
+.canvas-viewport.is-dragging {
+  cursor: grabbing;
+}
+
+.canvas-viewport.is-block-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.flow-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  transition: transform 120ms ease;
+}
+
+.canvas-viewport.is-dragging .flow-world {
+  transition: none;
+}

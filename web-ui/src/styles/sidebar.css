@@ -1,0 +1,18 @@
+.right-panel {
+  grid-area: right;
+  min-width: 0;
+  overflow: auto;
+  padding: 14px;
+}
+
+.form-card,
+.info-card,
+.preview-card,
+.validation-card,
+.draft-actions {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}

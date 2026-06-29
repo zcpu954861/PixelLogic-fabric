@@ -1,0 +1,16 @@
+export const dragThreshold = 6;
+export const doubleClickMs = 340;
+export const autoSaveDelayMs = 650;
+export const historyLimit = 80;
+export const normalBlockWidth = 260;
+export const normalBlockHeight = 150;
+export const conditionBlockWidth = 384;
+export const conditionBranchGap = 104;
+export const puzzleMouthHalfHeight = 18;
+export const insertSnapX = 188;
+export const insertSnapY = 118;
+export const reconnectSnapX = 24;
+export const reconnectSnapY = 18;
+export const connectedOverlap = 14;
+export const visualConnectXTolerance = 8;
+export const visualConnectYTolerance = 6;

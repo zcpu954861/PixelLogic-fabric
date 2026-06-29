@@ -1,0 +1,89 @@
+@media (max-width: 1380px) {
+  .workspace {
+    grid-template-columns: 220px minmax(620px, 1fr) 280px;
+    grid-template-rows: 62px minmax(0, 1fr) 128px;
+  }
+
+  .ghost-button,
+  .run-button,
+  .canvas-tools button {
+    min-height: 36px;
+    padding: 0 10px;
+  }
+
+  .stage-head {
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-size: 2.05rem;
+  }
+
+  .left-rail,
+  .right-panel,
+  .graph-stage {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 980px) {
+  .workspace {
+    height: auto;
+    min-height: 100vh;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto minmax(620px, 70vh) auto auto;
+    grid-template-areas:
+      "top"
+      "left"
+      "stage"
+      "right"
+      "dock";
+  }
+
+  .topbar,
+  .stage-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .top-actions,
+  .canvas-tools {
+    justify-content: flex-start;
+  }
+
+  .left-rail,
+  .bottom-dock {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-start {
+    margin-top: 0;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  h1 {
+    font-size: 1.72rem;
+  }
+
+  .left-rail,
+  .bottom-dock {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

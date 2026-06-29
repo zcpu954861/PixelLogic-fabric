@@ -8,11 +8,11 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Active Checkpoint Branch
 
-`feature/v1-graph-draft-simple-ux`
+`feature/v1-block-editor-modal`
 
 ## Next
 
-1. User review the simplified Graph Draft UX checkpoint on `feature/v1-graph-draft-simple-ux`.
+1. User review the modal block editor UX checkpoint on `feature/v1-block-editor-modal`.
 2. Run audit/merge readiness before merging to `mc-1.21.11`.
 3. Decide whether the next implementation target is API/WebUI polish or P2 state/timer capacity cleanup.
 4. Keep Region, old TZZ migration, and full WebUI graph editing out of v1 until the direct graph runtime baseline is stable.
@@ -27,6 +27,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - API-backed WebUI test-run integration connects localhost JSON endpoints to the slot-based WebUI trace panel.
 - Graph draft/validate/commit checkpoint stores `demo-start-flow` as committed JSON, saves drafts separately, validates before commit, and keeps test-run on committed graph.
 - Graph Draft UX simplification hides draft/validate/commit and reset internals from normal users: `保存` performs save/validate/commit, and `测试运行` automatically resets before starting.
+- Block editor modal UX moves selected-block fields out of the right panel: clicking a block opens an animated editor with unsaved-close confirmation.
 
 ## Follow-Ups
 

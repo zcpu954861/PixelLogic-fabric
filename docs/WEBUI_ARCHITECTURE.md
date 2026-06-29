@@ -37,7 +37,7 @@ POST /api/pixellogic/graphs/demo-start-flow/validate
 POST /api/pixellogic/graphs/demo-start-flow/commit
 ```
 
-The UI renders the graph as the confirmed Slot-Based horizontal block flow. The right panel edits only selected-block fields such as display name, message text, state key/value, and timer seconds.
+The UI renders the graph as the confirmed Slot-Based horizontal block flow. Clicking a block opens a focused editor modal for selected-block fields such as display name, message text, state key/value, and timer seconds.
 
 Important user semantics:
 
@@ -47,6 +47,9 @@ Important user semantics:
 - Invalid edits do not replace the committed runtime graph.
 - `测试运行` automatically saves pending valid edits, resets the demo test state, starts the run, and refreshes the trace.
 - Reset remains an internal API step, not a primary user button.
+- The right panel is an information surface, not the main field editor.
+- Closing the editor modal with unsaved changes requires confirmation.
+- Modal open/close uses short CSS animation and respects reduced motion.
 
 ## Boundary
 

@@ -133,6 +133,8 @@ The API layer still exposes draft, validate, and commit as separate operations, 
 - `保存`: save the current edits, validate them, and promote them only when validation passes.
 - `测试运行`: if there are unsaved edits, save/validate/promote them first; then reset the demo test state, start the test run, and refresh the trace.
 
+Block fields are edited in a focused modal opened from the Slot-Based canvas. The right panel only shows selected-block information and status.
+
 Validation remains fail-closed. If validation fails, the committed graph and runtime graph are not replaced, and the UI shows a Chinese validation error.
 
 The internal draft file can still exist after a failed save so the user can repair the fields and click `保存` again.

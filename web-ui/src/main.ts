@@ -109,6 +109,20 @@ type UiState = {
   hasDraft: boolean;
   dirty: boolean;
   selectedNodeId: string;
+  editorOpen: boolean;
+  editorClosing: boolean;
+  editorChanged: boolean;
+  confirmDiscard: boolean;
+  editorSnapshot: EditorSnapshot | null;
+};
+
+type EditorSnapshot = {
+  graph: GraphDocument;
+  dirty: boolean;
+  validation: ValidationReport | null;
+  hasDraft: boolean;
+  lastAction: string;
+  error: string;
 };
 
 type SlotBlock = {
@@ -229,6 +243,11 @@ const state: UiState = {
   hasDraft: false,
   dirty: false,
   selectedNodeId: 'condition-started',
+  editorOpen: false,
+  editorClosing: false,
+  editorChanged: false,
+  confirmDiscard: false,
+  editorSnapshot: null,
 };
 
 let scale = 0.86;
@@ -475,15 +494,12 @@ function renderApp(): void {
         </section>
       </main>
 
-      <aside class="right-panel" aria-label="选中积木属性">
+      <aside class="right-panel" aria-label="选中积木信息">
         <div class="panel-title">
-          <span>选中积木属性</span>
+          <span>选中积木</span>
           <b>${selectedNode ? escapeHtml(nodeTypeLabel(selectedNode.type)) : '未选中'}</b>
         </div>
-        ${selectedNode ? renderNodeEditor(selectedNode) : '<section class="form-card">请选择一个积木。</section>'}
-        <section class="draft-actions" aria-label="保存操作">
-          <button type="button" class="run-button" data-graph-action="save" ${apiBusyAttr()}>保存</button>
-        </section>
+        ${selectedNode ? renderNodeInfo(selectedNode) : '<section class="info-card">点击画布中的积木进行编辑。</section>'}
         <section class="preview-card">
           <b>API 状态</b>
           <p>${escapeHtml(state.statusMessage)}</p>
@@ -511,11 +527,73 @@ function renderApp(): void {
           </ol>
         </section>
       </footer>
+      ${state.editorOpen && selectedNode ? renderEditorModal(selectedNode) : ''}
     </section>
   `;
 
   bindInteractions();
   setTransform();
+  focusEditor();
+}
+
+function renderNodeInfo(nodeItem: GraphNode): string {
+  return `
+    <section class="info-card">
+      <b>${escapeHtml(nodeItem.displayName || nodeItem.id)}</b>
+      <p>${escapeHtml(nodeSummary(nodeItem))}</p>
+      <button type="button" class="run-button" data-action="edit-selected" ${apiBusyAttr()}>编辑积木</button>
+    </section>
+    <section class="info-card">
+      <b>编辑方式</b>
+      <p>点击画布中的任意积木，会打开聚焦编辑窗口。保存前退出会先确认。</p>
+    </section>
+  `;
+}
+
+function renderEditorModal(nodeItem: GraphNode): string {
+  const title = `${nodeTypeLabel(nodeItem.type)}：${nodeItem.displayName || nodeItem.id}`;
+  const modalIssue = state.error || validationSummaryText();
+
+  return `
+    <div class="editor-overlay${state.editorClosing ? ' is-closing' : ''}" data-modal-overlay>
+      <section class="editor-dialog" role="dialog" aria-modal="true" aria-labelledby="block-editor-title">
+        <header class="editor-head">
+          <div>
+            <p class="eyebrow">积木编辑</p>
+            <h2 id="block-editor-title" tabindex="-1">${escapeHtml(title)}</h2>
+          </div>
+          <button type="button" class="modal-close" data-modal-action="close" aria-label="关闭编辑窗口">×</button>
+        </header>
+        <div class="editor-body">
+          <section class="editor-summary">
+            <b>当前摘要</b>
+            <p data-modal-summary>${escapeHtml(nodeSummary(nodeItem))}</p>
+          </section>
+          ${renderNodeEditor(nodeItem)}
+          ${state.error || state.validation ? `
+            <section class="editor-issues" role="${state.error ? 'alert' : 'status'}">
+              <b>${state.error ? '保存提示' : '检查结果'}</b>
+              <p data-modal-error>${escapeHtml(modalIssue)}</p>
+            </section>
+          ` : ''}
+        </div>
+        <footer class="editor-actions">
+          <button type="button" class="ghost-button" data-modal-action="cancel">取消</button>
+          <button type="button" class="run-button" data-graph-action="save" ${apiBusyAttr()}>保存</button>
+        </footer>
+      </section>
+      ${state.confirmDiscard ? `
+        <section class="discard-confirm" role="alertdialog" aria-modal="true" aria-label="未保存修改确认">
+          <b>还有未保存的修改，确定要放弃吗？</b>
+          <p>放弃后，本次窗口里的修改不会保留。</p>
+          <div>
+            <button type="button" class="ghost-button" data-confirm-action="keep">继续编辑</button>
+            <button type="button" class="run-button danger" data-confirm-action="discard">放弃修改</button>
+          </div>
+        </section>
+      ` : ''}
+    </div>
+  `;
 }
 
 function renderNodeEditor(nodeItem: GraphNode): string {
@@ -663,8 +741,7 @@ function bindInteractions(): void {
   viewport.addEventListener('pointerdown', (event) => {
     const blockEl = (event.target as HTMLElement).closest<HTMLElement>('.logic-block');
     if (blockEl?.dataset.block) {
-      state.selectedNodeId = blockEl.dataset.block;
-      renderApp();
+      openEditor(blockEl.dataset.block);
       return;
     }
 
@@ -722,8 +799,33 @@ function bindInteractions(): void {
   document.querySelector('[data-action="fit"]')?.addEventListener('click', fitView);
   document.querySelector('[data-action="center"]')?.addEventListener('click', centerView);
   document.querySelector('[data-action="focus"]')?.addEventListener('click', focusSelectedBlock);
+  document.querySelector('[data-action="edit-selected"]')?.addEventListener('click', () => openEditor(state.selectedNodeId));
   document.querySelector('[data-api-action="start"]')?.addEventListener('click', () => void startTest());
   document.querySelector('[data-graph-action="save"]')?.addEventListener('click', () => void saveGraph());
+  document.querySelector('[data-modal-action="close"]')?.addEventListener('click', requestCloseEditor);
+  document.querySelector('[data-modal-action="cancel"]')?.addEventListener('click', requestCloseEditor);
+  document.querySelector('[data-confirm-action="keep"]')?.addEventListener('click', keepEditing);
+  document.querySelector('[data-confirm-action="discard"]')?.addEventListener('click', discardEditorChanges);
+  document.querySelector('.editor-overlay')?.addEventListener('pointerdown', (event) => {
+    if ((event.target as HTMLElement).hasAttribute('data-modal-overlay')) {
+      requestCloseEditor();
+    }
+  });
+
+  document.onkeydown = (event) => {
+    if (event.key === 'Escape' && state.editorOpen) {
+      event.preventDefault();
+      if (state.confirmDiscard) {
+        keepEditing();
+      } else {
+        requestCloseEditor();
+      }
+    }
+    if (event.key === 'Tab' && state.editorOpen) {
+      trapEditorFocus(event);
+    }
+  };
+  window.onbeforeunload = state.editorOpen && state.editorChanged ? () => '还有未保存的修改，确定要放弃吗？' : null;
 
   document.querySelectorAll<HTMLInputElement>('[data-node-field], [data-config-key]').forEach((inputEl) => {
     inputEl.addEventListener('input', () => updateSelectedNode(inputEl));
@@ -738,6 +840,97 @@ function bindInteractions(): void {
   });
 
   markSelectedFocus();
+}
+
+function openEditor(nodeId: string): void {
+  state.selectedNodeId = nodeId;
+  state.editorOpen = true;
+  state.editorClosing = false;
+  state.editorChanged = false;
+  state.confirmDiscard = false;
+  state.editorSnapshot = {
+    graph: cloneGraph(currentGraph()),
+    dirty: state.dirty,
+    validation: state.validation,
+    hasDraft: state.hasDraft,
+    lastAction: state.lastAction,
+    error: state.error,
+  };
+  renderApp();
+}
+
+function requestCloseEditor(): void {
+  if (state.editorChanged) {
+    state.confirmDiscard = true;
+    renderApp();
+    return;
+  }
+  closeEditor(false);
+}
+
+function keepEditing(): void {
+  state.confirmDiscard = false;
+  renderApp();
+}
+
+function discardEditorChanges(): void {
+  const snapshot = state.editorSnapshot;
+  if (snapshot) {
+    state.graph = cloneGraph(snapshot.graph);
+    state.dirty = snapshot.dirty;
+    state.validation = snapshot.validation;
+    state.hasDraft = snapshot.hasDraft;
+    state.lastAction = snapshot.lastAction;
+    state.error = snapshot.error;
+  }
+  state.editorChanged = false;
+  closeEditor(false);
+}
+
+function closeEditor(saved: boolean): void {
+  state.confirmDiscard = false;
+  state.editorClosing = true;
+  renderApp();
+  window.setTimeout(() => {
+    state.editorOpen = false;
+    state.editorClosing = false;
+    state.editorSnapshot = null;
+    state.editorChanged = false;
+    if (saved) {
+      state.error = '';
+    }
+    renderApp();
+  }, 160);
+}
+
+function focusEditor(): void {
+  if (!state.editorOpen) {
+    return;
+  }
+  window.setTimeout(() => {
+    const target = document.querySelector<HTMLElement>(
+      state.confirmDiscard ? '.discard-confirm [data-confirm-action="keep"]' : '.editor-dialog input, #block-editor-title',
+    );
+    target?.focus();
+  }, 0);
+}
+
+function trapEditorFocus(event: KeyboardEvent): void {
+  const focusables = Array.from(
+    document.querySelectorAll<HTMLElement>('.editor-overlay button:not([disabled]), .editor-overlay input:not([disabled]), #block-editor-title'),
+  ).filter((item) => item.offsetParent !== null);
+  if (focusables.length === 0) {
+    return;
+  }
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function updateSelectedNode(inputEl: HTMLInputElement): void {
@@ -760,6 +953,7 @@ function updateSelectedNode(inputEl: HTMLInputElement): void {
   }
   state.graph = nextGraph;
   state.dirty = true;
+  state.editorChanged = true;
   state.validation = null;
   state.lastAction = '内容已修改，尚未保存。';
   refreshDraftIndicators();
@@ -771,6 +965,8 @@ function refreshDraftIndicators(): void {
   const lastAction = document.querySelector<HTMLElement>('[data-last-action]');
   const validationTitleEl = document.querySelector<HTMLElement>('[data-validation-title]');
   const issueList = document.querySelector<HTMLElement>('[data-issue-list]');
+  const modalSummary = document.querySelector<HTMLElement>('[data-modal-summary]');
+  const modalError = document.querySelector<HTMLElement>('[data-modal-error]');
 
   if (draftStatus) {
     draftStatus.textContent = state.hasDraft ? '有未保存版本' : '已保存';
@@ -790,6 +986,13 @@ function refreshDraftIndicators(): void {
       ${uncommittedNotice() ? `<li><span class="warn"></span>${escapeHtml(uncommittedNotice())}</li>` : ''}
       ${validationList()}
     `;
+  }
+  if (modalSummary) {
+    const selected = selectedNodeFrom(currentGraph());
+    modalSummary.textContent = selected ? nodeSummary(selected) : '';
+  }
+  if (modalError) {
+    modalError.textContent = state.error || validationSummaryText();
   }
 }
 
@@ -819,7 +1022,10 @@ async function loadGraph(): Promise<void> {
 
 async function saveGraph(): Promise<void> {
   await runAction('保存', async () => {
-    await saveAndCommit();
+    const saved = await saveAndCommit();
+    if (saved && state.editorOpen) {
+      closeEditor(true);
+    }
   });
 }
 
@@ -850,6 +1056,7 @@ async function saveAndCommit(): Promise<boolean> {
   state.validation = data.validation ?? null;
   state.hasDraft = false;
   state.dirty = false;
+  state.editorChanged = false;
   state.lastAction = '已保存并生效。';
   return true;
 }
@@ -1075,6 +1282,16 @@ function validationErrorText(): string {
     return '保存失败：请修复验证问题。';
   }
   return `保存失败：${issues.map((issue) => issue.message).join('；')}`;
+}
+
+function validationSummaryText(): string {
+  if (!state.validation) {
+    return state.dirty ? '修改后点击保存完成检查。' : '尚未产生新的检查结果。';
+  }
+  if (state.validation.valid) {
+    return '保存检查通过。';
+  }
+  return validationErrorText();
 }
 
 function validationTitle(): string {

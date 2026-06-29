@@ -15,11 +15,24 @@ Server owners build minigame logic with nodes, cards, and direct edges instead o
 ## Product Rules
 
 - Direct Edge / Graph is the primary model.
-- Channels are hidden from normal users and reserved for internal event bus, adapters, or advanced API use.
+- Channel is not a normal-user concept and is not a core execution model.
 - Conditions are standalone cards/nodes.
 - Actions are typed forms, not a scripting language.
 - Scratch is only an interaction reference.
 - Old TZZ phone, AR, map, note, gallery, task, password, blocking, items, and blocks are not PixelLogic core.
+
+## Current Spike Commands
+
+The v1 manual simulation spike is exposed under `/pixellogic` only:
+
+```text
+/pixellogic status
+/pixellogic test start
+/pixellogic test reset
+/pixellogic trace last
+```
+
+`/pixellogic test start` runs the in-memory demo graph for the executing player. Console execution returns a Chinese error because the spike uses PLAYER state.
 
 ## v1 Specs
 

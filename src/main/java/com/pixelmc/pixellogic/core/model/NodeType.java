@@ -1,0 +1,12 @@
+package com.pixelmc.pixellogic.core.model;
+
+public enum NodeType {
+    MANUAL_TRIGGER,
+    COMMAND_TRIGGER,
+    STATE_COMPARE_CONDITION,
+    MESSAGE_ACTION,
+    STATE_SET_ACTION,
+    STATE_ADD_ACTION,
+    TIMER_START_ACTION,
+    DEBUG_LOG_ACTION
+}

@@ -1,0 +1,237 @@
+package com.pixelmc.pixellogic.core.graph;
+
+import com.pixelmc.pixellogic.core.model.EdgeDefinition;
+import com.pixelmc.pixellogic.core.model.GraphDefinition;
+import com.pixelmc.pixellogic.core.model.NodeDefinition;
+import com.pixelmc.pixellogic.core.model.NodeType;
+import com.pixelmc.pixellogic.core.model.SlotDefinition;
+import com.pixelmc.pixellogic.core.model.SlotDirection;
+import com.pixelmc.pixellogic.core.model.StateScope;
+import com.pixelmc.pixellogic.core.model.StateValueType;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+public final class GraphValidator {
+    public List<ValidationIssue> validate(GraphDefinition graph) {
+        List<ValidationIssue> issues = new ArrayList<>();
+        Map<String, NodeDefinition> nodes = new HashMap<>();
+
+        for (NodeDefinition node : graph.nodes()) {
+            if (nodes.put(node.id(), node) != null) {
+                error(issues, "duplicate_node", "节点 ID 重复：" + node.id());
+            }
+        }
+
+        if (graph.triggerEntries().isEmpty()) {
+            error(issues, "missing_trigger", "缺少手动触发入口。");
+        }
+
+        for (Map.Entry<String, String> entry : graph.triggerEntries().entrySet()) {
+            NodeDefinition trigger = nodes.get(entry.getValue());
+            if (trigger == null) {
+                error(issues, "missing_trigger_node", "触发入口不存在：" + entry.getValue());
+            } else if (trigger.type() != NodeType.MANUAL_TRIGGER && trigger.type() != NodeType.COMMAND_TRIGGER) {
+                error(issues, "invalid_trigger_node", "触发入口必须是 Trigger 节点：" + trigger.id());
+            }
+        }
+
+        for (EdgeDefinition edge : graph.edges()) {
+            NodeDefinition source = nodes.get(edge.sourceNodeId());
+            NodeDefinition target = nodes.get(edge.targetNodeId());
+            if (source == null) {
+                error(issues, "edge_source_missing", "连接的起点节点不存在：" + edge.id());
+                continue;
+            }
+            if (target == null) {
+                error(issues, "edge_target_missing", "连接的终点节点不存在：" + edge.id());
+                continue;
+            }
+
+            SlotDefinition sourceSlot = source.slot(edge.sourceSlotId()).orElse(null);
+            SlotDefinition targetSlot = target.slot(edge.targetSlotId()).orElse(null);
+            if (sourceSlot == null) {
+                error(issues, "edge_source_slot_missing", "连接的起点槽位不存在：" + edge.id());
+                continue;
+            }
+            if (targetSlot == null) {
+                error(issues, "edge_target_slot_missing", "连接的终点槽位不存在：" + edge.id());
+                continue;
+            }
+            if (sourceSlot.direction() != SlotDirection.OUTPUT || targetSlot.direction() != SlotDirection.INPUT) {
+                error(issues, "edge_direction_mismatch", "连接方向错误：" + edge.id());
+            }
+            if (sourceSlot.edgeType() != edge.edgeType() || targetSlot.edgeType() != edge.edgeType()) {
+                error(issues, "edge_type_mismatch", "连接类型不匹配：" + edge.id());
+            }
+        }
+        validateSingleOutgoingPerSlot(graph, issues);
+
+        validateNodes(graph, nodes, issues);
+        detectCycle(graph, issues);
+        return issues;
+    }
+
+    public boolean hasErrors(List<ValidationIssue> issues) {
+        return issues.stream().anyMatch(issue -> issue.severity() == ValidationIssue.Severity.ERROR);
+    }
+
+    private void validateNodes(GraphDefinition graph, Map<String, NodeDefinition> nodes, List<ValidationIssue> issues) {
+        for (NodeDefinition node : graph.nodes()) {
+            switch (node.type()) {
+                case STATE_COMPARE_CONDITION -> validateCondition(graph, node, issues);
+                case STATE_SET_ACTION -> validateStateAction(node, issues, true);
+                case STATE_ADD_ACTION -> validateStateAction(node, issues, false);
+                case TIMER_START_ACTION -> validateTimer(graph, node, issues);
+                case MANUAL_TRIGGER, COMMAND_TRIGGER, MESSAGE_ACTION, DEBUG_LOG_ACTION -> {
+                }
+            }
+        }
+    }
+
+    private void validateCondition(GraphDefinition graph, NodeDefinition node, List<ValidationIssue> issues) {
+        validateStateConfig(node, issues);
+        if (!"BOOLEAN".equals(node.config().get("valueType"))) {
+            error(issues, "condition_state_type_invalid", "State Compare Condition 当前只支持 BOOLEAN：" + node.id());
+        }
+        validateBooleanConfig(node, "expected", issues);
+        validateBooleanConfig(node, "missing", issues);
+        if (!hasIncoming(graph, node.id(), "input")) {
+            error(issues, "condition_missing_input", "条件节点缺少输入连接：" + node.id());
+        }
+        if (!hasOutgoing(graph, node.id(), "pass")) {
+            error(issues, "condition_missing_pass", "条件节点缺少通过分支：" + node.id());
+        }
+        if (!hasOutgoing(graph, node.id(), "fail")) {
+            error(issues, "condition_missing_fail", "条件节点缺少失败分支：" + node.id());
+        }
+    }
+
+    private void validateBooleanConfig(NodeDefinition node, String key, List<ValidationIssue> issues) {
+        String value = node.config().get(key);
+        if (!"true".equals(value) && !"false".equals(value)) {
+            error(issues, "condition_boolean_invalid", "条件布尔配置必须是 true 或 false：" + node.id() + "." + key);
+        }
+    }
+
+    private void validateStateAction(NodeDefinition node, List<ValidationIssue> issues, boolean allowAnyType) {
+        validateStateConfig(node, issues);
+        if (allowAnyType) {
+            validateStateSetValue(node, issues);
+        }
+        if (!allowAnyType && !"INTEGER".equals(node.config().get("valueType"))) {
+            error(issues, "state_add_type", "State Add 只能用于 INTEGER：" + node.id());
+        }
+        if (!allowAnyType) {
+            try {
+                Integer.parseInt(node.config().getOrDefault("amount", ""));
+            } catch (NumberFormatException exception) {
+                error(issues, "state_add_amount_invalid", "State Add 数值无效：" + node.id());
+            }
+        }
+    }
+
+    private void validateStateSetValue(NodeDefinition node, List<ValidationIssue> issues) {
+        String type = node.config().get("valueType");
+        String value = node.config().get("value");
+        if (value == null) {
+            error(issues, "state_set_value_missing", "State Set 缺少写入值：" + node.id());
+            return;
+        }
+        if ("BOOLEAN".equals(type) && !("true".equals(value) || "false".equals(value))) {
+            error(issues, "state_set_value_invalid", "BOOLEAN 值必须是 true 或 false：" + node.id());
+        }
+        if ("INTEGER".equals(type)) {
+            try {
+                Integer.parseInt(value);
+            } catch (NumberFormatException exception) {
+                error(issues, "state_set_value_invalid", "INTEGER 值无效：" + node.id());
+            }
+        }
+    }
+
+    private void validateStateConfig(NodeDefinition node, List<ValidationIssue> issues) {
+        try {
+            StateScope.valueOf(node.config().getOrDefault("scope", ""));
+            StateValueType.valueOf(node.config().getOrDefault("valueType", ""));
+        } catch (IllegalArgumentException exception) {
+            error(issues, "state_scope_or_type_invalid", "状态 scope/type 无效：" + node.id());
+        }
+        if (node.config().getOrDefault("key", "").isBlank()) {
+            error(issues, "state_key_missing", "状态 key 缺失：" + node.id());
+        }
+    }
+
+    private void validateTimer(GraphDefinition graph, NodeDefinition node, List<ValidationIssue> issues) {
+        try {
+            int seconds = Integer.parseInt(node.config().getOrDefault("durationSeconds", "0"));
+            if (seconds <= 0) {
+                error(issues, "timer_duration_invalid", "计时器时间必须大于 0 秒：" + node.id());
+            }
+        } catch (NumberFormatException exception) {
+            error(issues, "timer_duration_invalid", "计时器时间无效：" + node.id());
+        }
+        if (!hasOutgoing(graph, node.id(), "timer_completed")) {
+            error(issues, "timer_missing_completed", "计时器缺少完成后的连接：" + node.id());
+        }
+    }
+
+    private boolean hasIncoming(GraphDefinition graph, String nodeId, String slotId) {
+        return graph.edges().stream().anyMatch(edge -> edge.targetNodeId().equals(nodeId) && edge.targetSlotId().equals(slotId));
+    }
+
+    private boolean hasOutgoing(GraphDefinition graph, String nodeId, String slotId) {
+        return graph.edges().stream().anyMatch(edge -> edge.sourceNodeId().equals(nodeId) && edge.sourceSlotId().equals(slotId));
+    }
+
+    private void validateSingleOutgoingPerSlot(GraphDefinition graph, List<ValidationIssue> issues) {
+        Set<String> seen = new HashSet<>();
+        for (EdgeDefinition edge : graph.edges()) {
+            String key = edge.sourceNodeId() + "." + edge.sourceSlotId();
+            if (!seen.add(key)) {
+                error(issues, "multiple_outgoing_edges", "同一输出槽位暂不支持多条连接：" + key);
+            }
+        }
+    }
+
+    private void detectCycle(GraphDefinition graph, List<ValidationIssue> issues) {
+        Map<String, List<String>> outgoing = new HashMap<>();
+        for (EdgeDefinition edge : graph.edges()) {
+            outgoing.computeIfAbsent(edge.sourceNodeId(), ignored -> new ArrayList<>()).add(edge.targetNodeId());
+        }
+
+        Set<String> visited = new HashSet<>();
+        Set<String> active = new HashSet<>();
+        for (String nodeId : outgoing.keySet()) {
+            if (hasCycle(nodeId, outgoing, visited, active)) {
+                error(issues, "loop_risk", "图存在明显循环风险。");
+                return;
+            }
+        }
+    }
+
+    private boolean hasCycle(String nodeId, Map<String, List<String>> outgoing, Set<String> visited, Set<String> active) {
+        if (active.contains(nodeId)) {
+            return true;
+        }
+        if (!visited.add(nodeId)) {
+            return false;
+        }
+        active.add(nodeId);
+        for (String next : outgoing.getOrDefault(nodeId, List.of())) {
+            if (hasCycle(next, outgoing, visited, active)) {
+                return true;
+            }
+        }
+        active.remove(nodeId);
+        return false;
+    }
+
+    private void error(List<ValidationIssue> issues, String code, String message) {
+        issues.add(new ValidationIssue(ValidationIssue.Severity.ERROR, code, message));
+    }
+}

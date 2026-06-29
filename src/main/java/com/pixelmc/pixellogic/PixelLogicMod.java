@@ -1,5 +1,6 @@
 package com.pixelmc.pixellogic;
 
+import com.pixelmc.pixellogic.loader.fabric.FabricPixelLogicBootstrap;
 import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,6 +11,7 @@ public final class PixelLogicMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        FabricPixelLogicBootstrap.bootstrap();
         LOGGER.info("PixelLogic initialized.");
     }
 }

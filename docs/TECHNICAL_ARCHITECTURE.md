@@ -4,7 +4,16 @@ PixelLogic starts as a clean Fabric backend plus an independent WebUI project.
 
 ## Bootstrap Boundary
 
-This bootstrap only creates the Fabric mod initializer, resource metadata, WebUI shell, and documentation. It does not implement runtime logic, gameplay items, blocks, old TZZ systems, or Java-generated WebUI.
+The initial bootstrap created the Fabric mod initializer, resource metadata, WebUI shell, and documentation.
+
+The v1 manual simulation spike now adds the first backend runtime path:
+
+- Fabric Command API v2 adapter under `loader/fabric`.
+- `/pixellogic` command root only.
+- In-memory demo `GraphDefinition`, validation, compiled graph, state, trace, and wall-clock timer.
+- Timer due callbacks hand runtime continuation back to the Minecraft server thread.
+
+It still does not implement gameplay items, blocks, old TZZ systems, Region, persistent graph storage, WebUI API integration, or Java-generated WebUI.
 
 ## Future Module Boundaries
 

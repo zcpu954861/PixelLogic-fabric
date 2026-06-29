@@ -1,6 +1,6 @@
 # PixelLogic v1 Core Architecture Spec
 
-This document defines the v1 core architecture for PixelLogic. It is docs-only and must be confirmed before runtime implementation.
+This document defines the v1 core architecture for PixelLogic. It now also records the first manual simulation spike implementation checkpoint.
 
 ## Architecture Summary
 
@@ -19,6 +19,23 @@ TriggerEvent
 ```
 
 There is no Channel execution path in core.
+
+## Manual Simulation Spike Checkpoint
+
+The `feature/v1-manual-simulation-spike` implementation keeps the first runtime proof intentionally small:
+
+- `core/model`: graph, node, slot, edge, node type, edge type, state scope, and state value type.
+- `core/graph`: validation, compilation, compiled graph indexes, and the in-memory demo graph.
+- `core/runtime`: trigger event, execution context, graph runtime, runtime limits, runtime result, and a main-based self-check.
+- `core/state`: scoped in-memory state store with Boolean, Integer, and String values.
+- `core/timer`: wall-clock in-memory timer scheduler and immutable timer continuation.
+- `core/trace`: bounded in-memory execution trace buffer.
+- `server`: Fabric-facing spike service that owns the demo graph, state, trace, runtime, and scheduler.
+- `loader/fabric`: Fabric Command API v2 and server lifecycle adapter.
+
+The spike command root is `/pixellogic`; no `/pl` root is registered. The current commands are `/pixellogic status`, `/pixellogic test start`, `/pixellogic test reset`, and `/pixellogic trace last`.
+
+The current timer uses `ScheduledExecutorService` for wall-clock delay. The due callback only schedules runtime continuation back onto the Minecraft server thread through the Fabric adapter service.
 
 ## Layer Boundaries
 
@@ -269,6 +286,8 @@ v1 needs:
 
 Timer scheduling must not scan every timer every tick when avoidable. Prefer a due queue, min heap, or indexed next-due structure.
 
+The manual simulation spike uses JDK wall-clock scheduling instead of tick scanning. It is in-memory and intentionally does not recover timers across server restart.
+
 ### ExecutionContext
 
 ExecutionContext represents one execution.
@@ -399,6 +418,8 @@ v1 validation must cover:
 - budget risk when statically obvious
 
 Unknown block or edge types fail closed.
+
+The spike model uses enums for known node and edge types, then validates required slots, state config, timer duration, timer completion edge, and obvious loop risk before compilation/execution.
 
 ## API Draft
 

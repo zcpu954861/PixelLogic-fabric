@@ -41,6 +41,14 @@ tasks.withType(JavaCompile).configureEach {
 	options.release = 21
 }
 
+tasks.register('manualSimulationSelfCheck', JavaExec) {
+	dependsOn classes
+	mainClass = 'com.pixelmc.pixellogic.core.runtime.ManualSimulationSelfCheck'
+	classpath = sourceSets.main.runtimeClasspath
+}
+
+check.dependsOn tasks.named('manualSimulationSelfCheck')
+
 java {
 	withSourcesJar()
 	sourceCompatibility = JavaVersion.VERSION_21

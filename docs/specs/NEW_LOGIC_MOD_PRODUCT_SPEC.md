@@ -231,11 +231,12 @@ v1 should first prove the no-Channel Graph Runtime. Region can be designed for v
 A server owner opens PixelLogic, creates a lobby start flow, and builds:
 
 ```text
-/startgame
+/pixellogic test start
 -> whether PLAYER.started == false
    pass:
      -> send welcome message
      -> set PLAYER.started = true
+     -> add PLAYER.start_count += 1
      -> start 30 second timer
      -> debug log "countdown finished"
    fail:

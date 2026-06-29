@@ -6,6 +6,10 @@
 
 Version development happens on `mc-<minecraft-version>` branches, not on `main` or `master`.
 
+## Project Metadata
+
+- License: `Apache-2.0`
+
 ## Active Checkpoint Branch
 
 `feature/v1-block-editor-humanized-form`

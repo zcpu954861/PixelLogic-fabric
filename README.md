@@ -96,6 +96,10 @@ npm run dev
 
 The Gradle build does not require Node. WebUI build output is intentionally separate for this bootstrap.
 
+## License
+
+PixelLogic is licensed under the Apache License 2.0.
+
 ## External Project Memory
 
 Project memory lives in Obsidian at:

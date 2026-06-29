@@ -21,6 +21,12 @@ Server owners build minigame logic with nodes, cards, and direct edges instead o
 - Scratch is only an interaction reference.
 - Old TZZ phone, AR, map, note, gallery, task, password, blocking, items, and blocks are not PixelLogic core.
 
+## v1 Specs
+
+- [PixelLogic v1 Product Spec](docs/specs/NEW_LOGIC_MOD_PRODUCT_SPEC.md)
+- [PixelLogic v1 Core Architecture Spec](docs/specs/CORE_ARCHITECTURE_SPEC.md)
+- [PixelLogic v1 Minimal Vertical Spike Plan](docs/specs/V1_VERTICAL_SPIKE_PLAN.md)
+
 ## Builds
 
 Java / Fabric build:

@@ -8,10 +8,11 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Next
 
-1. Write `NEW_LOGIC_MOD_PRODUCT_SPEC.md`.
-2. Design the v1 minimal vertical spike.
-3. Define the first graph model shape.
-4. Define loader event adapter boundaries before implementing triggers.
+1. Review and confirm `docs/specs/NEW_LOGIC_MOD_PRODUCT_SPEC.md`.
+2. Review and confirm `docs/specs/CORE_ARCHITECTURE_SPEC.md`.
+3. Review and confirm `docs/specs/V1_VERTICAL_SPIKE_PLAN.md`.
+4. Write the v1 minimal vertical spike implementation prompt.
+5. Confirm loader/Minecraft official event APIs before implementing triggers.
 
 ## Loader Event Policy
 

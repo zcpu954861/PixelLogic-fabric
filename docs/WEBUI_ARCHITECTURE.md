@@ -41,11 +41,12 @@ The UI renders the graph as the confirmed Slot-Based horizontal block flow. The 
 
 Important user semantics:
 
-- Save draft does not change runtime.
-- Validate draft does not change runtime.
-- Commit promotes only a valid draft.
-- Test run always uses the committed graph.
-- When a draft or unsaved edit exists, the bottom dock warns that test run still uses the committed version.
+- The backend still keeps draft, validate, and commit separated.
+- The normal WebUI exposes one `保存` button instead of separate draft/validate/commit controls.
+- `保存` writes pending edits, validates them, and promotes them only when validation passes.
+- Invalid edits do not replace the committed runtime graph.
+- `测试运行` automatically saves pending valid edits, resets the demo test state, starts the run, and refreshes the trace.
+- Reset remains an internal API step, not a primary user button.
 
 ## Boundary
 

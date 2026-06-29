@@ -420,10 +420,7 @@ function renderApp(): void {
         </div>
         <nav class="top-actions" aria-label="工作台操作">
           <span class="api-pill ${state.apiStatus}" aria-live="polite">${escapeHtml(apiStatusText())}</span>
-          <button type="button" class="ghost-button" data-api-action="status" ${apiBusyAttr()}>刷新状态</button>
           <button type="button" class="run-button" data-api-action="start" ${apiBusyAttr()}>测试运行</button>
-          <button type="button" class="ghost-button" data-api-action="reset" ${apiBusyAttr()}>重置测试状态</button>
-          <button type="button" class="ghost-button" data-api-action="trace" ${apiBusyAttr()}>刷新执行记录</button>
           <button type="button" class="ghost-button" data-action="fit">适应视图</button>
           <button type="button" class="ghost-button" data-action="center">回到中心</button>
         </nav>
@@ -453,8 +450,8 @@ function renderApp(): void {
         <section class="quick-start">
           <div class="panel-title"><span>当前版本</span></div>
           <button type="button">Committed ${escapeHtml(shortFingerprint(state.committedGraph?.fingerprint ?? graph.fingerprint))}</button>
-          <button type="button" data-draft-status>${state.hasDraft ? '存在未提交草稿' : '无未提交草稿'}</button>
-          <button type="button" data-dirty-status>${state.dirty ? '有未保存改动' : '无本地改动'}</button>
+          <button type="button" data-draft-status>${state.hasDraft ? '有未保存版本' : '已保存'}</button>
+          <button type="button" data-dirty-status>${state.dirty ? '正在编辑' : '无本地改动'}</button>
         </section>
       </aside>
 
@@ -484,10 +481,8 @@ function renderApp(): void {
           <b>${selectedNode ? escapeHtml(nodeTypeLabel(selectedNode.type)) : '未选中'}</b>
         </div>
         ${selectedNode ? renderNodeEditor(selectedNode) : '<section class="form-card">请选择一个积木。</section>'}
-        <section class="draft-actions" aria-label="草稿操作">
-          <button type="button" class="ghost-button" data-graph-action="save" ${apiBusyAttr()}>保存草稿</button>
-          <button type="button" class="ghost-button" data-graph-action="validate" ${apiBusyAttr()}>校验草稿</button>
-          <button type="button" class="run-button" data-graph-action="commit" ${apiBusyAttr()}>提交生效</button>
+        <section class="draft-actions" aria-label="保存操作">
+          <button type="button" class="run-button" data-graph-action="save" ${apiBusyAttr()}>保存</button>
         </section>
         <section class="preview-card">
           <b>API 状态</b>
@@ -502,7 +497,7 @@ function renderApp(): void {
 
       <footer class="bottom-dock" aria-label="验证问题和执行记录">
         <section>
-          <div class="panel-title"><span>验证与草稿</span><b data-validation-title>${validationTitle()}</b></div>
+          <div class="panel-title"><span>保存检查</span><b data-validation-title>${validationTitle()}</b></div>
           <ul class="issue-list" data-issue-list>
             <li><span class="${state.apiStatus === 'online' ? 'ok' : 'warn'}"></span>${escapeHtml(state.statusMessage)}</li>
             ${uncommittedNotice() ? `<li><span class="warn"></span>${escapeHtml(uncommittedNotice())}</li>` : ''}
@@ -727,13 +722,8 @@ function bindInteractions(): void {
   document.querySelector('[data-action="fit"]')?.addEventListener('click', fitView);
   document.querySelector('[data-action="center"]')?.addEventListener('click', centerView);
   document.querySelector('[data-action="focus"]')?.addEventListener('click', focusSelectedBlock);
-  document.querySelector('[data-api-action="status"]')?.addEventListener('click', () => void refreshStatus());
   document.querySelector('[data-api-action="start"]')?.addEventListener('click', () => void startTest());
-  document.querySelector('[data-api-action="reset"]')?.addEventListener('click', () => void resetTest());
-  document.querySelector('[data-api-action="trace"]')?.addEventListener('click', () => void refreshLatestTrace());
-  document.querySelector('[data-graph-action="save"]')?.addEventListener('click', () => void saveDraft());
-  document.querySelector('[data-graph-action="validate"]')?.addEventListener('click', () => void validateDraft());
-  document.querySelector('[data-graph-action="commit"]')?.addEventListener('click', () => void commitDraft());
+  document.querySelector('[data-graph-action="save"]')?.addEventListener('click', () => void saveGraph());
 
   document.querySelectorAll<HTMLInputElement>('[data-node-field], [data-config-key]').forEach((inputEl) => {
     inputEl.addEventListener('input', () => updateSelectedNode(inputEl));
@@ -771,7 +761,7 @@ function updateSelectedNode(inputEl: HTMLInputElement): void {
   state.graph = nextGraph;
   state.dirty = true;
   state.validation = null;
-  state.lastAction = '草稿已修改，尚未保存。';
+  state.lastAction = '内容已修改，尚未保存。';
   refreshDraftIndicators();
 }
 
@@ -783,10 +773,10 @@ function refreshDraftIndicators(): void {
   const issueList = document.querySelector<HTMLElement>('[data-issue-list]');
 
   if (draftStatus) {
-    draftStatus.textContent = state.hasDraft ? '存在未提交草稿' : '无未提交草稿';
+    draftStatus.textContent = state.hasDraft ? '有未保存版本' : '已保存';
   }
   if (dirtyStatus) {
-    dirtyStatus.textContent = state.dirty ? '有未保存改动' : '无本地改动';
+    dirtyStatus.textContent = state.dirty ? '正在编辑' : '无本地改动';
   }
   if (lastAction) {
     lastAction.textContent = state.lastAction;
@@ -823,54 +813,45 @@ async function loadGraph(): Promise<void> {
     ensureSelectedNode();
     state.apiStatus = 'online';
     state.statusMessage = 'Graph 已从 API 加载';
-    state.lastAction = state.hasDraft ? '已加载未提交草稿' : '已加载已提交版本';
+    state.lastAction = state.hasDraft ? '已加载上次未保存完成的修改' : '已加载已保存版本';
   });
 }
 
-async function refreshStatus(): Promise<void> {
-  await runAction('刷新状态', async () => {
-    const data = await api('/api/pixellogic/status');
-    state.apiStatus = 'online';
-    state.statusMessage = data.message ?? 'API 已连接';
-    state.demoActor = data.demoActor?.label ?? 'WebUI 模拟玩家';
-    state.lastAction = 'API 状态已刷新';
+async function saveGraph(): Promise<void> {
+  await runAction('保存', async () => {
+    await saveAndCommit();
   });
 }
 
-async function saveDraft(): Promise<void> {
-  await runAction('保存草稿', async () => {
-    const data = await persistDraft();
-    state.lastAction = data.message ?? '草稿已保存';
-  });
-}
+async function saveAndCommit(): Promise<boolean> {
+  if (!state.dirty && !state.hasDraft) {
+    state.lastAction = '已保存。';
+    return true;
+  }
 
-async function validateDraft(): Promise<void> {
-  await runAction('校验草稿', async () => {
-    if (state.dirty) {
-      await persistDraft();
-    }
-    const data = await api(`/api/pixellogic/graphs/${graphId}/validate`, { method: 'POST' });
-    state.validation = data.validation ?? null;
-    state.lastAction = state.validation?.valid ? '草稿校验通过' : '草稿校验失败';
-  });
-}
+  if (state.dirty) {
+    await persistDraft();
+  }
 
-async function commitDraft(): Promise<void> {
-  await runAction('提交生效', async () => {
-    if (state.dirty) {
-      await persistDraft();
-    }
-    const data = await api(`/api/pixellogic/graphs/${graphId}/commit`, { method: 'POST' });
-    if (!data.graph) {
-      throw new Error('API 未返回已提交 graph。');
-    }
-    state.graph = data.graph;
-    state.committedGraph = data.graph;
-    state.validation = data.validation ?? null;
-    state.hasDraft = false;
-    state.dirty = false;
-    state.lastAction = data.message ?? '图已提交生效';
-  });
+  const validationData = await api(`/api/pixellogic/graphs/${graphId}/validate`, { method: 'POST' });
+  state.validation = validationData.validation ?? null;
+  if (!state.validation?.valid) {
+    state.lastAction = '保存失败：请修复验证问题。';
+    state.error = validationErrorText();
+    return false;
+  }
+
+  const data = await api(`/api/pixellogic/graphs/${graphId}/commit`, { method: 'POST' });
+  if (!data.graph) {
+    throw new Error('API 未返回已保存 graph。');
+  }
+  state.graph = data.graph;
+  state.committedGraph = data.graph;
+  state.validation = data.validation ?? null;
+  state.hasDraft = false;
+  state.dirty = false;
+  state.lastAction = '已保存并生效。';
+  return true;
 }
 
 async function persistDraft(): Promise<ApiResponse> {
@@ -879,7 +860,7 @@ async function persistDraft(): Promise<ApiResponse> {
     body: JSON.stringify({ graph: currentGraph() }),
   });
   if (!data.graph) {
-    throw new Error('API 未返回已保存草稿。');
+    throw new Error('API 未返回已保存内容。');
   }
   state.graph = data.graph;
   state.hasDraft = true;
@@ -890,20 +871,17 @@ async function persistDraft(): Promise<ApiResponse> {
 
 async function startTest(): Promise<void> {
   await runAction('测试运行', async () => {
-    const warning = uncommittedNotice();
+    if (state.dirty || state.hasDraft) {
+      const saved = await saveAndCommit();
+      if (!saved) {
+        return;
+      }
+    }
+    await api('/api/pixellogic/test/reset', { method: 'POST' });
     const data = await api('/api/pixellogic/test/start', { method: 'POST' });
     state.apiStatus = 'online';
     state.latestTrace = data.trace ?? null;
-    state.lastAction = warning || data.message || '测试运行已执行';
-  });
-}
-
-async function resetTest(): Promise<void> {
-  await runAction('重置测试状态', async () => {
-    const data = await api('/api/pixellogic/test/reset', { method: 'POST' });
-    state.apiStatus = 'online';
-    await refreshLatestTrace(false);
-    state.lastAction = data.message ?? '测试状态已重置';
+    state.lastAction = data.message || '测试运行已执行';
   });
 }
 
@@ -916,7 +894,7 @@ async function refreshLatestTrace(showBusy = true): Promise<void> {
   };
 
   if (showBusy) {
-    await runAction('刷新执行记录', action);
+    await runAction('刷新记录', action);
   } else {
     await action();
   }
@@ -1081,14 +1059,22 @@ function cloneGraph(graph: GraphDocument): GraphDocument {
 function validationList(): string {
   const validation = state.validation;
   if (!validation) {
-    return '<li><span class="warn"></span>草稿尚未校验</li>';
+    return '<li><span class="warn"></span>修改后点击保存完成检查</li>';
   }
   if (validation.valid) {
-    return '<li><span class="ok"></span>草稿校验通过，可以提交生效</li>';
+    return '<li><span class="ok"></span>保存检查通过</li>';
   }
   return validation.issues
     .map((issue) => `<li><span class="warn"></span>${escapeHtml(issue.message)}</li>`)
     .join('');
+}
+
+function validationErrorText(): string {
+  const issues = state.validation?.issues ?? [];
+  if (issues.length === 0) {
+    return '保存失败：请修复验证问题。';
+  }
+  return `保存失败：${issues.map((issue) => issue.message).join('；')}`;
 }
 
 function validationTitle(): string {
@@ -1101,15 +1087,15 @@ function validationTitle(): string {
   if (state.validation && !state.validation.valid) {
     return '失败';
   }
-  return state.hasDraft ? '有草稿' : '已提交';
+  return state.hasDraft ? '未完成' : '已保存';
 }
 
 function uncommittedNotice(): string {
   if (state.dirty) {
-    return '当前有未提交草稿/未保存改动，测试运行仍使用已提交版本。';
+    return '当前有未保存改动，测试运行前会自动保存。';
   }
   if (state.hasDraft) {
-    return '当前有未提交草稿，测试运行仍使用已提交版本。';
+    return '当前有上次未保存完成的修改，测试运行前会自动保存。';
   }
   return '';
 }

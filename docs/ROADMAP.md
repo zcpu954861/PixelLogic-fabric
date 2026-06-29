@@ -8,11 +8,11 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Active Checkpoint Branch
 
-`feature/v1-graph-draft-save-load`
+`feature/v1-graph-draft-simple-ux`
 
 ## Next
 
-1. User review the Graph Draft / Validate / Commit checkpoint on `feature/v1-graph-draft-save-load`.
+1. User review the simplified Graph Draft UX checkpoint on `feature/v1-graph-draft-simple-ux`.
 2. Run audit/merge readiness before merging to `mc-1.21.11`.
 3. Decide whether the next implementation target is API/WebUI polish or P2 state/timer capacity cleanup.
 4. Keep Region, old TZZ migration, and full WebUI graph editing out of v1 until the direct graph runtime baseline is stable.
@@ -26,6 +26,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - User manual Minecraft smoke passed for `/pixellogic status`, reset, pass branch, timer completion, trace, and second-run fail branch.
 - API-backed WebUI test-run integration connects localhost JSON endpoints to the slot-based WebUI trace panel.
 - Graph draft/validate/commit checkpoint stores `demo-start-flow` as committed JSON, saves drafts separately, validates before commit, and keeps test-run on committed graph.
+- Graph Draft UX simplification hides draft/validate/commit and reset internals from normal users: `保存` performs save/validate/commit, and `测试运行` automatically resets before starting.
 
 ## Follow-Ups
 

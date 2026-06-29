@@ -126,17 +126,13 @@ Error shape:
 
 ## WebUI Semantics
 
-The WebUI keeps the Slot-Based horizontal block flow. It loads the graph from the API, edits only a selected block's minimal fields, and shows draft state in the right panel/bottom dock.
+The WebUI keeps the Slot-Based horizontal block flow. It loads the graph from the API and edits only a selected block's minimal fields.
 
-User-facing distinction:
+The API layer still exposes draft, validate, and commit as separate operations, but the normal user UI does not expose that engineering sequence as separate buttons. The user-facing actions are:
 
-- `保存草稿` saves a draft only.
-- `校验草稿` validates the draft.
-- `提交生效` validates and promotes the draft to committed runtime graph.
-- `测试运行` uses committed graph.
+- `保存`: save the current edits, validate them, and promote them only when validation passes.
+- `测试运行`: if there are unsaved edits, save/validate/promote them first; then reset the demo test state, start the test run, and refresh the trace.
 
-When there is a draft or unsaved edit, the UI warns:
+Validation remains fail-closed. If validation fails, the committed graph and runtime graph are not replaced, and the UI shows a Chinese validation error.
 
-```text
-当前有未提交草稿，测试运行仍使用已提交版本。
-```
+The internal draft file can still exist after a failed save so the user can repair the fields and click `保存` again.

@@ -29,13 +29,24 @@ Not implemented:
 
 ## Interaction Decisions
 
-- Short click still opens the block editor modal.
+- Single click selects the block; double click opens the existing block editor modal.
+- Manual save is removed from the primary UI; every graph edit is recorded in history and queued for automatic draft save, validation, and commit.
+- Undo/redo is available through `上一步` / `下一步`, `Ctrl+Z`, `Ctrl+Y`, and `Ctrl+Shift+Z`.
 - Pointer movement past a small threshold starts drag and prevents accidental modal open.
-- Drag group is computed once on drag start from outgoing typed edges with a visited guard.
+- Drag group is computed once on drag start from outgoing typed edges that are still visually snapped, with a visited guard.
+- Snap detection and connected-state detection are separated: snap can be forgiving, but connected edges require tight visual alignment.
+- Candidate detection uses in-flight preview positions, so dragging away and then back can reconnect to the just-separated port before release.
+- Old-port reconnection uses a smaller snap radius than new-target snapping to avoid sticky pull-back while separating a chain.
+- Condition branch lanes reserve recursive downstream visual span above and below each input anchor, while the Condition card outline only draws the input head and normal-height branch caps around pass/fail mouths instead of drawing the full reserved lane.
+- Painted SVG paths and visible text are the only block hit targets, so transparent Condition lane space does not select or drag that block.
+- Connected downstream blocks are vertically realigned to the dynamic pass/fail output centers so nested branch lanes do not overlap.
 - Mouse move updates DOM positions and local insert feedback only.
 - Graph JSON changes only on drag end.
-- Releasing onto blank canvas moves the chain but keeps existing edges.
-- Releasing onto a valid slot rewrites the target edge as `A -> dragged root -> dragged tail -> B`.
+- Releasing onto blank canvas moves the chain and removes stale edges that are no longer visually snapped.
+- Releasing near a valid slot magnetically snaps the dragged chain and rewrites the target edge as `A -> dragged root -> dragged tail -> B`.
+- Valid middle-slot hover previews insertion by temporarily cutting that join, animating the two resulting connected components apart, and showing a green glow-only insertion gap.
+- Releasing near an empty chain-end output magnetically appends the dragged root to that output.
+- Releasing a dragged tail near an empty input magnetically connects the dragged chain before that target block or chain.
 - Insert success creates a local horizontal gap for the target block and its downstream chain so the slot-based blocks do not overlap.
 
 ## Validation
@@ -57,7 +68,7 @@ Key checks covered:
 - Condition drag moves pass and fail branches.
 - Invalid isolated Condition save fails closed.
 - Delete recovers to valid graph.
-- Disconnect input marks the graph dirty without committing until saved.
+- Disconnect input is undoable and then enters the automatic save/validation queue.
 
 ## Boundaries
 

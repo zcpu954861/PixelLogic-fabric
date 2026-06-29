@@ -23,7 +23,16 @@ The v1 API + WebUI test-run checkpoint adds a localhost-only spike API:
 - Vite dev proxy from `/api` to `127.0.0.1:18111`.
 - WebUI renders real status, reset, test run, latest trace, and recent trace responses.
 
-It still does not implement persistent graph storage, arbitrary graph editing APIs, Region, old TZZ adapters, or Java-generated WebUI.
+The v1 graph draft checkpoint adds the first persistent graph loop:
+
+- `server/storage` owns versioned JSON graph documents and world-local graph files.
+- Committed graph and draft graph are separate files under `pixellogic/graphs/`.
+- Startup seeds `demo-start-flow` as committed JSON when missing.
+- Draft save parses schema but does not affect runtime.
+- Commit runs `GraphValidator`; only valid drafts replace committed JSON and the compiled runtime graph.
+- Test-run endpoints continue to execute the committed graph.
+
+It still does not implement arbitrary graph create/delete editing, Region, old TZZ adapters, multi-loader storage, or Java-generated WebUI.
 
 ## Future Module Boundaries
 

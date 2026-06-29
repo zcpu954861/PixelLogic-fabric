@@ -48,11 +48,27 @@ GET  /api/pixellogic/traces
 
 This API is bound to `127.0.0.1:18111`, uses the fixed `WebUI 模拟玩家` actor, and is not the final graph save/load API.
 
+## Current Graph Draft API
+
+The v1 graph checkpoint adds a local draft/validate/commit loop for the seeded `demo-start-flow` graph:
+
+```text
+GET  /api/pixellogic/graphs
+GET  /api/pixellogic/graphs/demo-start-flow
+GET  /api/pixellogic/graphs/demo-start-flow/draft
+PUT  /api/pixellogic/graphs/demo-start-flow/draft
+POST /api/pixellogic/graphs/demo-start-flow/validate
+POST /api/pixellogic/graphs/demo-start-flow/commit
+```
+
+Draft saves do not affect runtime. Test run uses the committed graph until a valid draft is committed.
+
 ## v1 Specs
 
 - [PixelLogic v1 Product Spec](docs/specs/NEW_LOGIC_MOD_PRODUCT_SPEC.md)
 - [PixelLogic v1 Core Architecture Spec](docs/specs/CORE_ARCHITECTURE_SPEC.md)
 - [PixelLogic v1 Minimal Vertical Spike Plan](docs/specs/V1_VERTICAL_SPIKE_PLAN.md)
+- [Graph Draft / Validate / Commit API](docs/api/GRAPH_DRAFT_VALIDATE_COMMIT.md)
 
 ## Builds
 

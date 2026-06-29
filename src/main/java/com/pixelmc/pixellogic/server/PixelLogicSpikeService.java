@@ -6,6 +6,7 @@ import com.pixelmc.pixellogic.core.graph.GraphCompiler;
 import com.pixelmc.pixellogic.core.graph.GraphValidator;
 import com.pixelmc.pixellogic.core.graph.ValidationIssue;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
+import com.pixelmc.pixellogic.core.model.StateScope;
 import com.pixelmc.pixellogic.core.runtime.GraphRuntime;
 import com.pixelmc.pixellogic.core.runtime.RuntimeLimits;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
@@ -17,7 +18,11 @@ import com.pixelmc.pixellogic.core.timer.TimerContinuation;
 import com.pixelmc.pixellogic.core.timer.WallClockTimerScheduler;
 import com.pixelmc.pixellogic.core.trace.BoundedTraceBuffer;
 import com.pixelmc.pixellogic.core.trace.ExecutionTrace;
+import com.pixelmc.pixellogic.server.storage.GraphDocument;
+import com.pixelmc.pixellogic.server.storage.GraphStorageService;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -30,14 +35,17 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     private static final int MAX_TRACES = 50;
     private static final int MAX_STEPS_PER_TRACE = 100;
 
-    private final GraphDefinition demoGraph;
     private final GraphValidator validator = new GraphValidator();
     private final InMemoryStateStore stateStore = new InMemoryStateStore();
     private final BoundedTraceBuffer traces = new BoundedTraceBuffer(MAX_TRACES, MAX_STEPS_PER_TRACE);
     private final WallClockTimerScheduler timerScheduler = new WallClockTimerScheduler();
     private final AtomicBoolean closed = new AtomicBoolean();
-    private final List<ValidationIssue> validationIssues;
-    private final GraphRuntime runtime;
+    private final GraphStorageService graphStorage;
+    private final RuntimeServices services;
+
+    private volatile GraphDocument committedGraph;
+    private volatile List<ValidationIssue> validationIssues = List.of();
+    private volatile GraphRuntime runtime;
 
     public PixelLogicSpikeService(
             BiConsumer<UUID, String> playerMessenger,
@@ -53,15 +61,18 @@ public final class PixelLogicSpikeService implements AutoCloseable {
             Consumer<String> debugLogger,
             Duration timerDuration
     ) {
-        this.demoGraph = DemoGraphFactory.create(timerDuration);
-        this.validationIssues = List.copyOf(validator.validate(demoGraph));
-        if (validator.hasErrors(validationIssues)) {
-            this.runtime = null;
-            return;
-        }
+        this(playerMessenger, serverThreadExecutor, debugLogger, timerDuration, Path.of("world", "pixellogic"));
+    }
 
-        CompiledGraph compiledGraph = new GraphCompiler().compile(demoGraph);
-        RuntimeServices services = new RuntimeServices() {
+    public PixelLogicSpikeService(
+            BiConsumer<UUID, String> playerMessenger,
+            Consumer<Runnable> serverThreadExecutor,
+            Consumer<String> debugLogger,
+            Duration timerDuration,
+            Path storageRoot
+    ) {
+        this.graphStorage = new GraphStorageService(storageRoot);
+        this.services = new RuntimeServices() {
             @Override
             public void sendPlayerMessage(UUID playerId, String message) {
                 playerMessenger.accept(playerId, message);
@@ -79,22 +90,39 @@ public final class PixelLogicSpikeService implements AutoCloseable {
                         return;
                     }
                     serverThreadExecutor.accept(() -> {
-                        if (!closed.get()) {
-                            runtime.resumeTimer(due);
+                        GraphRuntime currentRuntime = runtime;
+                        if (!closed.get() && currentRuntime != null) {
+                            currentRuntime.resumeTimer(due);
                         }
                     });
                 });
             }
         };
-        this.runtime = new GraphRuntime(compiledGraph, stateStore, traces, services, RuntimeLimits.spikeDefaults());
+
+        try {
+            GraphDocument loaded = graphStorage.ensureCommitted(
+                    DemoGraphFactory.create(timerDuration),
+                    GraphStorageService.DEFAULT_DISPLAY_NAME
+            );
+            installCommittedGraph(loaded);
+        } catch (IOException exception) {
+            validationIssues = List.of(new ValidationIssue(
+                    ValidationIssue.Severity.ERROR,
+                    "graph_storage_unavailable",
+                    "Graph storage 初始化失败：" + exception.getMessage()
+            ));
+        }
     }
 
     public RuntimeResult startManualTest(UUID playerId) {
-        if (validator.hasErrors(validationIssues) || runtime == null) {
-            String message = "Demo graph validation failed: " + validationIssues.getFirst().message();
+        GraphRuntime currentRuntime = runtime;
+        if (validator.hasErrors(validationIssues) || currentRuntime == null) {
+            String message = validationIssues.isEmpty()
+                    ? "Graph runtime 未就绪。"
+                    : "Committed graph validation failed: " + validationIssues.getFirst().message();
             return new RuntimeResult(false, "", message);
         }
-        return runtime.start(new TriggerEvent(
+        return currentRuntime.start(new TriggerEvent(
                 DemoGraphFactory.TRIGGER_TYPE,
                 "/pixellogic test start",
                 playerId,
@@ -103,8 +131,52 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     }
 
     public void resetPlayer(UUID playerId) {
-        stateStore.remove(StateKey.of(com.pixelmc.pixellogic.core.model.StateScope.PLAYER, playerId.toString(), "started"));
-        stateStore.remove(StateKey.of(com.pixelmc.pixellogic.core.model.StateScope.PLAYER, playerId.toString(), "start_count"));
+        stateStore.remove(StateKey.of(StateScope.PLAYER, playerId.toString(), "started"));
+        stateStore.remove(StateKey.of(StateScope.PLAYER, playerId.toString(), "start_count"));
+    }
+
+    public List<GraphStorageService.GraphSummary> graphs() throws IOException {
+        return graphStorage.listGraphs();
+    }
+
+    public GraphDocument committedGraph(String graphId) throws IOException {
+        GraphStorageService.validateGraphId(graphId);
+        GraphDocument graph = committedGraph;
+        if (graph == null) {
+            throw new IllegalStateException("Committed graph 未就绪。");
+        }
+        if (!graph.id().equals(graphId)) {
+            return graphStorage.loadCommitted(graphId);
+        }
+        return graph;
+    }
+
+    public Optional<GraphDocument> draftGraph(String graphId) throws IOException {
+        return graphStorage.loadDraft(graphId);
+    }
+
+    public GraphDocument saveDraft(String graphId, GraphDocument draft) throws IOException {
+        return graphStorage.saveDraft(graphId, draft);
+    }
+
+    public GraphStorageService.ValidationReport validateDraft(String graphId) throws IOException {
+        return graphStorage.validateDraft(graphId);
+    }
+
+    public synchronized GraphStorageService.CommitReport commitDraft(String graphId) throws IOException {
+        GraphStorageService.CommitReport report = graphStorage.commitDraft(graphId);
+        if (report.committed()) {
+            installCommittedGraph(report.graph());
+        }
+        return report;
+    }
+
+    public GraphStorageService.ValidationReport committedValidation() {
+        return new GraphStorageService.ValidationReport(!validator.hasErrors(validationIssues), validationIssues);
+    }
+
+    public boolean draftExists(String graphId) {
+        return graphStorage.draftExists(graphId);
     }
 
     public Optional<ExecutionTrace> latestTrace() {
@@ -120,7 +192,10 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     }
 
     public String status() {
-        return "PixelLogic v1 manual simulation spike ready. Graph=" + demoGraph.id();
+        GraphDocument graph = committedGraph;
+        String graphId = graph == null ? "unavailable" : graph.id();
+        String fingerprint = graph == null ? "" : graph.fingerprint();
+        return "PixelLogic v1 graph runtime ready. Graph=" + graphId + " fingerprint=" + fingerprint;
     }
 
     @Override
@@ -128,5 +203,21 @@ public final class PixelLogicSpikeService implements AutoCloseable {
         if (closed.compareAndSet(false, true)) {
             timerScheduler.close();
         }
+    }
+
+    private void installCommittedGraph(GraphDocument document) {
+        GraphDefinition graph = document.toGraphDefinition();
+        List<ValidationIssue> issues = List.copyOf(validator.validate(graph));
+        if (validator.hasErrors(issues)) {
+            validationIssues = issues;
+            runtime = null;
+            committedGraph = document;
+            return;
+        }
+
+        CompiledGraph compiledGraph = new GraphCompiler().compile(graph);
+        runtime = new GraphRuntime(compiledGraph, stateStore, traces, services, RuntimeLimits.spikeDefaults());
+        validationIssues = issues;
+        committedGraph = document;
     }
 }

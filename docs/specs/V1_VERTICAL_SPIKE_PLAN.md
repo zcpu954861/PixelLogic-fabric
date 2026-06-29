@@ -277,11 +277,25 @@ Current spike implementation:
 - The UI remains slot-based horizontal block flow and does not become a free wire editor.
 - This checkpoint still does not implement graph save/load or draft commit.
 
+## Graph Draft / Validate / Commit Checkpoint
+
+`feature/v1-graph-draft-save-load` adds the first graph persistence loop:
+
+- Seed `demo-start-flow` to committed JSON when no graph file exists.
+- Load graph JSON through the local API.
+- Save a separate draft graph from the WebUI.
+- Validate the draft through `GraphValidator`.
+- Commit only valid drafts.
+- Replace the runtime compiled graph only after commit succeeds.
+- Keep test-run on committed graph while unsaved edits or draft files exist.
+
+The WebUI remains the confirmed Slot-Based horizontal block flow. It only edits selected-block fields and does not add arbitrary node create/delete or full layout persistence.
+
 ## Next After Spike
 
 After this spike is confirmed:
 
-1. User review API-backed WebUI test-run behavior.
-2. Decide merge readiness for `feature/v1-api-webui-test-run`.
-3. Decide the persisted Project / Graph JSON schema.
-4. Add persistent graph save/load only after the API-backed runtime shape is accepted.
+1. User review Graph Draft / Validate / Commit behavior.
+2. Decide merge readiness for `feature/v1-graph-draft-save-load`.
+3. Add optimistic fingerprint conflict handling before multi-tab/multi-user editing.
+4. Keep Region, Channel, and old TZZ adapters out of v1 core.

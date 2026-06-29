@@ -8,13 +8,14 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Active Checkpoint Branch
 
-`feature/v1-api-webui-test-run`
+`feature/v1-graph-draft-save-load`
 
 ## Next
 
-1. User review the API-backed WebUI test-run integration on `feature/v1-api-webui-test-run`.
-2. Decide whether the next implementation target is persisted graph save/load or P2 state/timer capacity cleanup.
-3. Keep Region, old TZZ migration, and full WebUI graph editing out of v1 until the direct graph runtime baseline is stable.
+1. User review the Graph Draft / Validate / Commit checkpoint on `feature/v1-graph-draft-save-load`.
+2. Run audit/merge readiness before merging to `mc-1.21.11`.
+3. Decide whether the next implementation target is API/WebUI polish or P2 state/timer capacity cleanup.
+4. Keep Region, old TZZ migration, and full WebUI graph editing out of v1 until the direct graph runtime baseline is stable.
 
 ## Completed Checkpoints
 
@@ -24,6 +25,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - Manual simulation runtime spike uses `/pixellogic` command root, in-memory state, bounded trace, wall-clock in-memory timer, and no Channel core model.
 - User manual Minecraft smoke passed for `/pixellogic status`, reset, pass branch, timer completion, trace, and second-run fail branch.
 - API-backed WebUI test-run integration connects localhost JSON endpoints to the slot-based WebUI trace panel.
+- Graph draft/validate/commit checkpoint stores `demo-start-flow` as committed JSON, saves drafts separately, validates before commit, and keeps test-run on committed graph.
 
 ## Follow-Ups
 
@@ -31,6 +33,7 @@ P2 before broader runtime use:
 
 - Pending timers now have a spike-level max pending count. Broader runtime still needs a real capacity/backpressure policy.
 - In-memory state should get a lifecycle, capacity, and cleanup policy before non-spike use.
+- Draft saves return fingerprints but do not yet enforce `expectedFingerprint`; add optimistic conflict handling before multi-user or multi-tab editing.
 
 ## Loader Event Policy
 

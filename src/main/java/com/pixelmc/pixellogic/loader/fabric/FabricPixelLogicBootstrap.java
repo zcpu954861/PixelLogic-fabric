@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
+import net.minecraft.util.WorldSavePath;
 
 import java.io.IOException;
 
@@ -33,7 +34,9 @@ public final class FabricPixelLogicBootstrap {
                         }
                     },
                     server::executeSync,
-                    PixelLogicMod.LOGGER::info
+                    PixelLogicMod.LOGGER::info,
+                    java.time.Duration.ofSeconds(30),
+                    server.getSavePath(WorldSavePath.ROOT).resolve("pixellogic")
             );
         }
         return service;

@@ -608,7 +608,8 @@ h1 {
 
 .form-card,
 .preview-card,
-.validation-card {
+.validation-card,
+.draft-actions {
   margin-bottom: 12px;
   padding: 12px;
   border: 1px solid var(--line);
@@ -657,6 +658,23 @@ input {
 .validation-card {
   border-color: rgba(196, 131, 34, 0.55);
   background: #fff8e9;
+}
+
+.draft-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.draft-actions button {
+  width: 100%;
+}
+
+.field-hint {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 .api-error {

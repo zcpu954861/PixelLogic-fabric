@@ -8,11 +8,11 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Active Checkpoint Branch
 
-`feature/v1-block-editor-modal`
+`feature/v1-block-editor-humanized-form`
 
 ## Next
 
-1. User review the modal block editor UX checkpoint on `feature/v1-block-editor-modal`.
+1. User review the humanized modal block editor form checkpoint on `feature/v1-block-editor-humanized-form`.
 2. Run audit/merge readiness before merging to `mc-1.21.11`.
 3. Decide whether the next implementation target is API/WebUI polish or P2 state/timer capacity cleanup.
 4. Keep Region, old TZZ migration, and full WebUI graph editing out of v1 until the direct graph runtime baseline is stable.
@@ -28,6 +28,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - Graph draft/validate/commit checkpoint stores `demo-start-flow` as committed JSON, saves drafts separately, validates before commit, and keeps test-run on committed graph.
 - Graph Draft UX simplification hides draft/validate/commit and reset internals from normal users: `保存` performs save/validate/commit, and `测试运行` automatically resets before starting.
 - Block editor modal UX moves selected-block fields out of the right panel: clicking a block opens an animated editor with unsaved-close confirmation.
+- Block editor humanized form UX hides internal enum strings from normal UI, uses Chinese labels and compact controls, and keeps graph JSON/runtime semantics unchanged.
 
 ## Follow-Ups
 

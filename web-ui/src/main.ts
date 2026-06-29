@@ -47,6 +47,26 @@ type GraphNode = {
   slots: GraphSlot[];
 };
 
+type EditableField = {
+  label: string;
+  key: string;
+  value: string;
+  control: 'text' | 'number' | 'select' | 'boolean';
+  options?: FieldOption[];
+  full?: boolean;
+  suffix?: string;
+};
+
+type FieldOption = {
+  value: string;
+  label: string;
+};
+
+type EditorSection = {
+  title: string;
+  fields: EditableField[];
+};
+
 type GraphEdge = {
   id: string;
   sourceNodeId: string;
@@ -537,15 +557,25 @@ function renderApp(): void {
 }
 
 function renderNodeInfo(nodeItem: GraphNode): string {
+  const configItems = nodeConfigItems(nodeItem);
   return `
     <section class="info-card">
       <b>${escapeHtml(nodeItem.displayName || nodeItem.id)}</b>
       <p>${escapeHtml(nodeSummary(nodeItem))}</p>
-      <button type="button" class="run-button" data-action="edit-selected" ${apiBusyAttr()}>编辑积木</button>
     </section>
     <section class="info-card">
-      <b>编辑方式</b>
-      <p>点击画布中的任意积木，会打开聚焦编辑窗口。保存前退出会先确认。</p>
+      <b>配置摘要</b>
+      ${configItems.length > 0 ? `
+        <dl class="config-list">
+          ${configItems
+            .map((item) => `<div><dt>${escapeHtml(item.label)}</dt><dd>${escapeHtml(item.value)}</dd></div>`)
+            .join('')}
+        </dl>
+      ` : '<p>该积木当前没有额外配置。</p>'}
+    </section>
+    <section class="info-card">
+      <b>提示</b>
+      <p>点击画布中的积木可以打开编辑窗口。</p>
     </section>
   `;
 }
@@ -582,71 +612,166 @@ function renderEditorModal(nodeItem: GraphNode): string {
           <button type="button" class="run-button" data-graph-action="save" ${apiBusyAttr()}>保存</button>
         </footer>
       </section>
-      ${state.confirmDiscard ? `
-        <section class="discard-confirm" role="alertdialog" aria-modal="true" aria-label="未保存修改确认">
-          <b>还有未保存的修改，确定要放弃吗？</b>
-          <p>放弃后，本次窗口里的修改不会保留。</p>
-          <div>
-            <button type="button" class="ghost-button" data-confirm-action="keep">继续编辑</button>
-            <button type="button" class="run-button danger" data-confirm-action="discard">放弃修改</button>
-          </div>
-        </section>
-      ` : ''}
+      <section class="discard-confirm${state.confirmDiscard ? ' is-visible' : ''}" role="alertdialog" aria-modal="true" aria-hidden="${state.confirmDiscard ? 'false' : 'true'}" aria-label="未保存修改确认">
+        <b>还有未保存的修改，确定要放弃吗？</b>
+        <p>放弃后，本次窗口里的修改不会保留。</p>
+        <div>
+          <button type="button" class="ghost-button" data-confirm-action="keep">继续编辑</button>
+          <button type="button" class="run-button danger" data-confirm-action="discard">放弃修改</button>
+        </div>
+      </section>
     </div>
   `;
 }
 
 function renderNodeEditor(nodeItem: GraphNode): string {
-  const fields = editableFields(nodeItem)
-    .map(
-      (field) => `
-        <label>${escapeHtml(field.label)}
-          <input value="${escapeAttr(field.value)}" data-config-key="${escapeAttr(field.key)}" />
-        </label>
-      `,
-    )
-    .join('');
+  const section = editorSection(nodeItem);
 
   return `
-    <section class="form-card">
-      <label>名称<input value="${escapeAttr(nodeItem.displayName)}" data-node-field="displayName" /></label>
-      <label>类型<input value="${escapeAttr(nodeTypeLabel(nodeItem.type))}" readonly /></label>
-      ${fields || '<p class="field-hint">该积木当前只允许修改名称。</p>'}
+    <section class="form-card editor-section">
+      <b>基础信息</b>
+      <div class="field-grid">
+        <label class="field-row is-full">名称<input value="${escapeAttr(nodeItem.displayName)}" data-node-field="displayName" /></label>
+        <div class="readonly-field"><span>积木类型</span><b>${escapeHtml(nodeTypeLabel(nodeItem.type))}</b></div>
+      </div>
+    </section>
+    <section class="form-card editor-section">
+      <b>${escapeHtml(section.title)}</b>
+      ${section.fields.length > 0 ? `
+        <div class="field-grid">
+          ${section.fields.map(renderEditableField).join('')}
+        </div>
+      ` : '<p class="field-hint">这个积木当前只需要修改名称。</p>'}
     </section>
   `;
 }
 
-function editableFields(nodeItem: GraphNode): Array<{ label: string; key: string; value: string }> {
+function renderEditableField(field: EditableField): string {
+  const inputType = field.control === 'number' ? 'number' : 'text';
+  const control = field.control === 'select'
+    ? `
+      <select data-config-key="${escapeAttr(field.key)}">
+        ${(field.options ?? [])
+          .map((option) => `<option value="${escapeAttr(option.value)}"${option.value === field.value ? ' selected' : ''}>${escapeHtml(option.label)}</option>`)
+          .join('')}
+      </select>
+    `
+    : field.control === 'boolean'
+      ? `
+        <div class="segmented-control" role="group" aria-label="${escapeAttr(field.label)}">
+          ${booleanOptions()
+            .map((option) => `
+              <button type="button" data-config-key="${escapeAttr(field.key)}" data-config-value="${escapeAttr(option.value)}" aria-pressed="${option.value === field.value}">
+                ${escapeHtml(option.label)}
+              </button>
+            `)
+            .join('')}
+        </div>
+      `
+      : `
+        <span class="input-with-suffix">
+          <input type="${inputType}" value="${escapeAttr(field.value)}" data-config-key="${escapeAttr(field.key)}" />
+          ${field.suffix ? `<span>${escapeHtml(field.suffix)}</span>` : ''}
+        </span>
+      `;
+
+  return `
+    <label class="field-row${field.full ? ' is-full' : ''}">${escapeHtml(field.label)}
+      ${control}
+    </label>
+  `;
+}
+
+function editorSection(nodeItem: GraphNode): EditorSection {
+  switch (nodeItem.type) {
+    case 'STATE_COMPARE_CONDITION':
+      return { title: '条件设置', fields: editableFields(nodeItem) };
+    case 'STATE_SET_ACTION':
+    case 'STATE_ADD_ACTION':
+      return { title: '状态设置', fields: editableFields(nodeItem) };
+    case 'MESSAGE_ACTION':
+      return { title: '消息内容', fields: editableFields(nodeItem) };
+    case 'TIMER_START_ACTION':
+      return { title: '计时设置', fields: editableFields(nodeItem) };
+    case 'DEBUG_LOG_ACTION':
+      return { title: '记录内容', fields: editableFields(nodeItem) };
+    default:
+      return { title: '配置内容', fields: editableFields(nodeItem) };
+  }
+}
+
+function editableFields(nodeItem: GraphNode): EditableField[] {
   const config = nodeItem.config;
   switch (nodeItem.type) {
     case 'STATE_COMPARE_CONDITION':
       return [
-        { label: '状态范围', key: 'scope', value: config.scope ?? 'PLAYER' },
-        { label: '字段', key: 'key', value: config.key ?? '' },
-        { label: '目标值', key: 'expected', value: config.expected ?? 'false' },
-        { label: '缺失时视为', key: 'missing', value: config.missing ?? 'false' },
+        { label: '作用对象', key: 'scope', value: config.scope ?? 'PLAYER', control: 'select', options: stateScopeOptions() },
+        { label: '状态名', key: 'key', value: config.key ?? '', control: 'text' },
+        { label: '目标值', key: 'expected', value: config.expected ?? 'false', control: 'boolean' },
+        { label: '缺失时视为', key: 'missing', value: config.missing ?? 'false', control: 'boolean' },
       ];
     case 'MESSAGE_ACTION':
+      return [{ label: '消息', key: 'message', value: config.message ?? '', control: 'text', full: true }];
     case 'DEBUG_LOG_ACTION':
-      return [{ label: '消息', key: 'message', value: config.message ?? '' }];
+      return [{ label: '内容', key: 'message', value: config.message ?? '', control: 'text', full: true }];
     case 'STATE_SET_ACTION':
       return [
-        { label: '状态范围', key: 'scope', value: config.scope ?? 'PLAYER' },
-        { label: '字段', key: 'key', value: config.key ?? '' },
-        { label: '值类型', key: 'valueType', value: config.valueType ?? 'BOOLEAN' },
-        { label: '写入值', key: 'value', value: config.value ?? '' },
+        { label: '作用对象', key: 'scope', value: config.scope ?? 'PLAYER', control: 'select', options: stateScopeOptions() },
+        { label: '状态名', key: 'key', value: config.key ?? '', control: 'text' },
+        { label: '数据类型', key: 'valueType', value: config.valueType ?? 'BOOLEAN', control: 'select', options: valueTypeOptions() },
+        { label: '设置为', key: 'value', value: config.value ?? '', control: config.valueType === 'BOOLEAN' ? 'boolean' : 'text' },
       ];
     case 'STATE_ADD_ACTION':
       return [
-        { label: '状态范围', key: 'scope', value: config.scope ?? 'PLAYER' },
-        { label: '字段', key: 'key', value: config.key ?? '' },
-        { label: '累加数值', key: 'amount', value: config.amount ?? '1' },
+        { label: '作用对象', key: 'scope', value: config.scope ?? 'PLAYER', control: 'select', options: stateScopeOptions() },
+        { label: '状态名', key: 'key', value: config.key ?? '', control: 'text' },
+        { label: '增加数值', key: 'amount', value: config.amount ?? '1', control: 'number' },
       ];
     case 'TIMER_START_ACTION':
-      return [{ label: '秒数', key: 'durationSeconds', value: config.durationSeconds ?? '30' }];
+      return [{ label: '等待时间', key: 'durationSeconds', value: config.durationSeconds ?? '30', control: 'number', suffix: '秒' }];
     default:
       return [];
   }
+}
+
+function nodeConfigItems(nodeItem: GraphNode): Array<{ label: string; value: string }> {
+  return editableFields(nodeItem).map((field) => ({ label: field.label, value: displayFieldValue(field) }));
+}
+
+function displayFieldValue(field: EditableField): string {
+  if (!field.value) {
+    return '未填写';
+  }
+  if (field.control === 'boolean') {
+    return booleanLabel(field.value);
+  }
+  if (field.control === 'select') {
+    return field.options?.find((option) => option.value === field.value)?.label ?? field.value;
+  }
+  return field.suffix ? `${field.value} ${field.suffix}` : field.value;
+}
+
+function booleanOptions(): FieldOption[] {
+  return [
+    { value: 'true', label: '是' },
+    { value: 'false', label: '否' },
+  ];
+}
+
+function stateScopeOptions(): FieldOption[] {
+  return [
+    { value: 'PLAYER', label: '玩家' },
+    { value: 'GLOBAL', label: '全局' },
+    { value: 'SESSION', label: '当前会话' },
+  ];
+}
+
+function valueTypeOptions(): FieldOption[] {
+  return [
+    { value: 'BOOLEAN', label: '是或否' },
+    { value: 'INTEGER', label: '数字' },
+    { value: 'STRING', label: '文本' },
+  ];
 }
 
 function setTransform(): void {
@@ -799,7 +924,6 @@ function bindInteractions(): void {
   document.querySelector('[data-action="fit"]')?.addEventListener('click', fitView);
   document.querySelector('[data-action="center"]')?.addEventListener('click', centerView);
   document.querySelector('[data-action="focus"]')?.addEventListener('click', focusSelectedBlock);
-  document.querySelector('[data-action="edit-selected"]')?.addEventListener('click', () => openEditor(state.selectedNodeId));
   document.querySelector('[data-api-action="start"]')?.addEventListener('click', () => void startTest());
   document.querySelector('[data-graph-action="save"]')?.addEventListener('click', () => void saveGraph());
   document.querySelector('[data-modal-action="close"]')?.addEventListener('click', requestCloseEditor);
@@ -827,8 +951,22 @@ function bindInteractions(): void {
   };
   window.onbeforeunload = state.editorOpen && state.editorChanged ? () => '还有未保存的修改，确定要放弃吗？' : null;
 
-  document.querySelectorAll<HTMLInputElement>('[data-node-field], [data-config-key]').forEach((inputEl) => {
+  document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-node-field], [data-config-key]').forEach((inputEl) => {
+    if (inputEl instanceof HTMLSelectElement) {
+      inputEl.addEventListener('change', () => updateSelectedNode(inputEl));
+      return;
+    }
     inputEl.addEventListener('input', () => updateSelectedNode(inputEl));
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-config-value]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      if (buttonEl.dataset.configKey && buttonEl.dataset.configValue) {
+        updateSelectedNodeValue(buttonEl.dataset.configKey, buttonEl.dataset.configValue);
+        document.querySelectorAll<HTMLButtonElement>(`[data-config-key="${buttonEl.dataset.configKey}"][data-config-value]`).forEach((item) => {
+          item.setAttribute('aria-pressed', String(item === buttonEl));
+        });
+      }
+    });
   });
 
   document.querySelectorAll<HTMLElement>('.slot-join').forEach((joinEl) => {
@@ -862,7 +1000,7 @@ function openEditor(nodeId: string): void {
 function requestCloseEditor(): void {
   if (state.editorChanged) {
     state.confirmDiscard = true;
-    renderApp();
+    showDiscardConfirm();
     return;
   }
   closeEditor(false);
@@ -870,7 +1008,7 @@ function requestCloseEditor(): void {
 
 function keepEditing(): void {
   state.confirmDiscard = false;
-  renderApp();
+  hideDiscardConfirm();
 }
 
 function discardEditorChanges(): void {
@@ -890,7 +1028,11 @@ function discardEditorChanges(): void {
 function closeEditor(saved: boolean): void {
   state.confirmDiscard = false;
   state.editorClosing = true;
-  renderApp();
+  hideDiscardConfirm();
+  const overlayEl = document.querySelector<HTMLElement>('.editor-overlay');
+  if (overlayEl) {
+    overlayEl.classList.add('is-closing');
+  }
   window.setTimeout(() => {
     state.editorOpen = false;
     state.editorClosing = false;
@@ -909,15 +1051,33 @@ function focusEditor(): void {
   }
   window.setTimeout(() => {
     const target = document.querySelector<HTMLElement>(
-      state.confirmDiscard ? '.discard-confirm [data-confirm-action="keep"]' : '.editor-dialog input, #block-editor-title',
+      state.confirmDiscard ? '.discard-confirm [data-confirm-action="keep"]' : '.editor-dialog input, .editor-dialog select, #block-editor-title',
     );
     target?.focus();
   }, 0);
 }
 
+function showDiscardConfirm(): void {
+  const confirmEl = document.querySelector<HTMLElement>('.discard-confirm');
+  confirmEl?.classList.add('is-visible');
+  confirmEl?.setAttribute('aria-hidden', 'false');
+  window.setTimeout(() => {
+    document.querySelector<HTMLElement>('[data-confirm-action="keep"]')?.focus();
+  }, 0);
+}
+
+function hideDiscardConfirm(): void {
+  const confirmEl = document.querySelector<HTMLElement>('.discard-confirm');
+  confirmEl?.classList.remove('is-visible');
+  confirmEl?.setAttribute('aria-hidden', 'true');
+}
+
 function trapEditorFocus(event: KeyboardEvent): void {
+  const focusSelector = state.confirmDiscard
+    ? '.discard-confirm button:not([disabled])'
+    : '.editor-dialog button:not([disabled]), .editor-dialog input:not([disabled]), .editor-dialog select:not([disabled]), #block-editor-title';
   const focusables = Array.from(
-    document.querySelectorAll<HTMLElement>('.editor-overlay button:not([disabled]), .editor-overlay input:not([disabled]), #block-editor-title'),
+    document.querySelectorAll<HTMLElement>(focusSelector),
   ).filter((item) => item.offsetParent !== null);
   if (focusables.length === 0) {
     return;
@@ -933,7 +1093,16 @@ function trapEditorFocus(event: KeyboardEvent): void {
   }
 }
 
-function updateSelectedNode(inputEl: HTMLInputElement): void {
+function updateSelectedNode(inputEl: HTMLInputElement | HTMLSelectElement): void {
+  if (inputEl.dataset.nodeField === 'displayName') {
+    updateSelectedNodeValue('displayName', inputEl.value, 'node');
+  }
+  if (inputEl.dataset.configKey) {
+    updateSelectedNodeValue(inputEl.dataset.configKey, inputEl.value);
+  }
+}
+
+function updateSelectedNodeValue(key: string, value: string, target: 'config' | 'node' = 'config'): void {
   const graph = currentGraph();
   const selected = selectedNodeFrom(graph);
   if (!selected) {
@@ -945,11 +1114,10 @@ function updateSelectedNode(inputEl: HTMLInputElement): void {
     return;
   }
 
-  if (inputEl.dataset.nodeField === 'displayName') {
-    nextNode.displayName = inputEl.value;
-  }
-  if (inputEl.dataset.configKey) {
-    nextNode.config[inputEl.dataset.configKey] = inputEl.value;
+  if (target === 'node' && key === 'displayName') {
+    nextNode.displayName = value;
+  } else {
+    nextNode.config[key] = value;
   }
   state.graph = nextGraph;
   state.dirty = true;
@@ -1021,12 +1189,13 @@ async function loadGraph(): Promise<void> {
 }
 
 async function saveGraph(): Promise<void> {
+  const renderBusy = !state.editorOpen;
   await runAction('保存', async () => {
     const saved = await saveAndCommit();
     if (saved && state.editorOpen) {
       closeEditor(true);
     }
-  });
+  }, { renderBusy });
 }
 
 async function saveAndCommit(): Promise<boolean> {
@@ -1107,10 +1276,12 @@ async function refreshLatestTrace(showBusy = true): Promise<void> {
   }
 }
 
-async function runAction(label: string, action: () => Promise<void>): Promise<void> {
+async function runAction(label: string, action: () => Promise<void>, options: { renderBusy?: boolean } = {}): Promise<void> {
   state.busyAction = label;
   state.error = '';
-  renderApp();
+  if (options.renderBusy ?? true) {
+    renderApp();
+  }
 
   try {
     await action();
@@ -1121,7 +1292,9 @@ async function runAction(label: string, action: () => Promise<void>): Promise<vo
     state.error = error instanceof Error ? error.message : 'API 未连接';
   } finally {
     state.busyAction = null;
-    renderApp();
+    if (!state.editorClosing) {
+      renderApp();
+    }
   }
 }
 
@@ -1218,20 +1391,36 @@ function nodeSummary(nodeItem: GraphNode): string {
     case 'MANUAL_TRIGGER':
       return 'WebUI 点击后调用真实后端 API';
     case 'STATE_COMPARE_CONDITION':
-      return `${config.scope ?? 'PLAYER'}.${config.key ?? 'key'} 等于 ${config.expected ?? 'false'}`;
+      return `当“${scopeLabel(config.scope)}”的 ${config.key ?? '状态名'} 等于“${booleanLabel(config.expected ?? 'false')}”时，走“通过”分支。`;
     case 'MESSAGE_ACTION':
       return `向模拟玩家显示：${config.message ?? ''}`;
     case 'STATE_SET_ACTION':
-      return `把 ${config.scope ?? 'PLAYER'}.${config.key ?? 'key'} 设置为 ${config.value ?? ''}`;
+      return `把“${scopeLabel(config.scope)}”的 ${config.key ?? '状态名'} 设置为“${stateValueLabel(config.value ?? '', config.valueType ?? 'BOOLEAN')}”。`;
     case 'STATE_ADD_ACTION':
-      return `把 ${config.scope ?? 'PLAYER'}.${config.key ?? 'key'} 增加 ${config.amount ?? '1'}`;
+      return `把“${scopeLabel(config.scope)}”的 ${config.key ?? '状态名'} 增加 ${config.amount ?? '1'}。`;
     case 'TIMER_START_ACTION':
-      return `倒计时 ${config.durationSeconds ?? '30'} 秒后继续`;
+      return `等待 ${config.durationSeconds ?? '30'} 秒后继续。`;
     case 'DEBUG_LOG_ACTION':
       return `记录：${config.message ?? ''}`;
     default:
       return nodeItem.id;
   }
+}
+
+function scopeLabel(value = 'PLAYER'): string {
+  return stateScopeOptions().find((option) => option.value === value)?.label ?? value;
+}
+
+function valueTypeLabel(value = 'BOOLEAN'): string {
+  return valueTypeOptions().find((option) => option.value === value)?.label ?? value;
+}
+
+function booleanLabel(value = 'false'): string {
+  return booleanOptions().find((option) => option.value === value)?.label ?? value;
+}
+
+function stateValueLabel(value: string, valueType: string): string {
+  return valueType === 'BOOLEAN' ? booleanLabel(value || 'false') : value || '未填写';
 }
 
 function fallbackPosition(nodeId: string): GraphPosition {

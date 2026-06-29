@@ -35,7 +35,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -49,7 +50,8 @@ button:disabled {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible {
   outline: 3px solid rgba(45, 111, 159, 0.45);
   outline-offset: 2px;
 }
@@ -623,20 +625,17 @@ h1 {
   background: var(--panel);
 }
 
-label {
+.field-row {
   display: grid;
   gap: 6px;
-  margin-bottom: 10px;
+  margin: 0;
   color: var(--muted);
   font-size: 0.86rem;
   font-weight: 900;
 }
 
-label:last-child {
-  margin-bottom: 0;
-}
-
-input {
+input,
+select {
   width: 100%;
   min-height: 38px;
   border: 1px solid #b8c8bc;
@@ -645,6 +644,104 @@ input {
   color: var(--ink);
   padding: 0 10px;
   font-weight: 700;
+}
+
+input[type="number"] {
+  appearance: textfield;
+}
+
+select {
+  appearance: none;
+  padding-right: 34px;
+  background:
+    linear-gradient(45deg, transparent 50%, #40534a 50%),
+    linear-gradient(135deg, #40534a 50%, transparent 50%),
+    #ffffff;
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%,
+    0 0;
+  background-size:
+    6px 6px,
+    6px 6px,
+    100% 100%;
+  background-repeat: no-repeat;
+}
+
+.editor-section {
+  display: grid;
+  gap: 12px;
+}
+
+.editor-section > b {
+  color: var(--ink);
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field-row.is-full {
+  grid-column: 1 / -1;
+}
+
+.input-with-suffix {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-with-suffix > span {
+  color: #40534a;
+  font-weight: 900;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: 38px;
+  padding: 3px;
+  border: 1px solid #b8c8bc;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.segmented-control button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #40534a;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.segmented-control button[aria-pressed="true"] {
+  background: #2d6f9f;
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(45, 111, 159, 0.25);
+}
+
+.readonly-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.readonly-field b {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  border: 1px solid #c9d6cc;
+  border-radius: 8px;
+  background: #eef5ee;
+  color: var(--ink);
+  padding: 0 10px;
 }
 
 .info-card b,
@@ -666,6 +763,32 @@ input {
 .info-card .run-button {
   width: 100%;
   margin-top: 12px;
+}
+
+.config-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.config-list div {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.config-list dt {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.config-list dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .validation-card {
@@ -782,6 +905,12 @@ input {
   background: var(--panel);
 }
 
+@media (max-width: 640px) {
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .editor-summary b,
 .editor-issues b {
   display: block;
@@ -817,7 +946,16 @@ input {
   border-radius: 8px;
   background: #fffef9;
   box-shadow: 0 24px 60px rgba(23, 33, 29, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transform: translate(-50%, calc(-50% + 8px)) scale(0.985);
+}
+
+.discard-confirm.is-visible {
   animation: confirm-in 160ms cubic-bezier(0.2, 0.85, 0.26, 1) both;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 .discard-confirm b {

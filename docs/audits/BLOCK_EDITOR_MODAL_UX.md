@@ -16,6 +16,7 @@ The right-side property editor made block configuration feel like a side panel w
 - Closing the modal with unsaved edits asks for confirmation.
 - The modal uses short CSS open/close animations.
 - Reduced motion disables animation.
+- Follow-up humanized form work keeps this modal interaction, but replaces internal-field-looking controls with Chinese labels, compact field groups, and mapped enum controls.
 
 ## Save Semantics
 

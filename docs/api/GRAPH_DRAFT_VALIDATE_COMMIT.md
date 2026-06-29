@@ -135,6 +135,8 @@ The API layer still exposes draft, validate, and commit as separate operations, 
 
 Block fields are edited in a focused modal opened from the Slot-Based canvas. The right panel only shows selected-block information and status.
 
+The modal is a display/control layer over the same graph JSON. It maps internal config values to user-facing Chinese labels, for example `PLAYER` -> `玩家`, `BOOLEAN` -> `是或否`, and `true` / `false` -> `是` / `否`. Saving still writes the original internal values back to the draft graph.
+
 Validation remains fail-closed. If validation fails, the committed graph and runtime graph are not replaced, and the UI shows a Chinese validation error.
 
 The internal draft file can still exist after a failed save so the user can repair the fields and click `保存` again.

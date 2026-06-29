@@ -50,6 +50,8 @@ Important user semantics:
 - The right panel is an information surface, not the main field editor.
 - Closing the editor modal with unsaved changes requires confirmation.
 - Modal open/close uses short CSS animation and respects reduced motion.
+- The editor modal uses humanized Chinese form labels and controls. Internal graph values such as `PLAYER`, `BOOLEAN`, and `true` remain storage/runtime values, but normal UI renders them as labels such as `玩家`, `是或否`, and `是`.
+- Short configuration fields use compact two-column layout where space allows; long text fields remain full-width.
 
 ## Boundary
 

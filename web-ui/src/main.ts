@@ -32,13 +32,6 @@ type SlotJoin = {
   tone?: 'normal' | 'pass' | 'fail';
 };
 
-const statusText: Record<Status, string> = {
-  ok: '正常',
-  selected: '已选中',
-  warning: '警告',
-  error: '错误',
-};
-
 const blocks: SlotBlock[] = [
   {
     id: 'trigger',
@@ -49,9 +42,9 @@ const blocks: SlotBlock[] = [
     summary: '玩家输入命令后开始流程',
     status: 'ok',
     x: 48,
-    y: 86,
-    width: 286,
-    height: 148,
+    y: 205,
+    width: 260,
+    height: 150,
     meta: '起点',
   },
   {
@@ -63,10 +56,10 @@ const blocks: SlotBlock[] = [
     summary: 'PLAYER.started 等于 false',
     status: 'selected',
     selected: true,
-    x: 326,
-    y: 74,
-    width: 360,
-    height: 432,
+    x: 294,
+    y: 78,
+    width: 384,
+    height: 404,
     meta: '双槽位',
   },
   {
@@ -77,7 +70,7 @@ const blocks: SlotBlock[] = [
     title: '发送欢迎语',
     summary: '向玩家显示：欢迎开始游戏',
     status: 'ok',
-    x: 696,
+    x: 664,
     y: 78,
     width: 260,
     height: 150,
@@ -91,7 +84,7 @@ const blocks: SlotBlock[] = [
     title: '记录开始状态',
     summary: '把 PLAYER.started 设置为 true',
     status: 'ok',
-    x: 936,
+    x: 910,
     y: 78,
     width: 260,
     height: 150,
@@ -105,9 +98,9 @@ const blocks: SlotBlock[] = [
     title: '等待 30 秒',
     summary: '倒计时结束后继续',
     status: 'warning',
-    x: 1176,
+    x: 1156,
     y: 78,
-    width: 246,
+    width: 260,
     height: 150,
     meta: '主路完成',
   },
@@ -119,7 +112,7 @@ const blocks: SlotBlock[] = [
     title: '倒计时结束',
     summary: '记录本轮开始流程完成',
     status: 'ok',
-    x: 1388,
+    x: 1402,
     y: 78,
     width: 260,
     height: 150,
@@ -132,20 +125,20 @@ const blocks: SlotBlock[] = [
     title: '已经开始过',
     summary: '记录玩家已经开始过游戏',
     status: 'error',
-    x: 746,
+    x: 664,
     y: 332,
-    width: 300,
-    height: 156,
+    width: 260,
+    height: 150,
   },
 ];
 
 const joins: SlotJoin[] = [
-  { id: 'j1', from: 'trigger', to: 'condition', branch: 'main', x: 318, y: 151, width: 44 },
-  { id: 'j2', from: 'condition', to: 'message', branch: 'pass', x: 676, y: 139, width: 36, tone: 'pass' },
-  { id: 'j3', from: 'message', to: 'state', branch: 'pass', x: 928, y: 139, width: 36, tone: 'pass' },
-  { id: 'j4', from: 'state', to: 'timer', branch: 'pass', x: 1168, y: 139, width: 36, tone: 'pass' },
-  { id: 'j5', from: 'timer', to: 'done-debug', branch: 'pass', x: 1380, y: 139, width: 36, tone: 'pass' },
-  { id: 'j6', from: 'condition', to: 'fail-debug', branch: 'fail', x: 676, y: 397, width: 86, tone: 'fail' },
+  { id: 'j1', from: 'trigger', to: 'condition', branch: 'main', x: 292, y: 266, width: 20 },
+  { id: 'j2', from: 'condition', to: 'message', branch: 'pass', x: 662, y: 139, width: 20, tone: 'pass' },
+  { id: 'j3', from: 'message', to: 'state', branch: 'pass', x: 908, y: 139, width: 20, tone: 'pass' },
+  { id: 'j4', from: 'state', to: 'timer', branch: 'pass', x: 1154, y: 139, width: 20, tone: 'pass' },
+  { id: 'j5', from: 'timer', to: 'done-debug', branch: 'pass', x: 1400, y: 139, width: 20, tone: 'pass' },
+  { id: 'j6', from: 'condition', to: 'fail-debug', branch: 'fail', x: 662, y: 393, width: 20, tone: 'fail' },
 ];
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -157,6 +150,47 @@ let offsetY = 34;
 let isDragging = false;
 let dragStart = { x: 0, y: 0 };
 let dragOffset = { x: 0, y: 0 };
+
+function puzzlePath(kind: BlockKind, width: number, height: number): string {
+  const tab = 18;
+  const notchTop = 57;
+  const notchBottom = 93;
+
+  if (kind === 'trigger') {
+    return `M0 0 H${width - tab} V${notchTop} H${width} V${notchBottom} H${width - tab} V${height} H0 Z`;
+  }
+
+  if (kind === 'condition') {
+    const headHeight = 150;
+    const headTop = (height - headHeight) / 2;
+    const headBottom = headTop + headHeight;
+    const inputTop = headTop + notchTop;
+    const inputBottom = headTop + notchBottom;
+    const branchInset = width - 106;
+
+    return `M${branchInset} 0 H${width - tab} V${notchTop} H${width} V${notchBottom} H${width - tab} V311 H${width} V347 H${width - tab} V${height} H${branchInset} V${headBottom} H0 V${inputBottom} H${tab} V${inputTop} H0 V${headTop} H${branchInset} Z`;
+  }
+
+  return `M0 0 H${width - tab} V${notchTop} H${width} V${notchBottom} H${width - tab} V${height} H0 V${notchBottom} H${tab} V${notchTop} H0 Z`;
+}
+
+function conditionBranchTabs(width: number): string {
+  return `
+      <path class="branch-tab-fill pass" d="M${width - 20} ${57} H${width} V${93} H${width - 20} Z" />
+      <path class="branch-tab pass" d="M${width - 18} ${57} H${width} V${93} H${width - 18}" />
+      <path class="branch-tab-fill fail" d="M${width - 20} ${311} H${width} V${347} H${width - 20} Z" />
+      <path class="branch-tab fail" d="M${width - 18} ${311} H${width} V${347} H${width - 18}" />
+    `;
+}
+
+function renderShape(path: string, width: number, height: number, extraPaths = ''): string {
+  return `
+    <svg class="puzzle-shape" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
+      <path class="block-body" d="${path}" />
+      ${extraPaths}
+    </svg>
+  `;
+}
 
 function renderSlotJoin(join: SlotJoin): string {
   return `
@@ -174,35 +208,21 @@ function renderSlotJoin(join: SlotJoin): string {
 }
 
 function renderBlock(block: SlotBlock): string {
-  const errorChip = block.collapsedError
-    ? `<span class="error-chip">${block.collapsedError}</span>`
-    : '';
-  const conditionSlots =
-    block.kind === 'condition'
-      ? `
-        <div class="condition-slots" aria-label="条件分支槽位">
-          <div class="branch-slot pass"><span>通过</span><b>继续开始流程</b></div>
-          <div class="branch-slot fail"><span>失败</span><b>写入调试记录</b></div>
-        </div>
-      `
-      : '';
+  const branchTabs = block.kind === 'condition' ? conditionBranchTabs(block.width) : '';
 
   return `
     <article
-      class="logic-block ${block.kind} ${block.status} ${block.branch}"
+      class="logic-block ${block.kind} ${block.branch}${block.selected ? ' selected' : ''}"
       data-block="${block.id}"
       data-branch="${block.branch}"
-      style="left:${block.x}px; top:${block.y}px; width:${block.width}px; min-height:${block.height}px"
+      style="left:${block.x}px; top:${block.y}px; width:${block.width}px; height:${block.height}px; z-index:${3000 - block.x + (block.selected ? 1000 : 0)}"
     >
+      ${renderShape(puzzlePath(block.kind, block.width, block.height), block.width, block.height, branchTabs)}
       <div class="block-topline">
         <span>${block.type}</span>
-        <b>${statusText[block.status]}</b>
       </div>
       <h3>${block.title}</h3>
       <p>${block.summary}</p>
-      ${block.meta ? `<small>${block.meta}</small>` : ''}
-      ${errorChip}
-      ${conditionSlots}
     </article>
   `;
 }
@@ -266,7 +286,7 @@ function focusSelectedBlock(): void {
 }
 
 function clearFocus(): void {
-  document.querySelectorAll('.logic-block, .slot-join, .branch-lane').forEach((item) => {
+  document.querySelectorAll('.logic-block, .slot-join').forEach((item) => {
     item.classList.remove('is-related');
   });
 }
@@ -276,7 +296,6 @@ function markJoinFocus(joinEl: HTMLElement): void {
   joinEl.classList.add('is-related');
   document.querySelector(`[data-block="${joinEl.dataset.from}"]`)?.classList.add('is-related');
   document.querySelector(`[data-block="${joinEl.dataset.to}"]`)?.classList.add('is-related');
-  document.querySelector(`[data-lane="${joinEl.dataset.branch}"]`)?.classList.add('is-related');
 }
 
 function markSelectedFocus(): void {
@@ -290,7 +309,6 @@ function markSelectedFocus(): void {
   document.querySelectorAll<HTMLElement>('.slot-join').forEach((joinEl) => {
     if (joinEl.dataset.from === selected.id || joinEl.dataset.to === selected.id) {
       joinEl.classList.add('is-related');
-      document.querySelector(`[data-lane="${joinEl.dataset.branch}"]`)?.classList.add('is-related');
     }
   });
 }
@@ -436,15 +454,8 @@ if (app) {
         </div>
         <section class="canvas-viewport" aria-label="可拖动画布">
           <div class="flow-world" style="width:${world.width}px; height:${world.height}px">
-            <div class="branch-lane pass" data-lane="pass">
-              <span>通过分支</span>
-            </div>
-            <div class="branch-lane fail" data-lane="fail">
-              <span>失败分支</span>
-            </div>
             ${joins.map(renderSlotJoin).join('')}
             ${blocks.map(renderBlock).join('')}
-            <div class="drop-slot" style="left: 1788px; top: 112px">放入下一个积木</div>
           </div>
         </section>
       </main>

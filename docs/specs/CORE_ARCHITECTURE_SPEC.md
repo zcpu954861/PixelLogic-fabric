@@ -39,6 +39,8 @@ The current timer uses `ScheduledExecutorService` for wall-clock delay. The due 
 
 The API + WebUI test-run checkpoint adds a localhost-only spike API for the same demo graph. The API uses a fixed `WebUI 模拟玩家` actor for PLAYER-scoped browser simulation and does not implement graph save/load.
 
+The graph draft/validate/commit checkpoint adds versioned JSON persistence for `demo-start-flow`. The runtime starts from the committed graph, draft saves are isolated, and commit swaps the compiled runtime graph only after `GraphValidator` passes.
+
 ## Layer Boundaries
 
 ### Core
@@ -379,7 +381,10 @@ Recommended v1 world storage:
 world/pixellogic/
   project.json
   graphs/
-    <graph-id>.json
+    committed/
+      <graph-id>.json
+    drafts/
+      <graph-id>.json
   state/
     global.json
     players/
@@ -399,6 +404,17 @@ Each persisted config file must include:
 - fingerprint
 
 Graph drafts and committed graphs should be distinguishable so invalid drafts do not replace a valid committed graph.
+
+The current implemented graph checkpoint uses:
+
+```text
+<world>/pixellogic/
+  graphs/
+    committed/demo-start-flow.json
+    drafts/demo-start-flow.json
+```
+
+`demo-start-flow` is seeded on first startup. Writes use a temporary file and atomic replace where available. Graph ids are limited to `[A-Za-z0-9_-]+` so API paths cannot escape the PixelLogic storage root.
 
 ## Validation Spec
 
@@ -439,6 +455,25 @@ POST   /api/graphs/{id}/simulate
 GET    /api/traces
 GET    /api/events/stream
 ```
+
+### Implemented Graph Draft API
+
+```text
+GET  /api/pixellogic/graphs
+GET  /api/pixellogic/graphs/demo-start-flow
+GET  /api/pixellogic/graphs/demo-start-flow/draft
+PUT  /api/pixellogic/graphs/demo-start-flow/draft
+POST /api/pixellogic/graphs/demo-start-flow/validate
+POST /api/pixellogic/graphs/demo-start-flow/commit
+```
+
+Rules:
+
+- All responses are JSON envelopes.
+- `PUT draft` parses versioned graph JSON and writes only the draft file.
+- `validate` runs the existing `GraphValidator` against the draft.
+- `commit` validates again; invalid drafts return issues and do not replace committed graph.
+- Test-run endpoints execute the committed graph, not the draft.
 
 ### Implemented Spike API
 

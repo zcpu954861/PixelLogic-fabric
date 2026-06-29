@@ -3,6 +3,7 @@ import './styles.css';
 type ApiStatus = 'checking' | 'online' | 'offline';
 type BlockKind = 'trigger' | 'condition' | 'action' | 'state' | 'timer' | 'debug';
 type Branch = 'main' | 'pass' | 'fail';
+type LibraryKind = 'trigger' | 'condition' | 'action' | 'state' | 'timer' | 'debug';
 
 type ApiTraceStep = {
   timestamp: string;
@@ -134,6 +135,7 @@ type UiState = {
   editorChanged: boolean;
   confirmDiscard: boolean;
   editorSnapshot: EditorSnapshot | null;
+  recentNodeId: string | null;
 };
 
 type EditorSnapshot = {
@@ -168,6 +170,26 @@ type SlotJoin = {
   y: number;
   width: number;
   tone?: 'normal' | 'pass' | 'fail';
+};
+
+type InsertCandidate = {
+  edge: GraphEdge;
+  join: SlotJoin;
+  valid: boolean;
+  message: string;
+};
+
+type BlockDrag = {
+  pointerId: number;
+  rootId: string;
+  groupIds: string[];
+  started: boolean;
+  startClient: GraphPosition;
+  startWorld: GraphPosition;
+  startPositions: Map<string, GraphPosition>;
+  previewPositions: Map<string, GraphPosition>;
+  joins: SlotJoin[];
+  candidate: InsertCandidate | null;
 };
 
 class PixelLogicApiError extends Error {
@@ -268,14 +290,17 @@ const state: UiState = {
   editorChanged: false,
   confirmDiscard: false,
   editorSnapshot: null,
+  recentNodeId: null,
 };
 
 let scale = 0.86;
 let offsetX = 28;
 let offsetY = 34;
-let isDragging = false;
-let dragStart = { x: 0, y: 0 };
-let dragOffset = { x: 0, y: 0 };
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let panOffset = { x: 0, y: 0 };
+let activeBlockDrag: BlockDrag | null = null;
+const dragThreshold = 6;
 
 function node(
   id: string,
@@ -345,15 +370,19 @@ function renderShape(path: string, width: number, height: number, extraPaths = '
   `;
 }
 
+function blockSize(kind: BlockKind): { width: number; height: number } {
+  return kind === 'condition' ? { width: 384, height: 404 } : { width: 260, height: 150 };
+}
+
 function buildBlocks(graph: GraphDocument): SlotBlock[] {
   return graph.nodes.map((nodeItem) => {
     const kind = blockKind(nodeItem.type);
     const position = nodeItem.position ?? fallbackPosition(nodeItem.id);
-    const size = kind === 'condition' ? { width: 384, height: 404 } : { width: 260, height: 150 };
+    const size = blockSize(kind);
     return {
       id: nodeItem.id,
       kind,
-      branch: branchForNode(nodeItem),
+      branch: branchForNode(graph, nodeItem),
       type: nodeTypeLabel(nodeItem.type),
       title: nodeItem.displayName || nodeItem.id,
       summary: nodeSummary(nodeItem),
@@ -410,7 +439,7 @@ function renderBlock(block: SlotBlock): string {
 
   return `
     <article
-      class="logic-block ${block.kind} ${block.branch}${block.selected ? ' selected' : ''}"
+      class="logic-block ${block.kind} ${block.branch}${block.selected ? ' selected' : ''}${state.recentNodeId === block.id ? ' newly-added' : ''}"
       data-block="${escapeAttr(block.id)}"
       data-branch="${block.branch}"
       style="left:${block.x}px; top:${block.y}px; width:${block.width}px; height:${block.height}px; z-index:${3000 - block.x + (block.selected ? 1000 : 0)}"
@@ -431,7 +460,7 @@ function renderTrace(trace: ApiTrace | null): string {
   }
 
   return trace.steps
-    .map((step) => `<li>[${escapeHtml(formatTime(step.timestamp))}] ${escapeHtml(step.message)}</li>`)
+    .map((step) => `<li>[${escapeHtml(formatTime(step.timestamp))}] ${escapeHtml(humanizeTraceMessage(step.message))}</li>`)
     .join('');
 }
 
@@ -459,6 +488,7 @@ function renderApp(): void {
         </div>
         <nav class="top-actions" aria-label="工作台操作">
           <span class="api-pill ${state.apiStatus}" aria-live="polite">${escapeHtml(apiStatusText())}</span>
+          <button type="button" class="run-button save-button" data-graph-action="save" ${apiBusyAttr()}>保存</button>
           <button type="button" class="run-button" data-api-action="start" ${apiBusyAttr()}>测试运行</button>
           <button type="button" class="ghost-button" data-action="fit">适应视图</button>
           <button type="button" class="ghost-button" data-action="center">回到中心</button>
@@ -477,12 +507,12 @@ function renderApp(): void {
         <section>
           <div class="panel-title"><span>积木库</span></div>
           <div class="library-grid">
-            <button type="button">触发器</button>
-            <button type="button">条件</button>
-            <button type="button">动作</button>
-            <button type="button">状态</button>
-            <button type="button">计时器</button>
-            <button type="button">调试</button>
+            <button type="button" data-library-kind="trigger">触发器</button>
+            <button type="button" data-library-kind="condition">条件</button>
+            <button type="button" data-library-kind="action">动作</button>
+            <button type="button" data-library-kind="state">状态</button>
+            <button type="button" data-library-kind="timer">计时器</button>
+            <button type="button" data-library-kind="debug">调试</button>
           </div>
         </section>
 
@@ -511,6 +541,7 @@ function renderApp(): void {
             ${joins.map(renderSlotJoin).join('')}
             ${blocks.map(renderBlock).join('')}
           </div>
+          <div class="drag-hint" data-drag-hint aria-live="polite"></div>
         </section>
       </main>
 
@@ -573,11 +604,40 @@ function renderNodeInfo(nodeItem: GraphNode): string {
         </dl>
       ` : '<p>该积木当前没有额外配置。</p>'}
     </section>
+    ${renderConnectionInfo(nodeItem)}
     <section class="info-card">
       <b>提示</b>
-      <p>点击画布中的积木可以打开编辑窗口。</p>
+      <p>点击积木打开编辑窗口；按住拖动可移动它和后续链条。</p>
     </section>
   `;
+}
+
+function renderConnectionInfo(nodeItem: GraphNode): string {
+  const graph = currentGraph();
+  const incoming = graph.edges.filter((graphEdge) => graphEdge.targetNodeId === nodeItem.id);
+  const outgoing = graph.edges.filter((graphEdge) => graphEdge.sourceNodeId === nodeItem.id);
+  const canDelete = !Object.values(graph.triggerEntries).includes(nodeItem.id);
+
+  return `
+    <section class="info-card connection-card">
+      <b>连接</b>
+      <dl class="config-list">
+        <div><dt>输入</dt><dd>${escapeHtml(incoming.length > 0 ? incoming.map(edgeSummary).join('；') : '未连接')}</dd></div>
+        <div><dt>输出</dt><dd>${escapeHtml(outgoing.length > 0 ? outgoing.map(edgeSummary).join('；') : '未连接')}</dd></div>
+      </dl>
+      <div class="info-actions">
+        <button type="button" class="ghost-button" data-graph-action="disconnect-input" ${incoming.length === 0 ? 'disabled' : ''}>断开输入</button>
+        <button type="button" class="ghost-button danger" data-graph-action="delete-selected" ${canDelete ? '' : 'disabled'}>删除积木</button>
+      </div>
+    </section>
+  `;
+}
+
+function edgeSummary(graphEdge: GraphEdge): string {
+  const graph = currentGraph();
+  const source = graph.nodes.find((nodeItem) => nodeItem.id === graphEdge.sourceNodeId);
+  const target = graph.nodes.find((nodeItem) => nodeItem.id === graphEdge.targetNodeId);
+  return `${source?.displayName ?? graphEdge.sourceNodeId}.${slotLabel(graphEdge.sourceSlotId)} -> ${target?.displayName ?? graphEdge.targetNodeId}`;
 }
 
 function renderEditorModal(nodeItem: GraphNode): string {
@@ -864,41 +924,59 @@ function bindInteractions(): void {
   }
 
   viewport.addEventListener('pointerdown', (event) => {
-    const blockEl = (event.target as HTMLElement).closest<HTMLElement>('.logic-block');
+    const target = event.target as HTMLElement;
+    const blockEl = target.closest<HTMLElement>('.logic-block');
     if (blockEl?.dataset.block) {
-      openEditor(blockEl.dataset.block);
+      event.preventDefault();
+      beginBlockPointerDown(event, blockEl.dataset.block, viewport);
       return;
     }
 
-    if ((event.target as HTMLElement).closest('.slot-join, button, input')) {
+    if (target.closest('.slot-join, button, input, select')) {
       return;
     }
 
-    isDragging = true;
-    dragStart = { x: event.clientX, y: event.clientY };
-    dragOffset = { x: offsetX, y: offsetY };
+    isPanning = true;
+    panStart = { x: event.clientX, y: event.clientY };
+    panOffset = { x: offsetX, y: offsetY };
     viewport.classList.add('is-dragging');
     viewport.setPointerCapture(event.pointerId);
   });
 
   viewport.addEventListener('pointermove', (event) => {
-    if (!isDragging) {
+    if (activeBlockDrag?.pointerId === event.pointerId) {
+      moveBlockDrag(event);
       return;
     }
 
-    offsetX = dragOffset.x + event.clientX - dragStart.x;
-    offsetY = dragOffset.y + event.clientY - dragStart.y;
+    if (!isPanning) {
+      return;
+    }
+
+    offsetX = panOffset.x + event.clientX - panStart.x;
+    offsetY = panOffset.y + event.clientY - panStart.y;
     setTransform();
   });
 
   viewport.addEventListener('pointerup', (event) => {
-    isDragging = false;
+    if (activeBlockDrag?.pointerId === event.pointerId) {
+      endBlockDrag(event, viewport);
+      return;
+    }
+
+    isPanning = false;
     viewport.classList.remove('is-dragging');
-    viewport.releasePointerCapture(event.pointerId);
+    if (viewport.hasPointerCapture(event.pointerId)) {
+      viewport.releasePointerCapture(event.pointerId);
+    }
   });
 
-  viewport.addEventListener('pointercancel', () => {
-    isDragging = false;
+  viewport.addEventListener('pointercancel', (event) => {
+    if (activeBlockDrag?.pointerId === event.pointerId) {
+      cancelBlockDrag(viewport);
+      return;
+    }
+    isPanning = false;
     viewport.classList.remove('is-dragging');
   });
 
@@ -925,11 +1003,23 @@ function bindInteractions(): void {
   document.querySelector('[data-action="center"]')?.addEventListener('click', centerView);
   document.querySelector('[data-action="focus"]')?.addEventListener('click', focusSelectedBlock);
   document.querySelector('[data-api-action="start"]')?.addEventListener('click', () => void startTest());
-  document.querySelector('[data-graph-action="save"]')?.addEventListener('click', () => void saveGraph());
+  document.querySelectorAll('[data-graph-action="save"]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => void saveGraph());
+  });
+  document.querySelector('[data-graph-action="disconnect-input"]')?.addEventListener('click', disconnectSelectedInput);
+  document.querySelector('[data-graph-action="delete-selected"]')?.addEventListener('click', deleteSelectedNode);
   document.querySelector('[data-modal-action="close"]')?.addEventListener('click', requestCloseEditor);
   document.querySelector('[data-modal-action="cancel"]')?.addEventListener('click', requestCloseEditor);
   document.querySelector('[data-confirm-action="keep"]')?.addEventListener('click', keepEditing);
   document.querySelector('[data-confirm-action="discard"]')?.addEventListener('click', discardEditorChanges);
+  document.querySelectorAll<HTMLButtonElement>('[data-library-kind]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      const kind = buttonEl.dataset.libraryKind as LibraryKind | undefined;
+      if (kind) {
+        addLibraryBlock(kind);
+      }
+    });
+  });
   document.querySelector('.editor-overlay')?.addEventListener('pointerdown', (event) => {
     if ((event.target as HTMLElement).hasAttribute('data-modal-overlay')) {
       requestCloseEditor();
@@ -978,6 +1068,510 @@ function bindInteractions(): void {
   });
 
   markSelectedFocus();
+}
+
+function beginBlockPointerDown(event: PointerEvent, nodeId: string, viewport: HTMLElement): void {
+  const graph = currentGraph();
+  if (!graph.nodes.some((nodeItem) => nodeItem.id === nodeId)) {
+    return;
+  }
+
+  const groupIds = downstreamNodeIds(graph, nodeId);
+  const startPositions = new Map<string, GraphPosition>();
+  groupIds.forEach((id) => startPositions.set(id, nodePosition(graph, id)));
+  activeBlockDrag = {
+    pointerId: event.pointerId,
+    rootId: nodeId,
+    groupIds,
+    started: false,
+    startClient: { x: event.clientX, y: event.clientY },
+    startWorld: pointerToWorld(event),
+    startPositions,
+    previewPositions: new Map(startPositions),
+    joins: buildJoins(graph, buildBlocks(graph)),
+    candidate: null,
+  };
+  viewport.setPointerCapture(event.pointerId);
+}
+
+function moveBlockDrag(event: PointerEvent): void {
+  const drag = activeBlockDrag;
+  if (!drag) {
+    return;
+  }
+
+  const clientDx = event.clientX - drag.startClient.x;
+  const clientDy = event.clientY - drag.startClient.y;
+  if (!drag.started && Math.hypot(clientDx, clientDy) < dragThreshold) {
+    return;
+  }
+
+  if (!drag.started) {
+    drag.started = true;
+    state.selectedNodeId = drag.rootId;
+    state.recentNodeId = null;
+    document.querySelector('.canvas-viewport')?.classList.add('is-block-dragging');
+    drag.groupIds.forEach((id) => document.querySelector<HTMLElement>(`[data-block="${id}"]`)?.classList.add('is-chain-dragging'));
+    document.querySelector<HTMLElement>(`[data-block="${drag.rootId}"]`)?.classList.add('is-drag-root', 'selected');
+    clearFocus();
+    setDragHint('拖动整链中，靠近两个积木之间可插入。', 'active');
+  }
+
+  const current = pointerToWorld(event);
+  const worldDx = current.x - drag.startWorld.x;
+  const worldDy = current.y - drag.startWorld.y;
+  drag.previewPositions = new Map();
+  drag.groupIds.forEach((id) => {
+    const start = drag.startPositions.get(id);
+    if (!start) {
+      return;
+    }
+    const next = {
+      x: Math.round(start.x + worldDx),
+      y: Math.round(start.y + worldDy),
+    };
+    drag.previewPositions.set(id, next);
+    const blockEl = document.querySelector<HTMLElement>(`[data-block="${id}"]`);
+    if (blockEl) {
+      blockEl.style.left = `${next.x}px`;
+      blockEl.style.top = `${next.y}px`;
+    }
+  });
+
+  drag.candidate = findInsertCandidate(drag);
+  renderInsertPreview(drag.candidate);
+}
+
+function endBlockDrag(event: PointerEvent, viewport: HTMLElement): void {
+  const drag = activeBlockDrag;
+  if (!drag) {
+    return;
+  }
+
+  activeBlockDrag = null;
+  clearInsertPreview();
+  setDragHint('', '');
+  viewport.classList.remove('is-block-dragging');
+  if (viewport.hasPointerCapture(event.pointerId)) {
+    viewport.releasePointerCapture(event.pointerId);
+  }
+
+  if (!drag.started) {
+    openEditor(drag.rootId);
+    return;
+  }
+
+  const nextGraph = cloneGraph(currentGraph());
+  nextGraph.nodes = nextGraph.nodes.map((nodeItem) => {
+    const nextPosition = drag.previewPositions.get(nodeItem.id);
+    return nextPosition ? { ...nodeItem, position: nextPosition } : nodeItem;
+  });
+  const inserted = drag.candidate?.valid ? insertDraggedGroup(nextGraph, drag) : false;
+  if (inserted) {
+    makeInsertionGap(nextGraph, drag);
+  }
+  state.graph = nextGraph;
+  state.dirty = true;
+  state.validation = null;
+  state.error = '';
+  state.selectedNodeId = drag.rootId;
+  state.lastAction = inserted ? '已插入到连接处，点击保存完成检查。' : '位置已更新，点击保存完成检查。';
+  renderApp();
+}
+
+function cancelBlockDrag(viewport: HTMLElement): void {
+  activeBlockDrag = null;
+  clearInsertPreview();
+  setDragHint('', '');
+  viewport.classList.remove('is-block-dragging');
+  renderApp();
+}
+
+function pointerToWorld(event: PointerEvent): GraphPosition {
+  const viewport = document.querySelector<HTMLElement>('.canvas-viewport');
+  if (!viewport) {
+    return { x: 0, y: 0 };
+  }
+  const rect = viewport.getBoundingClientRect();
+  return {
+    x: (event.clientX - rect.left - offsetX) / scale,
+    y: (event.clientY - rect.top - offsetY) / scale,
+  };
+}
+
+function downstreamNodeIds(graph: GraphDocument, rootId: string): string[] {
+  const outgoing = new Map<string, GraphEdge[]>();
+  graph.edges.forEach((graphEdge) => {
+    const list = outgoing.get(graphEdge.sourceNodeId) ?? [];
+    list.push(graphEdge);
+    outgoing.set(graphEdge.sourceNodeId, list);
+  });
+
+  const visited = new Set<string>();
+  const ordered: string[] = [];
+  const stack = [rootId];
+  while (stack.length > 0) {
+    const nextId = stack.pop();
+    if (!nextId || visited.has(nextId)) {
+      continue;
+    }
+    visited.add(nextId);
+    ordered.push(nextId);
+    for (const graphEdge of outgoing.get(nextId) ?? []) {
+      if (!visited.has(graphEdge.targetNodeId)) {
+        stack.push(graphEdge.targetNodeId);
+      }
+    }
+  }
+  return ordered;
+}
+
+function nodePosition(graph: GraphDocument, nodeId: string): GraphPosition {
+  return graph.nodes.find((nodeItem) => nodeItem.id === nodeId)?.position ?? fallbackPosition(nodeId);
+}
+
+function findInsertCandidate(drag: BlockDrag): InsertCandidate | null {
+  const graph = currentGraph();
+  const rootNode = graph.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
+  const rootPosition = drag.previewPositions.get(drag.rootId);
+  if (!rootNode || !rootPosition) {
+    return null;
+  }
+
+  const rootSize = blockSize(blockKind(rootNode.type));
+  const anchor = { x: rootPosition.x, y: rootPosition.y + rootSize.height / 2 };
+  let best: { edge: GraphEdge; join: SlotJoin; score: number } | null = null;
+  for (const join of drag.joins) {
+    const edgeItem = graph.edges.find((graphEdge) => graphEdge.id === join.id);
+    if (!edgeItem) {
+      continue;
+    }
+    const center = { x: join.x + join.width / 2, y: join.y + 15 };
+    const dx = Math.abs(anchor.x - center.x);
+    const dy = Math.abs(anchor.y - center.y);
+    if (dx > 120 || dy > 92) {
+      continue;
+    }
+    const score = dx + dy * 1.35;
+    if (!best || score < best.score) {
+      best = { edge: edgeItem, join, score };
+    }
+  }
+
+  if (!best) {
+    return null;
+  }
+
+  const check = canInsertIntoEdge(graph, best.edge, drag);
+  return { edge: best.edge, join: best.join, valid: check.valid, message: check.message };
+}
+
+function canInsertIntoEdge(graph: GraphDocument, edgeItem: GraphEdge, drag: BlockDrag): { valid: boolean; message: string } {
+  const group = new Set(drag.groupIds);
+  if (group.has(edgeItem.sourceNodeId) || group.has(edgeItem.targetNodeId)) {
+    return { valid: false, message: '不能插入到正在拖动的链条内部。' };
+  }
+
+  const source = graph.nodes.find((nodeItem) => nodeItem.id === edgeItem.sourceNodeId);
+  const target = graph.nodes.find((nodeItem) => nodeItem.id === edgeItem.targetNodeId);
+  const root = graph.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
+  const sourceSlot = source?.slots.find((slot) => slot.id === edgeItem.sourceSlotId);
+  const targetSlot = target?.slots.find((slot) => slot.id === edgeItem.targetSlotId);
+  const rootInput = root?.slots.find((slot) => slot.direction === 'INPUT');
+  const tail = draggedTailOutput(graph, group);
+
+  if (!source || !target || !sourceSlot || !targetSlot || !root) {
+    return { valid: false, message: '连接信息不完整，不能插入。' };
+  }
+  if (!rootInput) {
+    return { valid: false, message: '这个积木没有输入槽，不能插入到连接中。' };
+  }
+  if (!tail) {
+    return { valid: false, message: '这个链条有多个出口，暂不支持直接插入。' };
+  }
+  if (sourceSlot.edgeType !== rootInput.edgeType || tail.slot.edgeType !== targetSlot.edgeType) {
+    return { valid: false, message: '槽位类型不匹配，不能插入。' };
+  }
+  return { valid: true, message: '放开即可插入到这里。' };
+}
+
+function draggedTailOutput(graph: GraphDocument, group: Set<string>): { nodeId: string; slot: GraphSlot } | null {
+  const tails: Array<{ nodeId: string; slot: GraphSlot }> = [];
+  graph.nodes.forEach((nodeItem) => {
+    if (!group.has(nodeItem.id)) {
+      return;
+    }
+    const slot = preferredMainOutput(nodeItem);
+    if (!slot) {
+      return;
+    }
+    const keepsGoingInsideGroup = graph.edges.some((graphEdge) =>
+      graphEdge.sourceNodeId === nodeItem.id
+      && graphEdge.sourceSlotId === slot.id
+      && group.has(graphEdge.targetNodeId),
+    );
+    if (!keepsGoingInsideGroup) {
+      tails.push({ nodeId: nodeItem.id, slot });
+    }
+  });
+  return tails.length === 1 ? tails[0] : null;
+}
+
+function preferredMainOutput(nodeItem: GraphNode): GraphSlot | null {
+  const outputs = nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT');
+  for (const slotId of ['done', 'timer_completed', 'started']) {
+    const slot = outputs.find((item) => item.id === slotId);
+    if (slot) {
+      return slot;
+    }
+  }
+  return outputs.length === 1 && !['pass', 'fail'].includes(outputs[0].id) ? outputs[0] : null;
+}
+
+function renderInsertPreview(candidate: InsertCandidate | null): void {
+  clearInsertPreview();
+  if (!candidate) {
+    setDragHint('拖动整链中，靠近两个积木之间可插入。', 'active');
+    return;
+  }
+
+  const joinEl = document.querySelector<HTMLElement>(`[data-join="${candidate.join.id}"]`);
+  joinEl?.classList.add(candidate.valid ? 'insert-target' : 'insert-invalid');
+  document.querySelector<HTMLElement>(`[data-block="${candidate.join.from}"]`)?.classList.add('is-related');
+  document.querySelector<HTMLElement>(`[data-block="${candidate.join.to}"]`)?.classList.add('is-related');
+  setDragHint(candidate.message, candidate.valid ? 'valid' : 'invalid');
+}
+
+function clearInsertPreview(): void {
+  document.querySelectorAll('.slot-join.insert-target, .slot-join.insert-invalid').forEach((item) => {
+    item.classList.remove('insert-target', 'insert-invalid');
+  });
+  clearFocus();
+}
+
+function setDragHint(message: string, tone: string): void {
+  const hint = document.querySelector<HTMLElement>('[data-drag-hint]');
+  if (!hint) {
+    return;
+  }
+  hint.textContent = message;
+  hint.className = `drag-hint${tone ? ` ${tone}` : ''}`;
+}
+
+function insertDraggedGroup(graph: GraphDocument, drag: BlockDrag): boolean {
+  const candidate = drag.candidate;
+  if (!candidate?.valid) {
+    return false;
+  }
+
+  const group = new Set(drag.groupIds);
+  const root = graph.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
+  const rootInput = root?.slots.find((slot) => slot.direction === 'INPUT');
+  const tail = draggedTailOutput(graph, group);
+  if (!rootInput || !tail) {
+    return false;
+  }
+
+  graph.edges = graph.edges.filter((graphEdge) =>
+    graphEdge.id !== candidate.edge.id
+    && !(graphEdge.targetNodeId === drag.rootId && graphEdge.targetSlotId === rootInput.id && !group.has(graphEdge.sourceNodeId)),
+  );
+  graph.edges.push(edge(nextEdgeId(graph), candidate.edge.sourceNodeId, candidate.edge.sourceSlotId, drag.rootId, rootInput.id));
+  graph.edges.push(edge(nextEdgeId(graph), tail.nodeId, tail.slot.id, candidate.edge.targetNodeId, candidate.edge.targetSlotId));
+  return true;
+}
+
+function makeInsertionGap(graph: GraphDocument, drag: BlockDrag): void {
+  const candidate = drag.candidate;
+  if (!candidate) {
+    return;
+  }
+
+  const group = new Set(drag.groupIds);
+  const groupRight = drag.groupIds.reduce((right, nodeId) => {
+    const nodeItem = graph.nodes.find((item) => item.id === nodeId);
+    if (!nodeItem) {
+      return right;
+    }
+    const position = nodeItem.position ?? fallbackPosition(nodeId);
+    const size = blockSize(blockKind(nodeItem.type));
+    return Math.max(right, position.x + size.width);
+  }, 0);
+  const targetPosition = nodePosition(graph, candidate.edge.targetNodeId);
+  const shiftX = Math.max(0, Math.round(groupRight - 14 - targetPosition.x));
+
+  const shifted = new Set(downstreamNodeIds(graph, candidate.edge.targetNodeId).filter((nodeId) => !group.has(nodeId)));
+  if (shiftX > 0) {
+    graph.nodes = graph.nodes.map((nodeItem) => {
+      if (!shifted.has(nodeItem.id)) {
+        return nodeItem;
+      }
+      const position = nodeItem.position ?? fallbackPosition(nodeItem.id);
+      return { ...nodeItem, position: { x: position.x + shiftX, y: position.y } };
+    });
+  }
+  ensureLocalHorizontalGaps(graph, candidate.edge.targetNodeId, group);
+}
+
+function ensureLocalHorizontalGaps(graph: GraphDocument, startNodeId: string, locked: Set<string>): void {
+  const visited = new Set<string>();
+  const queue = [startNodeId];
+  while (queue.length > 0) {
+    const sourceId = queue.shift();
+    if (!sourceId || visited.has(sourceId)) {
+      continue;
+    }
+    visited.add(sourceId);
+    const source = graph.nodes.find((nodeItem) => nodeItem.id === sourceId);
+    if (!source) {
+      continue;
+    }
+    const sourcePosition = source.position ?? fallbackPosition(source.id);
+    const minTargetX = sourcePosition.x + blockSize(blockKind(source.type)).width - 14;
+    graph.edges
+      .filter((graphEdge) => graphEdge.sourceNodeId === sourceId)
+      .forEach((graphEdge) => {
+        if (locked.has(graphEdge.targetNodeId)) {
+          return;
+        }
+        const target = graph.nodes.find((nodeItem) => nodeItem.id === graphEdge.targetNodeId);
+        if (!target) {
+          return;
+        }
+        const targetPosition = target.position ?? fallbackPosition(target.id);
+        if (targetPosition.x < minTargetX) {
+          target.position = { x: minTargetX, y: targetPosition.y };
+        }
+        queue.push(target.id);
+      });
+  }
+}
+
+function nextEdgeId(graph: GraphDocument): string {
+  let index = graph.edges.length + 1;
+  while (graph.edges.some((graphEdge) => graphEdge.id === `e${index}`)) {
+    index += 1;
+  }
+  return `e${index}`;
+}
+
+function addLibraryBlock(kind: LibraryKind): void {
+  const graph = cloneGraph(currentGraph());
+  const nodeItem = createLibraryNode(kind, visibleDropPosition(kind));
+  graph.nodes.push(nodeItem);
+  state.graph = graph;
+  state.selectedNodeId = nodeItem.id;
+  state.recentNodeId = nodeItem.id;
+  state.dirty = true;
+  state.validation = null;
+  state.error = '';
+  state.lastAction = `已新增“${nodeTypeLabel(nodeItem.type)}”，拖动到连接处可插入。`;
+  renderApp();
+}
+
+function createLibraryNode(kind: LibraryKind, position: GraphPosition): GraphNode {
+  const graph = currentGraph();
+  switch (kind) {
+    case 'trigger':
+      return node(uniqueNodeId('manual-trigger', graph), 'MANUAL_TRIGGER', '手动触发', {}, position, [out('started')]);
+    case 'condition':
+      return node(
+        uniqueNodeId('condition', graph),
+        'STATE_COMPARE_CONDITION',
+        '条件判断',
+        { scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', expected: 'false', missing: 'false' },
+        position,
+        [input('input'), out('pass'), out('fail')],
+      );
+    case 'state':
+      return node(
+        uniqueNodeId('state-set', graph),
+        'STATE_SET_ACTION',
+        '状态写入',
+        { scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', value: 'true' },
+        position,
+        [input('input'), out('done')],
+      );
+    case 'timer':
+      return node(uniqueNodeId('timer', graph), 'TIMER_START_ACTION', '计时器', { durationSeconds: '30' }, position, [
+        input('input'),
+        out('timer_completed'),
+      ]);
+    case 'debug':
+      return node(uniqueNodeId('debug', graph), 'DEBUG_LOG_ACTION', '调试记录', { message: '调试记录' }, position, [
+        input('input'),
+        out('done'),
+      ]);
+    case 'action':
+    default:
+      return node(uniqueNodeId('message', graph), 'MESSAGE_ACTION', '发送消息', { message: '新消息' }, position, [
+        input('input'),
+        out('done'),
+      ]);
+  }
+}
+
+function uniqueNodeId(prefix: string, graph: GraphDocument): string {
+  let index = graph.nodes.length + 1;
+  let id = `${prefix}-${index}`;
+  while (graph.nodes.some((nodeItem) => nodeItem.id === id)) {
+    index += 1;
+    id = `${prefix}-${index}`;
+  }
+  return id;
+}
+
+function visibleDropPosition(kind: LibraryKind): GraphPosition {
+  const viewport = document.querySelector<HTMLElement>('.canvas-viewport');
+  const size = blockSize(kind);
+  if (!viewport) {
+    return { x: 84, y: 88 };
+  }
+  const rect = viewport.getBoundingClientRect();
+  const x = (rect.width / 2 - offsetX) / scale - size.width / 2;
+  const y = (rect.height / 2 - offsetY) / scale - size.height / 2;
+  return {
+    x: Math.max(28, Math.round(x)),
+    y: Math.max(28, Math.round(y)),
+  };
+}
+
+function disconnectSelectedInput(): void {
+  const graph = cloneGraph(currentGraph());
+  const before = graph.edges.length;
+  graph.edges = graph.edges.filter((graphEdge) => graphEdge.targetNodeId !== state.selectedNodeId);
+  if (graph.edges.length === before) {
+    return;
+  }
+  state.graph = graph;
+  state.dirty = true;
+  state.validation = null;
+  state.error = '';
+  state.lastAction = '已断开该积木的输入连接，点击保存完成检查。';
+  renderApp();
+}
+
+function deleteSelectedNode(): void {
+  const graph = cloneGraph(currentGraph());
+  if (Object.values(graph.triggerEntries).includes(state.selectedNodeId)) {
+    state.error = '入口积木不能删除。';
+    refreshDraftIndicators();
+    return;
+  }
+  const before = graph.nodes.length;
+  graph.nodes = graph.nodes.filter((nodeItem) => nodeItem.id !== state.selectedNodeId);
+  if (graph.nodes.length === before) {
+    return;
+  }
+  graph.edges = graph.edges.filter((graphEdge) => graphEdge.sourceNodeId !== state.selectedNodeId && graphEdge.targetNodeId !== state.selectedNodeId);
+  state.graph = graph;
+  state.selectedNodeId = graph.nodes[0]?.id ?? '';
+  state.recentNodeId = null;
+  state.dirty = true;
+  state.validation = null;
+  state.error = '';
+  state.lastAction = '已删除积木和相关连接，点击保存完成检查。';
+  renderApp();
 }
 
 function openEditor(nodeId: string): void {
@@ -1352,11 +1946,15 @@ function blockKind(type: string): BlockKind {
   return 'action';
 }
 
-function branchForNode(nodeItem: GraphNode): Branch {
-  if (nodeItem.id === 'debug-already-started') {
+function branchForNode(graph: GraphDocument, nodeItem: GraphNode): Branch {
+  const incoming = graph.edges.find((graphEdge) => graphEdge.targetNodeId === nodeItem.id);
+  if (incoming?.sourceSlotId === 'fail') {
     return 'fail';
   }
-  if (nodeItem.id === 'manual-trigger' || nodeItem.id === 'condition-started') {
+  if (incoming?.sourceSlotId === 'pass') {
+    return 'pass';
+  }
+  if (nodeItem.type.includes('TRIGGER') || nodeItem.type.includes('CONDITION')) {
     return 'main';
   }
   return 'pass';
@@ -1419,8 +2017,39 @@ function booleanLabel(value = 'false'): string {
   return booleanOptions().find((option) => option.value === value)?.label ?? value;
 }
 
+function slotLabel(value: string): string {
+  switch (value) {
+    case 'input':
+      return '输入';
+    case 'started':
+      return '开始';
+    case 'pass':
+      return '通过';
+    case 'fail':
+      return '失败';
+    case 'done':
+      return '完成';
+    case 'timer_completed':
+      return '计时完成';
+    default:
+      return value;
+  }
+}
+
 function stateValueLabel(value: string, valueType: string): string {
   return valueType === 'BOOLEAN' ? booleanLabel(value || 'false') : value || '未填写';
+}
+
+function humanizeTraceMessage(message: string): string {
+  return message
+    .replace(/\bPLAYER\.([A-Za-z0-9_]+)/g, '玩家状态 $1')
+    .replace(/\bGLOBAL\.([A-Za-z0-9_]+)/g, '全局状态 $1')
+    .replace(/\bSESSION\.([A-Za-z0-9_]+)/g, '当前会话状态 $1')
+    .replace(/\bBOOLEAN\b/g, '是或否')
+    .replace(/\bINTEGER\b/g, '数字')
+    .replace(/\bSTRING\b/g, '文本')
+    .replace(/\btrue\b/g, '是')
+    .replace(/\bfalse\b/g, '否');
 }
 
 function fallbackPosition(nodeId: string): GraphPosition {

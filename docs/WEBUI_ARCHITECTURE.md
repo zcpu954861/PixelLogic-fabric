@@ -53,6 +53,20 @@ Important user semantics:
 - The editor modal uses humanized Chinese form labels and controls. Internal graph values such as `PLAYER`, `BOOLEAN`, and `true` remain storage/runtime values, but normal UI renders them as labels such as `玩家`, `是或否`, and `是`.
 - Short configuration fields use compact two-column layout where space allows; long text fields remain full-width.
 
+## Slot Flow Drag / Insert
+
+The slot-based canvas now supports a minimal direct-manipulation graph editing loop:
+
+- Block library buttons add a new block to the visible canvas and select it.
+- Short click opens the existing editor modal; pointer movement past the drag threshold starts drag.
+- Dragging a block moves that block and all downstream nodes reachable from outgoing typed edges.
+- Dragging a Condition moves both pass and fail downstream branches.
+- Releasing on blank canvas stores new position metadata but keeps graph edges unchanged.
+- Releasing on a valid join rewrites the edge as an inserted chain and keeps validation fail-closed through the existing save flow.
+- Insert success shifts the target block and local downstream chain rightward to keep puzzle blocks from overlapping.
+- The right panel remains informational, but now also shows selected-block connections plus minimal `断开输入` and `删除积木` controls.
+- Trace text is humanized in the WebUI display layer only; runtime trace payloads remain unchanged.
+
 ## Boundary
 
 Java may serve built static assets later, but Java must not generate WebUI source strings.

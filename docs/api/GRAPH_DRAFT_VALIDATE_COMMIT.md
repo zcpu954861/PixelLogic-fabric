@@ -140,3 +140,11 @@ The modal is a display/control layer over the same graph JSON. It maps internal 
 Validation remains fail-closed. If validation fails, the committed graph and runtime graph are not replaced, and the UI shows a Chinese validation error.
 
 The internal draft file can still exist after a failed save so the user can repair the fields and click `保存` again.
+
+The slot flow drag/insert checkpoint keeps the same API contract. The WebUI may now change:
+
+- node `position` metadata after free drag or chain drag;
+- `nodes` when adding or deleting a block;
+- `edges` when inserting a block into an existing slot connection or disconnecting an input.
+
+These edits are still submitted as the same graph draft JSON. `保存` continues to run draft save, validation, and commit. Invalid drag/edit outcomes do not replace the committed runtime graph.

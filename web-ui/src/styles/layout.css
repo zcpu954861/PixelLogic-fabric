@@ -238,6 +238,84 @@ button:hover:not(:disabled) {
   font-size: 1rem;
 }
 
+.catalog-nav {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.catalog-list {
+  display: grid;
+  gap: 8px;
+}
+
+.catalog-category,
+.catalog-block {
+  width: 100%;
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-content: center;
+  gap: 4px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.catalog-category b,
+.catalog-block b {
+  min-width: 0;
+  font-size: 0.98rem;
+  line-height: 1.2;
+}
+
+.catalog-category span,
+.catalog-block span {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.catalog-category small,
+.catalog-block small {
+  justify-self: end;
+  padding: 2px 7px;
+  border: 1px solid rgba(31, 111, 81, 0.24);
+  border-radius: 999px;
+  background: #eaf6ee;
+  color: #1f6f51;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.catalog-block {
+  border-left: 5px solid var(--green);
+}
+
+.catalog-empty {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed #91a99a;
+  border-radius: 8px;
+  background: #f7fbf5;
+  color: var(--muted);
+  font-weight: 800;
+}
+
 .quick-start {
   margin-top: auto;
   padding: 12px;

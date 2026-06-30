@@ -10,7 +10,7 @@ export const fallbackGraph: GraphDocument = {
   fingerprint: '',
   triggerEntries: { 'manual.test.start': 'manual-trigger' },
   nodes: [
-    node('manual-trigger', 'MANUAL_TRIGGER', 'WebUI 测试运行', {}, { x: 48, y: 205 }, [out('started')]),
+    node('manual-trigger', 'MANUAL_TRIGGER', 'WebUI 测试运行', {}, { x: 48, y: 205 }, [out('started')], 'trigger.manual_test'),
     node(
       'condition-started',
       'STATE_COMPARE_CONDITION',
@@ -18,11 +18,12 @@ export const fallbackGraph: GraphDocument = {
       { scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', expected: 'false', missing: 'false' },
       { x: 294, y: 78 },
       [input('input'), out('pass'), out('fail')],
+      'condition.state.equals',
     ),
     node('welcome-message', 'MESSAGE_ACTION', '发送欢迎语', { message: '欢迎开始游戏' }, { x: 664, y: 78 }, [
       input('input'),
       out('done'),
-    ]),
+    ], 'action.message.chat'),
     node(
       'set-started',
       'STATE_SET_ACTION',
@@ -30,6 +31,7 @@ export const fallbackGraph: GraphDocument = {
       { scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', value: 'true' },
       { x: 910, y: 78 },
       [input('input'), out('done')],
+      'state.set',
     ),
     node(
       'add-start-count',
@@ -38,15 +40,16 @@ export const fallbackGraph: GraphDocument = {
       { scope: 'PLAYER', key: 'start_count', valueType: 'INTEGER', amount: '1' },
       { x: 1156, y: 78 },
       [input('input'), out('done')],
+      'state.add',
     ),
     node('timer-start', 'TIMER_START_ACTION', '等待倒计时', { durationSeconds: '30' }, { x: 1402, y: 78 }, [
       input('input'),
       out('timer_completed'),
-    ]),
+    ], 'timer.wait'),
     node('debug-finished', 'DEBUG_LOG_ACTION', '倒计时结束', { message: '倒计时结束' }, { x: 1648, y: 78 }, [
       input('input'),
       out('done'),
-    ]),
+    ], 'debug.log'),
     node(
       'debug-already-started',
       'DEBUG_LOG_ACTION',
@@ -54,6 +57,7 @@ export const fallbackGraph: GraphDocument = {
       { message: '玩家已经开始过游戏' },
       { x: 664, y: 332 },
       [input('input'), out('done')],
+      'debug.log',
     ),
   ],
   edges: [
@@ -75,8 +79,9 @@ export function node(
   config: Record<string, string>,
   position: GraphPosition,
   slots: GraphSlot[],
+  blockId?: string,
 ): GraphNode {
-  return { id, type, displayName, config, position, slots };
+  return { id, type, blockId, displayName, config, position, slots };
 }
 export function input(id: string): GraphSlot {
   return { id, direction: 'INPUT', edgeType: 'CONTROL' };

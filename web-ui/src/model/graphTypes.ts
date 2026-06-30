@@ -1,7 +1,6 @@
 export type ApiStatus = 'checking' | 'online' | 'offline';
 export type BlockKind = 'trigger' | 'condition' | 'action' | 'state' | 'timer' | 'debug';
 export type Branch = 'main' | 'pass' | 'fail';
-export type LibraryKind = 'trigger' | 'condition' | 'action' | 'state' | 'timer' | 'debug';
 
 export type ApiTraceStep = {
   timestamp: string;
@@ -40,10 +39,65 @@ export type GraphSlot = {
 export type GraphNode = {
   id: string;
   type: string;
+  blockId?: string;
   displayName: string;
   config: Record<string, string>;
   position?: GraphPosition;
   slots: GraphSlot[];
+};
+
+export type CatalogCategory = {
+  id: string;
+  displayName: string;
+  description: string;
+  order: number;
+  visibleByDefault: boolean;
+};
+
+export type CatalogSubcategory = {
+  id: string;
+  categoryId: string;
+  displayName: string;
+  description: string;
+  order: number;
+};
+
+export type CatalogFormField = {
+  key: string;
+  label: string;
+  control: 'text' | 'number' | 'select' | 'boolean';
+  options: FieldOption[];
+  required: boolean;
+  full: boolean;
+  suffix: string;
+};
+
+export type CatalogBlock = {
+  id: string;
+  version: number;
+  displayName: string;
+  description: string;
+  categoryId: string;
+  subcategoryId: string;
+  tags: string[];
+  nodeKind: string;
+  nodeType: string;
+  defaultConfig: Record<string, string>;
+  formFields: CatalogFormField[];
+  inputSlots: GraphSlot[];
+  outputSlots: GraphSlot[];
+  simulationCapability: string;
+  mcCapability: string;
+  safetyFlags: string[];
+  deprecated: boolean;
+  hidden: boolean;
+  aliases: string[];
+};
+
+export type BlockCatalog = {
+  categories: CatalogCategory[];
+  subcategories: CatalogSubcategory[];
+  blocks: CatalogBlock[];
 };
 
 export type EditableField = {
@@ -103,6 +157,7 @@ export type ApiResponse = {
   traceId?: string;
   trace?: ApiTrace | null;
   traces?: ApiTrace[];
+  catalog?: BlockCatalog;
   api?: string;
   demoActor?: {
     id: string;
@@ -122,6 +177,8 @@ export type UiState = {
   lastAction: string;
   error: string;
   latestTrace: ApiTrace | null;
+  catalog: BlockCatalog | null;
+  catalogCategoryId: string | null;
   graph: GraphDocument | null;
   committedGraph: GraphDocument | null;
   validation: ValidationReport | null;

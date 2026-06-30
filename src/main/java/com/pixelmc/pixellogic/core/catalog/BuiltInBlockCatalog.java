@@ -1,0 +1,304 @@
+package com.pixelmc.pixellogic.core.catalog;
+
+import com.pixelmc.pixellogic.core.model.EdgeType;
+import com.pixelmc.pixellogic.core.model.NodeType;
+import com.pixelmc.pixellogic.core.model.SlotDefinition;
+import com.pixelmc.pixellogic.core.model.SlotDirection;
+
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+public final class BuiltInBlockCatalog {
+    public static final String TRIGGER_MANUAL_TEST = "trigger.manual_test";
+    public static final String CONDITION_STATE_EQUALS = "condition.state.equals";
+    public static final String ACTION_MESSAGE_CHAT = "action.message.chat";
+    public static final String STATE_SET = "state.set";
+    public static final String STATE_ADD = "state.add";
+    public static final String TIMER_WAIT = "timer.wait";
+    public static final String DEBUG_LOG = "debug.log";
+
+    private static final BlockCatalog CATALOG = new BlockCatalog(categories(), subcategories(), blocks());
+    private static final Map<String, BlockDefinition> BLOCKS_BY_ID = CATALOG.blocks().stream()
+            .collect(Collectors.toUnmodifiableMap(BlockDefinition::id, Function.identity()));
+    private static final Map<String, String> ALIASES = CATALOG.blocks().stream()
+            .flatMap(block -> block.aliases().stream().map(alias -> Map.entry(alias, block.id())))
+            .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+    private static final Map<NodeType, String> BLOCK_ID_BY_NODE_TYPE = blockIdByNodeType();
+
+    private BuiltInBlockCatalog() {
+    }
+
+    public static BlockCatalog catalog() {
+        return CATALOG;
+    }
+
+    public static Optional<BlockDefinition> block(String blockId) {
+        return Optional.ofNullable(BLOCKS_BY_ID.get(canonicalBlockId(blockId)));
+    }
+
+    public static String blockIdFor(NodeType type) {
+        return BLOCK_ID_BY_NODE_TYPE.getOrDefault(type, "");
+    }
+
+    public static String resolveBlockId(String blockId, NodeType type) {
+        String canonical = canonicalBlockId(blockId);
+        return canonical.isBlank() ? blockIdFor(type) : canonical;
+    }
+
+    public static Optional<NodeType> nodeTypeFor(String blockId) {
+        return block(blockId).map(BlockDefinition::nodeType);
+    }
+
+    private static String canonicalBlockId(String blockId) {
+        if (blockId == null || blockId.isBlank()) {
+            return "";
+        }
+        return ALIASES.getOrDefault(blockId, blockId);
+    }
+
+    private static Map<NodeType, String> blockIdByNodeType() {
+        EnumMap<NodeType, String> result = new EnumMap<>(NodeType.class);
+        CATALOG.blocks().forEach(block -> result.put(block.nodeType(), block.id()));
+        return Map.copyOf(result);
+    }
+
+    private static List<BlockCategoryDefinition> categories() {
+        return List.of(
+                category("trigger", "触发事件", "从玩家操作或测试入口开始一条逻辑流。", 10),
+                category("condition", "条件判断", "按状态或上下文决定走哪条分支。", 20),
+                category("message", "消息显示", "向玩家或调试视图展示文本反馈。", 30),
+                category("state", "状态数据", "读取或修改流程运行时状态。", 40),
+                category("timer", "时间调度", "等待一段时间后继续流程。", 50),
+                category("debug", "调试诊断", "记录测试和排查信息。", 60)
+        );
+    }
+
+    private static List<BlockSubcategoryDefinition> subcategories() {
+        return List.of(
+                subcategory("trigger.manual", "trigger", "手动测试", "用于 WebUI 和本地验证的测试入口。", 10),
+                subcategory("condition.state", "condition", "状态条件", "基于玩家、全局或会话状态做判断。", 10),
+                subcategory("message.player", "message", "玩家消息", "面向玩家的文本反馈。", 10),
+                subcategory("state.write", "state", "写入状态", "设置或累加状态值。", 10),
+                subcategory("timer.basic", "timer", "基础等待", "等待后继续执行。", 10),
+                subcategory("debug.basic", "debug", "调试输出", "记录模拟执行信息。", 10)
+        );
+    }
+
+    private static List<BlockDefinition> blocks() {
+        return List.of(
+                block(
+                        TRIGGER_MANUAL_TEST,
+                        "WebUI 测试运行",
+                        "点击测试运行时进入这条流程。",
+                        "trigger",
+                        "trigger.manual",
+                        "trigger",
+                        NodeType.MANUAL_TRIGGER,
+                        Map.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(out("started")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY),
+                        List.of("manual.test.start")
+                ),
+                block(
+                        CONDITION_STATE_EQUALS,
+                        "判断状态是否等于",
+                        "比较一个状态值，按通过或失败继续。",
+                        "condition",
+                        "condition.state",
+                        "condition",
+                        NodeType.STATE_COMPARE_CONDITION,
+                        Map.of("scope", "PLAYER", "key", "started", "valueType", "BOOLEAN", "expected", "false", "missing", "false"),
+                        List.of(
+                                select("scope", "作用对象", List.of(option("PLAYER", "玩家"), option("GLOBAL", "全局"), option("SESSION", "当前会话"))),
+                                text("key", "状态名", true),
+                                bool("expected", "目标值"),
+                                bool("missing", "缺失时视为")
+                        ),
+                        List.of(in("input")),
+                        List.of(out("pass"), out("fail")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY),
+                        List.of()
+                ),
+                block(
+                        ACTION_MESSAGE_CHAT,
+                        "发送聊天消息",
+                        "向当前玩家或模拟玩家发送一条消息。",
+                        "message",
+                        "message.player",
+                        "action",
+                        NodeType.MESSAGE_ACTION,
+                        Map.of("message", "新消息"),
+                        List.of(text("message", "消息", true)),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.APPROXIMATE_SIMULATION,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.PLAYER_MUTATING, BlockSafetyFlag.REQUIRES_PLAYER),
+                        List.of()
+                ),
+                block(
+                        STATE_SET,
+                        "设置状态",
+                        "把一个状态写成指定值。",
+                        "state",
+                        "state.write",
+                        "state",
+                        NodeType.STATE_SET_ACTION,
+                        Map.of("scope", "PLAYER", "key", "started", "valueType", "BOOLEAN", "value", "true"),
+                        List.of(
+                                select("scope", "作用对象", List.of(option("PLAYER", "玩家"), option("GLOBAL", "全局"), option("SESSION", "当前会话"))),
+                                text("key", "状态名", false),
+                                select("valueType", "数据类型", List.of(option("BOOLEAN", "是或否"), option("INTEGER", "数字"), option("STRING", "文本"))),
+                                text("value", "设置为", false)
+                        ),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.STATE_MUTATING),
+                        List.of()
+                ),
+                block(
+                        STATE_ADD,
+                        "累加状态",
+                        "把数字状态增加指定数值。",
+                        "state",
+                        "state.write",
+                        "state",
+                        NodeType.STATE_ADD_ACTION,
+                        Map.of("scope", "PLAYER", "key", "start_count", "valueType", "INTEGER", "amount", "1"),
+                        List.of(
+                                select("scope", "作用对象", List.of(option("PLAYER", "玩家"), option("GLOBAL", "全局"), option("SESSION", "当前会话"))),
+                                text("key", "状态名", false),
+                                number("amount", "增加数值", "")
+                        ),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.STATE_MUTATING),
+                        List.of()
+                ),
+                block(
+                        TIMER_WAIT,
+                        "等待一段时间",
+                        "等待指定秒数后继续执行。",
+                        "timer",
+                        "timer.basic",
+                        "timer",
+                        NodeType.TIMER_START_ACTION,
+                        Map.of("durationSeconds", "30"),
+                        List.of(number("durationSeconds", "等待时间", "秒")),
+                        List.of(in("input")),
+                        List.of(out("timer_completed")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY),
+                        List.of()
+                ),
+                block(
+                        DEBUG_LOG,
+                        "调试记录",
+                        "在模拟执行记录里写入一条调试信息。",
+                        "debug",
+                        "debug.basic",
+                        "debug",
+                        NodeType.DEBUG_LOG_ACTION,
+                        Map.of("message", "调试记录"),
+                        List.of(text("message", "内容", true)),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY),
+                        List.of()
+                )
+        );
+    }
+
+    private static BlockCategoryDefinition category(String id, String displayName, String description, int order) {
+        return new BlockCategoryDefinition(id, displayName, description, order, true);
+    }
+
+    private static BlockSubcategoryDefinition subcategory(String id, String categoryId, String displayName, String description, int order) {
+        return new BlockSubcategoryDefinition(id, categoryId, displayName, description, order);
+    }
+
+    private static BlockDefinition block(
+            String id,
+            String displayName,
+            String description,
+            String categoryId,
+            String subcategoryId,
+            String nodeKind,
+            NodeType nodeType,
+            Map<String, String> defaultConfig,
+            List<BlockFormFieldDefinition> formFields,
+            List<SlotDefinition> inputSlots,
+            List<SlotDefinition> outputSlots,
+            BlockCapabilityLevel simulationCapability,
+            BlockCapabilityLevel mcCapability,
+            List<BlockSafetyFlag> safetyFlags,
+            List<String> aliases
+    ) {
+        return new BlockDefinition(
+                id,
+                1,
+                displayName,
+                description,
+                categoryId,
+                subcategoryId,
+                List.of(),
+                nodeKind,
+                nodeType,
+                defaultConfig,
+                formFields,
+                inputSlots,
+                outputSlots,
+                simulationCapability,
+                mcCapability,
+                safetyFlags,
+                false,
+                false,
+                aliases
+        );
+    }
+
+    private static SlotDefinition in(String id) {
+        return new SlotDefinition(id, SlotDirection.INPUT, EdgeType.CONTROL);
+    }
+
+    private static SlotDefinition out(String id) {
+        return new SlotDefinition(id, SlotDirection.OUTPUT, EdgeType.CONTROL);
+    }
+
+    private static BlockFormFieldDefinition text(String key, String label, boolean full) {
+        return new BlockFormFieldDefinition(key, label, "text", List.of(), true, full, "");
+    }
+
+    private static BlockFormFieldDefinition number(String key, String label, String suffix) {
+        return new BlockFormFieldDefinition(key, label, "number", List.of(), true, false, suffix);
+    }
+
+    private static BlockFormFieldDefinition bool(String key, String label) {
+        return new BlockFormFieldDefinition(key, label, "boolean", List.of(option("true", "是"), option("false", "否")), true, false, "");
+    }
+
+    private static BlockFormFieldDefinition select(String key, String label, List<BlockFormFieldDefinition.FieldOption> options) {
+        return new BlockFormFieldDefinition(key, label, "select", options, true, false, "");
+    }
+
+    private static BlockFormFieldDefinition.FieldOption option(String value, String label) {
+        return new BlockFormFieldDefinition.FieldOption(value, label);
+    }
+}

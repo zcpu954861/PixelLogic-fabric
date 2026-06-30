@@ -12,6 +12,8 @@
 
 ## Current demo block mapping
 
+Implementation status: this mapping is now registered by the Java built-in catalog skeleton and exposed to the WebUI through `GET /api/pixellogic/catalog`. No extra catalog blocks are implemented in this checkpoint.
+
 | Block ID | 中文名 | Category | Subcategory | Simulation level | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `trigger.manual_test` | 手动测试触发 | 触发事件 | 测试 | `FULLY_SIMULATABLE` | 当前 WebUI/命令测试入口 |

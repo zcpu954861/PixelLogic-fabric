@@ -19,6 +19,18 @@
 - 不改 runtime、API、Graph JSON schema 或 WebUI 代码。
 - 不把 WebUI 静态产物打包进 jar。
 
+## Implementation Checkpoint: Catalog Skeleton
+
+`feature/v1-block-catalog-skeleton` implements the first code-level slice of this design:
+
+- Java registry lives under `core/catalog`.
+- The readonly API endpoint is `GET /api/pixellogic/catalog`.
+- Current demo nodes now have concrete `blockId` values while keeping `node.type`.
+- Old graph JSON without `blockId` is still accepted by inferring from legacy `node.type`.
+- GraphRuntime still dispatches through the existing `NodeType` path; the catalog is a compatibility and UI/data registry layer for this checkpoint.
+- The WebUI left library is catalog-driven: category navigation first, then concrete blocks such as `发送聊天消息`, `设置状态`, or `等待一段时间`.
+- `blockCatalogSelfCheck` verifies demo block registration, graph/document compatibility, and validation failures for unknown or mismatched `blockId`.
+
 ## Product Principles
 
 - 分类不是积木。

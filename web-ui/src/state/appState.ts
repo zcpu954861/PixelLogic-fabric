@@ -1,4 +1,5 @@
 import type { UiState } from '../model/graphTypes';
+import { fallbackCatalog } from '../model/blockCatalog';
 
 export const world = { width: 2160, height: 620 };
 
@@ -10,6 +11,8 @@ export const state: UiState = {
   lastAction: '尚未运行',
   error: '',
   latestTrace: null,
+  catalog: fallbackCatalog,
+  catalogCategoryId: null,
   graph: null,
   committedGraph: null,
   validation: null,

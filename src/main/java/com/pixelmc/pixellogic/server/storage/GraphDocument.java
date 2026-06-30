@@ -1,5 +1,6 @@
 package com.pixelmc.pixellogic.server.storage;
 
+import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.EdgeType;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
@@ -75,6 +76,7 @@ public record GraphDocument(
         return new NodeDocument(
                 node.id(),
                 node.type().name(),
+                node.blockId(),
                 defaultDisplayName(node),
                 sortedMap(node.config()),
                 defaultPosition(node.id()),
@@ -147,6 +149,7 @@ public record GraphDocument(
     public record NodeDocument(
             String id,
             String type,
+            String blockId,
             String displayName,
             Map<String, String> config,
             Position position,
@@ -156,18 +159,22 @@ public record GraphDocument(
             requireNonBlank(id, "node id");
             requireNonBlank(type, "node type");
             require(slots != null && !slots.isEmpty(), "node slots must not be empty");
+            NodeType nodeType = NodeType.valueOf(type);
             return new NodeDefinition(
                     id,
-                    NodeType.valueOf(type),
+                    nodeType,
+                    BuiltInBlockCatalog.resolveBlockId(blockId, nodeType),
                     slots.stream().map(SlotDocument::toDefinition).toList(),
                     sortedMap(config)
             );
         }
 
         NodeDocument normalized() {
+            NodeType nodeType = NodeType.valueOf(type);
             return new NodeDocument(
                     id,
                     type,
+                    BuiltInBlockCatalog.resolveBlockId(blockId, nodeType),
                     blankToDefault(displayName, id),
                     sortedMap(config),
                     position == null ? new Position(48, 78) : position,

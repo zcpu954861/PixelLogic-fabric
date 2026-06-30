@@ -1,5 +1,15 @@
 import { PixelLogicApiError, api } from '../api/pixelLogicApi';
-import { edge, fallbackGraph, graphId, input, node, out } from '../model/demoGraph';
+import {
+  blockKindFromCatalogBlock,
+  catalogBlock,
+  catalogBlocksForCategory,
+  catalogCategories,
+  catalogCategory,
+  catalogNodeIdPrefix,
+  createCatalogNode,
+  fallbackCatalog,
+} from '../model/blockCatalog';
+import { fallbackGraph, graphId } from '../model/demoGraph';
 import { state, world } from '../state/appState';
 import {
   blockMetrics,
@@ -21,6 +31,7 @@ import type {
   ApiStatus,
   ApiTrace,
   BlockDrag,
+  BlockCatalog,
   BlockKind,
   BlockMetrics,
   Branch,
@@ -35,7 +46,6 @@ import type {
   GraphSlot,
   InsertCandidate,
   LaneSpan,
-  LibraryKind,
   SlotBlock,
   SlotJoin,
   UiState,
@@ -204,15 +214,8 @@ function renderApp(): void {
         </section>
 
         <section>
-          <div class="panel-title"><span>积木库</span></div>
-          <div class="library-grid">
-            <button type="button" data-library-kind="trigger">触发器</button>
-            <button type="button" data-library-kind="condition">条件</button>
-            <button type="button" data-library-kind="action">动作</button>
-            <button type="button" data-library-kind="state">状态</button>
-            <button type="button" data-library-kind="timer">计时器</button>
-            <button type="button" data-library-kind="debug">调试</button>
-          </div>
+          <div class="panel-title"><span>积木库</span><b>${state.catalogCategoryId ? '具体积木' : '全部分类'}</b></div>
+          ${renderCatalogLibrary(activeCatalog())}
         </section>
 
         <section class="quick-start">
@@ -284,6 +287,62 @@ function renderApp(): void {
   bindInteractions();
   setTransform();
   focusEditor();
+}
+
+function activeCatalog(): BlockCatalog {
+  return state.catalog ?? fallbackCatalog;
+}
+
+function renderCatalogLibrary(catalog: BlockCatalog): string {
+  const selectedCategoryId = state.catalogCategoryId;
+  if (selectedCategoryId) {
+    const categoryItem = catalogCategory(catalog, selectedCategoryId);
+    const blocks = catalogBlocksForCategory(catalog, selectedCategoryId);
+    return `
+      <div class="catalog-nav">
+        <button type="button" class="tiny-button" data-catalog-back>返回分类</button>
+        <span>${escapeHtml(categoryItem?.displayName ?? '分类')}</span>
+      </div>
+      <div class="catalog-list catalog-block-list">
+        ${blocks.length > 0 ? blocks.map((blockItem) => `
+          <button type="button" class="catalog-block" data-catalog-block="${escapeAttr(blockItem.id)}">
+            <b>${escapeHtml(blockItem.displayName)}</b>
+            <span>${escapeHtml(blockItem.description)}</span>
+            <small>${escapeHtml(capabilityLabel(blockItem.simulationCapability))}</small>
+          </button>
+        `).join('') : '<p class="catalog-empty">这个分类暂时没有积木。</p>'}
+      </div>
+    `;
+  }
+
+  const categories = catalogCategories(catalog);
+  return `
+    <div class="catalog-list">
+      ${categories.map((categoryItem) => {
+        const count = catalogBlocksForCategory(catalog, categoryItem.id).length;
+        return `
+          <button type="button" class="catalog-category" data-catalog-category="${escapeAttr(categoryItem.id)}">
+            <b>${escapeHtml(categoryItem.displayName)}</b>
+            <span>${escapeHtml(categoryItem.description)}</span>
+            <small>${count} 个积木</small>
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function capabilityLabel(value: string): string {
+  switch (value) {
+    case 'FULLY_SIMULATABLE':
+      return '可模拟';
+    case 'APPROXIMATE_SIMULATION':
+      return '近似模拟';
+    case 'REQUIRES_MINECRAFT_RUNTIME':
+      return '需要游戏运行时';
+    default:
+      return '目录积木';
+  }
 }
 
 
@@ -474,11 +533,22 @@ function bindInteractions(): void {
   document.querySelector('[data-graph-action="delete-selected"]')?.addEventListener('click', deleteSelectedNode);
   document.querySelector('[data-modal-action="close"]')?.addEventListener('click', requestCloseEditor);
   document.querySelector('[data-modal-action="cancel"]')?.addEventListener('click', requestCloseEditor);
-  document.querySelectorAll<HTMLButtonElement>('[data-library-kind]').forEach((buttonEl) => {
+  document.querySelectorAll<HTMLButtonElement>('[data-catalog-category]').forEach((buttonEl) => {
     buttonEl.addEventListener('click', () => {
-      const kind = buttonEl.dataset.libraryKind as LibraryKind | undefined;
-      if (kind) {
-        addLibraryBlock(kind);
+      if (buttonEl.dataset.catalogCategory) {
+        state.catalogCategoryId = buttonEl.dataset.catalogCategory;
+        renderApp();
+      }
+    });
+  });
+  document.querySelector('[data-catalog-back]')?.addEventListener('click', () => {
+    state.catalogCategoryId = null;
+    renderApp();
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-catalog-block]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      if (buttonEl.dataset.catalogBlock) {
+        addCatalogBlock(buttonEl.dataset.catalogBlock);
       }
     });
   });
@@ -889,56 +959,21 @@ function setDragHint(message: string, tone: string): void {
 
 
 
-function addLibraryBlock(kind: LibraryKind): void {
+function addCatalogBlock(blockId: string): void {
+  const blockItem = catalogBlock(activeCatalog(), blockId);
+  if (!blockItem) {
+    state.error = '没有找到这个积木，请重新打开积木库。';
+    refreshDraftIndicators();
+    return;
+  }
   const graph = cloneGraph(currentGraph());
-  const nodeItem = createLibraryNode(kind, visibleDropPosition(kind));
+  const kind = blockKindFromCatalogBlock(blockItem);
+  const nodeItem = createCatalogNode(blockItem, uniqueNodeId(catalogNodeIdPrefix(blockItem), graph), visibleDropPosition(kind));
   graph.nodes.push(nodeItem);
-  applyGraphEdit(graph, `已新增“${nodeTypeLabel(nodeItem.type)}”，正在自动保存。`, {
+  applyGraphEdit(graph, `已新增“${blockItem.displayName}”，正在自动保存。`, {
     selectedNodeId: nodeItem.id,
     recentNodeId: nodeItem.id,
   });
-}
-
-function createLibraryNode(kind: LibraryKind, position: GraphPosition): GraphNode {
-  const graph = currentGraph();
-  switch (kind) {
-    case 'trigger':
-      return node(uniqueNodeId('manual-trigger', graph), 'MANUAL_TRIGGER', '手动触发', {}, position, [out('started')]);
-    case 'condition':
-      return node(
-        uniqueNodeId('condition', graph),
-        'STATE_COMPARE_CONDITION',
-        '条件判断',
-        { scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', expected: 'false', missing: 'false' },
-        position,
-        [input('input'), out('pass'), out('fail')],
-      );
-    case 'state':
-      return node(
-        uniqueNodeId('state-set', graph),
-        'STATE_SET_ACTION',
-        '状态写入',
-        { scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', value: 'true' },
-        position,
-        [input('input'), out('done')],
-      );
-    case 'timer':
-      return node(uniqueNodeId('timer', graph), 'TIMER_START_ACTION', '计时器', { durationSeconds: '30' }, position, [
-        input('input'),
-        out('timer_completed'),
-      ]);
-    case 'debug':
-      return node(uniqueNodeId('debug', graph), 'DEBUG_LOG_ACTION', '调试记录', { message: '调试记录' }, position, [
-        input('input'),
-        out('done'),
-      ]);
-    case 'action':
-    default:
-      return node(uniqueNodeId('message', graph), 'MESSAGE_ACTION', '发送消息', { message: '新消息' }, position, [
-        input('input'),
-        out('done'),
-      ]);
-  }
 }
 
 function uniqueNodeId(prefix: string, graph: GraphDocument): string {
@@ -951,7 +986,7 @@ function uniqueNodeId(prefix: string, graph: GraphDocument): string {
   return id;
 }
 
-function visibleDropPosition(kind: LibraryKind): GraphPosition {
+function visibleDropPosition(kind: BlockKind): GraphPosition {
   const viewport = document.querySelector<HTMLElement>('.canvas-viewport');
   const size = blockSize(kind);
   if (!viewport) {
@@ -1205,6 +1240,18 @@ async function waitForPendingAutoSave(): Promise<void> {
   }
 }
 
+async function loadCatalog(): Promise<void> {
+  await runAction('加载积木库', async () => {
+    const catalogResponse = await api('/api/pixellogic/catalog');
+    state.catalog = catalogResponse.catalog ?? fallbackCatalog;
+    if (state.catalogCategoryId && !state.catalog.categories.some((categoryItem) => categoryItem.id === state.catalogCategoryId)) {
+      state.catalogCategoryId = null;
+    }
+    state.apiStatus = 'online';
+    state.statusMessage = '积木库已加载';
+  }, { renderBusy: false });
+}
+
 async function loadGraph(): Promise<void> {
   await runAction('加载图', async () => {
     const graphResponse = await api(`/api/pixellogic/graphs/${graphId}`);
@@ -1423,7 +1470,7 @@ export function startPixelLogicApp(): void {
   }
   renderApp();
   centerView();
-  void loadGraph().then(() => {
+  void loadCatalog().then(() => loadGraph()).then(() => {
     if (state.apiStatus === 'online') {
       void refreshLatestTrace(false).catch(() => {
         state.apiStatus = 'offline';

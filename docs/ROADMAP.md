@@ -16,10 +16,10 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Next
 
-1. Design Block Catalog and Simulation Model as docs-only groundwork for the next implementation checkpoint.
-2. If accepted, implement the smallest BlockDefinition registry skeleton and migrate only the current demo blocks into it.
-3. Keep WebUI category navigation data-driven; the current six buttons are not permanent product categories.
-4. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+1. Review the first Block Catalog skeleton implementation.
+2. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
+3. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+4. Next catalog work should add shared summary/validation/form-schema reuse only when the current seven-block skeleton is accepted.
 
 ## Completed Checkpoints
 
@@ -39,6 +39,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - v1 editor baseline health audit completed with no P0/P1.
 - Lifecycle/capacity safety cleanup is merged into `mc-1.21.11` with state/timer/trace/undo/autosave/API lifecycle bounds.
 - Block Catalog / Simulation Model docs define the next direction: concrete catalog blocks, registry-driven categories, and simulation executors separated from future Minecraft executors.
+- Block Catalog skeleton branch adds the Java built-in catalog registry, `blockId` compatibility, readonly catalog API, catalog-driven WebUI library, and `blockCatalogSelfCheck` for the current seven demo blocks.
 
 ## Follow-Ups
 

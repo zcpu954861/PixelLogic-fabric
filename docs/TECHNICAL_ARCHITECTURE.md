@@ -34,7 +34,13 @@ The v1 graph draft checkpoint adds the first persistent graph loop:
 
 It still does not implement arbitrary graph create/delete editing, Region, old TZZ adapters, multi-loader storage, or Java-generated WebUI.
 
-The next catalog design step separates Block Catalog definitions from the current demo node families. The six current WebUI entries are temporary catalog examples, not a stable architecture boundary. A future registry should describe concrete blocks, their slots, form schema, summary, validation, simulation capability, Minecraft capability, and safety flags.
+The v1 block catalog skeleton separates Block Catalog definitions from the current demo node families:
+
+- `core/catalog` owns the built-in registry records for categories, subcategories, concrete blocks, form fields, simulation capability, Minecraft capability, and safety flags.
+- Only the current demo concrete block ids are registered: `trigger.manual_test`, `condition.state.equals`, `action.message.chat`, `state.set`, `state.add`, `timer.wait`, and `debug.log`.
+- Graph JSON keeps legacy `node.type` and adds `blockId`; old graph documents without `blockId` infer it from `node.type`.
+- GraphRuntime still dispatches on `NodeType` in this checkpoint. The catalog is a registry and compatibility layer, not a runtime rewrite.
+- `GET /api/pixellogic/catalog` exposes the readonly catalog to the independent WebUI.
 
 ## Lifecycle / Capacity Safety
 

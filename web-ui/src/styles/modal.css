@@ -13,6 +13,10 @@
   animation: overlay-out 140ms ease-in both;
 }
 
+.editor-overlay.is-steady {
+  animation: none;
+}
+
 .editor-dialog {
   position: relative;
   width: min(720px, calc(100vw - 28px));
@@ -29,6 +33,10 @@
 
 .editor-overlay.is-closing .editor-dialog {
   animation: editor-out 130ms ease-in both;
+}
+
+.editor-overlay.is-steady .editor-dialog {
+  animation: none;
 }
 
 .editor-head,

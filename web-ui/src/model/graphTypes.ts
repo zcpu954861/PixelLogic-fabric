@@ -195,6 +195,11 @@ export type UiState = {
   simulationTestContext: SimulationTestContext;
   simulationTestContextError: string;
   simulationResult: SimulationTestResult | null;
+  simulationMenuOpen: boolean;
+  simulationEditorOpen: boolean;
+  simulationEditorClosing: boolean;
+  simulationDraftContext: SimulationTestContext | null;
+  simulationOriginalContext: SimulationTestContext | null;
   busyAction: string | null;
   lastAction: string;
   error: string;

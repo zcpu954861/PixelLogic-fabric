@@ -21,10 +21,12 @@
 
 ## UX
 
-- The right panel now includes a compact `测试玩家` card near the test status surface.
+- The `测试运行` control is a split button: left side runs the test, right arrow opens a dropdown.
+- The dropdown contains short helper copy and `编辑测试玩家`.
+- `编辑测试玩家` opens a modal that follows the block editor pattern: local draft, `保存`, close animation, and unsaved-close confirmation.
 - Labels are Chinese: `玩家名`, `标签`, `管理员`, `恢复默认`.
-- Tags use chips plus a small input and `添加` button.
-- Running a test shows `本次玩家`, `初始标签`, `结束标签`, `标签变化`, and `管理员`.
+- Tags use chips with a left-side `×` remove button, plus a small input and `添加` button.
+- The right panel keeps a read-only run result summary with `本次玩家`, `初始标签`, `结束标签`, `标签变化`, and `管理员`.
 - Result tags are not written back into the test context inputs.
 
 ## Validation

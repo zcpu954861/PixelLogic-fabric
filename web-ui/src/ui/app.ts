@@ -11,7 +11,17 @@ import {
 } from '../model/blockCatalog';
 import { fallbackGraph, graphId } from '../model/demoGraph';
 import { richTextConfig, richTextPlainText } from '../model/richText';
-import { simulationTestPayload, validateSimulationTestContext } from '../model/simulationTestContext';
+import {
+  addSimulationTag,
+  cloneSimulationTestContext,
+  defaultSimulationTestContext,
+  removeSimulationTag,
+  simulationTestPayload,
+  type SimulationTestContext,
+  updateSimulationDisplayName,
+  updateSimulationOperator,
+  validateSimulationTestContext,
+} from '../model/simulationTestContext';
 import { state, world } from '../state/appState';
 import {
   blockMetrics,
@@ -77,7 +87,7 @@ import {
   snapDraggedGroupToCandidate,
 } from './canvas/dragInsert';
 import { renderEditorModal } from './editor/blockEditorModal';
-import { bindSimulationTestContextPanel, renderSimulationTestContextPanel } from './simulation/simulationTestContextPanel';
+import { renderSimulationTestContextModal, renderSimulationTestResultSummary, renderTestRunControl } from './simulation/simulationTestContextPanel';
 import { renderTrace } from './trace/traceView';
 import { draftStatusText, uncommittedNotice, validationErrorText, validationList, validationSummaryText, validationTitle } from './validation/validationView';
 import { renderNodeInfo } from './sidebar/selectionSummary';
@@ -181,6 +191,7 @@ function renderApp(): void {
     return;
   }
 
+  const simulationEditorWasOpen = Boolean(document.querySelector('[data-sim-modal-overlay]'));
   const graph = currentGraph();
   const blocks = buildBlocks(graph);
   updateWorldSize(blocks);
@@ -204,7 +215,7 @@ function renderApp(): void {
           <span class="api-pill ${state.apiStatus}" data-api-status aria-live="polite">${escapeHtml(apiStatusText())}</span>
           <button type="button" class="ghost-button" data-history-action="undo" title="Ctrl+Z" ${canUndo() ? '' : 'disabled'}>上一步</button>
           <button type="button" class="ghost-button" data-history-action="redo" title="Ctrl+Y / Ctrl+Shift+Z" ${canRedo() ? '' : 'disabled'}>下一步</button>
-          <button type="button" class="run-button" data-api-action="start" ${apiBusyAttr()}>测试运行</button>
+          ${renderTestRunControl(state.simulationMenuOpen, apiBusyAttr())}
           <button type="button" class="ghost-button" data-action="fit">适应视图</button>
           <button type="button" class="ghost-button" data-action="center">回到中心</button>
         </nav>
@@ -259,7 +270,7 @@ function renderApp(): void {
           <b>${selectedNode ? escapeHtml(nodeTypeLabel(selectedNode.type)) : '未选中'}</b>
         </div>
         ${selectedNode ? renderNodeInfo(selectedNode, graph, state.selectedNodeId, activeCatalog()) : '<section class="info-card">单击积木选中，拖动积木移动，双击积木编辑。</section>'}
-        ${renderSimulationTestContextPanel(state.simulationTestContext, state.simulationResult, state.simulationTestContextError)}
+        ${renderSimulationTestResultSummary(state.simulationResult)}
         <section class="preview-card">
           <b>API 状态</b>
           <p>${escapeHtml(state.statusMessage)}</p>
@@ -287,13 +298,14 @@ function renderApp(): void {
           </ol>
         </section>
       </footer>
-      ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation), modalIssue: state.error || validationSummaryText(state) }) : ''}
+      ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation && !state.validation.valid), modalIssue: state.error || validationSummaryText(state) }) : ''}
+      ${state.simulationEditorOpen && state.simulationDraftContext ? renderSimulationTestContextModal(state.simulationDraftContext, { closing: state.simulationEditorClosing, error: state.simulationTestContextError, steady: simulationEditorWasOpen }) : ''}
     </section>
   `;
 
   bindInteractions();
   setTransform();
-  focusEditor();
+  focusEditor(simulationEditorWasOpen);
 }
 
 function activeCatalog(): BlockCatalog {
@@ -534,19 +546,16 @@ function bindInteractions(): void {
   document.querySelector('[data-action="center"]')?.addEventListener('click', centerView);
   document.querySelector('[data-action="focus"]')?.addEventListener('click', focusSelectedBlock);
   document.querySelector('[data-api-action="start"]')?.addEventListener('click', () => void startTest());
-  bindSimulationTestContextPanel(document, {
-    getContext: () => state.simulationTestContext,
-    setContext: (context, options = {}) => {
-      state.simulationTestContext = context;
-      state.simulationTestContextError = '';
-      if (options.render ?? true) {
-        renderApp();
-      }
-    },
-    setError: (message) => {
-      state.simulationTestContextError = message;
+  document.querySelector('[data-sim-menu-toggle]')?.addEventListener('click', () => {
+    state.simulationMenuOpen = !state.simulationMenuOpen;
+    renderApp();
+  });
+  document.querySelector('[data-sim-action="open-editor"]')?.addEventListener('click', openSimulationEditor);
+  document.querySelector('.workspace')?.addEventListener('pointerdown', (event) => {
+    if (state.simulationMenuOpen && !(event.target as HTMLElement).closest('.test-run-control')) {
+      state.simulationMenuOpen = false;
       renderApp();
-    },
+    }
   });
   document.querySelector('[data-history-action="undo"]')?.addEventListener('click', undoGraphEdit);
   document.querySelector('[data-history-action="redo"]')?.addEventListener('click', redoGraphEdit);
@@ -563,6 +572,12 @@ function bindInteractions(): void {
     hideModeSwitchConfirm();
     void saveEditorDraft();
   });
+  document.querySelector('[data-sim-modal-action="close"]')?.addEventListener('click', requestCloseSimulationEditor);
+  document.querySelector('[data-sim-modal-action="cancel"]')?.addEventListener('click', requestCloseSimulationEditor);
+  document.querySelector('[data-sim-modal-action="save"]')?.addEventListener('click', saveSimulationEditorDraft);
+  document.querySelector('[data-sim-modal-action="continue-edit"]')?.addEventListener('click', hideSimulationUnsavedConfirm);
+  document.querySelector('[data-sim-modal-action="discard"]')?.addEventListener('click', discardSimulationEditorDraft);
+  bindSimulationDraftFields();
   document.querySelectorAll<HTMLButtonElement>('[data-catalog-category]').forEach((buttonEl) => {
     buttonEl.addEventListener('click', () => {
       if (buttonEl.dataset.catalogCategory) {
@@ -587,10 +602,15 @@ function bindInteractions(): void {
       requestCloseEditor();
     }
   });
+  document.querySelector('[data-sim-modal-overlay]')?.addEventListener('pointerdown', (event) => {
+    if ((event.target as HTMLElement).hasAttribute('data-sim-modal-overlay')) {
+      requestCloseSimulationEditor();
+    }
+  });
 
   document.onkeydown = (event) => {
     const editableTarget = isEditableTarget(event.target);
-    if (state.editorOpen && editableTarget && (isUndoShortcut(event) || isRedoShortcut(event))) {
+    if ((state.editorOpen || state.simulationEditorOpen) && editableTarget && (isUndoShortcut(event) || isRedoShortcut(event))) {
       return;
     }
     if (isUndoShortcut(event)) {
@@ -606,8 +626,13 @@ function bindInteractions(): void {
     if (event.key === 'Escape' && state.editorOpen) {
       event.preventDefault();
       requestCloseEditor();
+      return;
     }
-    if (event.key === 'Tab' && state.editorOpen) {
+    if (event.key === 'Escape' && state.simulationEditorOpen) {
+      event.preventDefault();
+      requestCloseSimulationEditor();
+    }
+    if (event.key === 'Tab' && (state.editorOpen || state.simulationEditorOpen)) {
       trapEditorFocus(event);
     }
   };
@@ -1143,12 +1168,145 @@ function discardEditorDraft(): void {
   closeEditor();
 }
 
-function focusEditor(): void {
-  if (!state.editorOpen) {
+function openSimulationEditor(): void {
+  state.simulationMenuOpen = false;
+  state.simulationDraftContext = cloneSimulationTestContext(state.simulationTestContext);
+  state.simulationOriginalContext = cloneSimulationTestContext(state.simulationTestContext);
+  state.simulationEditorOpen = true;
+  state.simulationEditorClosing = false;
+  state.simulationTestContextError = '';
+  renderApp();
+}
+
+function requestCloseSimulationEditor(): void {
+  if (hasSimulationDraftChanges()) {
+    showSimulationUnsavedConfirm();
+    return;
+  }
+  closeSimulationEditor();
+}
+
+function closeSimulationEditor(): void {
+  hideSimulationUnsavedConfirm();
+  state.simulationEditorClosing = true;
+  const overlayEl = document.querySelector<HTMLElement>('[data-sim-modal-overlay]');
+  if (overlayEl) {
+    overlayEl.classList.add('is-closing');
+  }
+  window.setTimeout(() => {
+    state.simulationEditorOpen = false;
+    state.simulationEditorClosing = false;
+    state.simulationDraftContext = null;
+    state.simulationOriginalContext = null;
+    state.simulationTestContextError = '';
+    renderApp();
+  }, 160);
+}
+
+function showSimulationUnsavedConfirm(): void {
+  const confirmEl = document.querySelector<HTMLElement>('[data-sim-unsaved-confirm]');
+  confirmEl?.removeAttribute('hidden');
+  document.querySelector<HTMLElement>('[data-sim-modal-action="continue-edit"]')?.focus();
+}
+
+function hideSimulationUnsavedConfirm(): void {
+  document.querySelector<HTMLElement>('[data-sim-unsaved-confirm]')?.setAttribute('hidden', '');
+}
+
+function discardSimulationEditorDraft(): void {
+  state.simulationDraftContext = state.simulationOriginalContext
+    ? cloneSimulationTestContext(state.simulationOriginalContext)
+    : null;
+  closeSimulationEditor();
+}
+
+function bindSimulationDraftFields(): void {
+  const nameInput = document.querySelector<HTMLInputElement>('[data-sim-draft-name]');
+  nameInput?.addEventListener('input', () => {
+    updateSimulationDraft(updateSimulationDisplayName(simulationDraft(), nameInput.value), false);
+  });
+
+  const tagInput = document.querySelector<HTMLInputElement>('[data-sim-draft-tag-input]');
+  const addTag = () => {
+    if (!tagInput) {
+      return;
+    }
+    const result = addSimulationTag(simulationDraft(), tagInput.value);
+    if (result.error) {
+      state.simulationTestContextError = result.error;
+      renderApp();
+      return;
+    }
+    tagInput.value = '';
+    updateSimulationDraft(result.context);
+  };
+  document.querySelector('[data-sim-draft-action="add-tag"]')?.addEventListener('click', addTag);
+  tagInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addTag();
+    }
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-sim-draft-admin-value]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      updateSimulationDraft(updateSimulationOperator(simulationDraft(), buttonEl.dataset.simDraftAdminValue === 'true'));
+    });
+  });
+  document.querySelector('[data-sim-draft-action="reset"]')?.addEventListener('click', () => {
+    updateSimulationDraft(defaultSimulationTestContext());
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-sim-draft-remove-tag]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      updateSimulationDraft(removeSimulationTag(simulationDraft(), buttonEl.dataset.simDraftRemoveTag ?? ''));
+    });
+  });
+}
+
+function simulationDraft(): SimulationTestContext {
+  return state.simulationDraftContext ?? state.simulationTestContext;
+}
+
+function updateSimulationDraft(context: SimulationTestContext, render = true): void {
+  state.simulationDraftContext = context;
+  state.simulationTestContextError = '';
+  hideSimulationUnsavedConfirm();
+  if (render) {
+    renderApp();
+  }
+}
+
+function saveSimulationEditorDraft(): void {
+  const draft = state.simulationDraftContext;
+  if (!draft) {
+    return;
+  }
+  const error = validateSimulationTestContext(draft);
+  if (error) {
+    state.simulationTestContextError = error;
+    renderApp();
+    return;
+  }
+  if (!hasSimulationDraftChanges()) {
+    closeSimulationEditor();
+    return;
+  }
+  state.simulationTestContext = cloneSimulationTestContext(simulationTestPayload(draft).testContext);
+  state.simulationOriginalContext = cloneSimulationTestContext(state.simulationTestContext);
+  state.simulationDraftContext = cloneSimulationTestContext(state.simulationTestContext);
+  state.lastAction = '测试玩家已更新';
+  closeSimulationEditor();
+}
+
+function focusEditor(simulationEditorWasOpen = false): void {
+  if (!state.editorOpen && !state.simulationEditorOpen) {
+    return;
+  }
+  if (state.simulationEditorOpen && simulationEditorWasOpen) {
     return;
   }
   window.setTimeout(() => {
-    const target = document.querySelector<HTMLElement>('.editor-dialog input, .editor-dialog textarea, .editor-dialog select, #block-editor-title');
+    const target = document.querySelector<HTMLElement>('.editor-dialog input, .editor-dialog textarea, .editor-dialog select, #block-editor-title, #simulation-editor-title');
     target?.focus();
   }, 0);
 }
@@ -1611,7 +1769,7 @@ async function runAction(label: string, action: () => Promise<void>, options: { 
     state.error = error instanceof Error ? error.message : 'API 未连接';
   } finally {
     state.busyAction = null;
-    if (!state.editorClosing) {
+    if (!state.editorClosing && !state.simulationEditorClosing) {
       renderApp();
     }
   }
@@ -1644,6 +1802,11 @@ function cloneNode(nodeItem: GraphNode): GraphNode {
 function hasEditorDraftChanges(): boolean {
   return Boolean(state.editorDraftNode && state.editorOriginalNode)
     && JSON.stringify(state.editorDraftNode) !== JSON.stringify(state.editorOriginalNode);
+}
+
+function hasSimulationDraftChanges(): boolean {
+  return Boolean(state.simulationDraftContext && state.simulationOriginalContext)
+    && JSON.stringify(state.simulationDraftContext) !== JSON.stringify(state.simulationOriginalContext);
 }
 
 function conditionModeRemovalSignature(): string | null {

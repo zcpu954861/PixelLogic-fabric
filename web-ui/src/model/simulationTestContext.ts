@@ -35,6 +35,15 @@ export function defaultSimulationTestContext(): SimulationTestContext {
   };
 }
 
+export function cloneSimulationTestContext(context: SimulationTestContext): SimulationTestContext {
+  return {
+    actor: {
+      ...context.actor,
+      tags: [...context.actor.tags],
+    },
+  };
+}
+
 export function updateSimulationDisplayName(context: SimulationTestContext, displayName: string): SimulationTestContext {
   return {
     actor: {

@@ -67,6 +67,16 @@ public final class GraphStorageSelfCheck {
             require(afterInvalid.success() && afterInvalidTrace.containsMessage("欢迎进入新流程"),
                     "runtime should keep previous committed graph after invalid draft");
 
+            service.resetPlayer(playerId);
+            RuntimeResult pendingTimer = service.startManualTest(playerId);
+            ExecutionTrace pendingTimerTrace = service.trace(pendingTimer.traceId()).orElseThrow();
+            require(pendingTimer.success() && pendingTimerTrace.containsMessage("计时器启动"),
+                    "timer run should start before reset");
+            service.resetPlayer(playerId);
+            Thread.sleep(1200L);
+            require(!pendingTimerTrace.containsMessage("计时器完成") && service.pendingTimers() == 0,
+                    "reset should invalidate and clear pending timer callbacks");
+
             try {
                 service.committedGraph("../bad");
                 throw new IllegalStateException("path traversal graph id should be rejected");

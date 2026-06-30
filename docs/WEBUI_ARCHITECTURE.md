@@ -54,6 +54,14 @@ Important user semantics:
 - The editor modal uses humanized Chinese form labels and controls. Internal graph values such as `PLAYER`, `BOOLEAN`, and `true` remain storage/runtime values, but normal UI renders them as labels such as `玩家`, `是或否`, and `是`.
 - Short configuration fields use compact two-column layout where space allows; long text fields remain full-width.
 
+Safety bounds:
+
+- Automatic save is debounced and keeps at most one in-flight save path, with a latest-rerun flag when edits happen during the request.
+- Save responses are applied only if both the local graph version and save sequence still match.
+- Undo and redo history are both capped at 80 graph snapshots.
+- Trace rendering caps visible steps at 100 even though the backend already bounds each trace.
+- The app uses assigned `document.onkeydown` and `window.onbeforeunload` handlers rather than stacking duplicate global listeners.
+
 ## Slot Flow Drag / Insert
 
 The slot-based canvas now supports a minimal direct-manipulation graph editing loop:

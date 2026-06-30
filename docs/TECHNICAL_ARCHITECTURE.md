@@ -34,6 +34,19 @@ The v1 graph draft checkpoint adds the first persistent graph loop:
 
 It still does not implement arbitrary graph create/delete editing, Region, old TZZ adapters, multi-loader storage, or Java-generated WebUI.
 
+## Lifecycle / Capacity Safety
+
+The v1 editor baseline now has spike-level safety bounds:
+
+- In-memory state is capped at 1024 entries and fails closed when a new key would exceed the cap.
+- Test reset clears the demo player's PLAYER state, the manual SESSION state, pending timers, and rebuilds the current committed runtime generation.
+- Timer continuations carry a runtime generation. Reset, committed graph reload, and server stop invalidate older generations before callbacks can resume graph execution.
+- Pending timers are capped at 128 and can be cleared as a group during reset, graph install, and shutdown.
+- Trace storage remains a bounded ring buffer: 50 traces, 100 steps per trace.
+- `PixelLogicSpikeService.close()` stops timers and clears in-memory state.
+
+These bounds are intentionally small and local to the spike. Before broader runtime use, state ownership, lifecycle, persistence, and per-scope capacity policy still need a product decision.
+
 ## Future Module Boundaries
 
 - `core/model`

@@ -16,9 +16,10 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Next
 
-1. User review the current v1 editor baseline on `mc-1.21.11`.
-2. Decide whether the next implementation target is state/timer lifecycle and capacity cleanup or a first release-candidate audit.
-3. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+1. User review `feature/v1-lifecycle-capacity-safety-cleanup`.
+2. Repair any lifecycle/capacity findings reported from review or hand test.
+3. If accepted, run merge-readiness audit before merging back to `mc-1.21.11`.
+4. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
 
 ## Completed Checkpoints
 
@@ -36,13 +37,14 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - WebUI structure split moves the large frontend entry and stylesheet into responsibility-based TypeScript and CSS modules without changing behavior.
 - Apache-2.0 license metadata and full `LICENSE` text are included on `mc-1.21.11`.
 - v1 editor baseline health audit completed with no P0/P1.
+- Lifecycle/capacity safety cleanup is in progress on `feature/v1-lifecycle-capacity-safety-cleanup`.
 
 ## Follow-Ups
 
 P2 before broader runtime use:
 
-- Pending timers now have a spike-level max pending count. Broader runtime still needs a real capacity/backpressure policy.
-- In-memory state should get a lifecycle, capacity, and cleanup policy before non-spike use.
+- Pending timers now have a spike-level max pending count plus reset/commit/stop cleanup. Broader runtime still needs a real capacity/backpressure policy.
+- In-memory state now has a spike-level cap and reset/stop cleanup. Broader runtime still needs durable lifecycle and persistence policy before non-spike use.
 - Draft saves return fingerprints but do not yet enforce `expectedFingerprint`; add optimistic conflict handling before multi-user or multi-tab editing.
 
 ## Loader Event Policy

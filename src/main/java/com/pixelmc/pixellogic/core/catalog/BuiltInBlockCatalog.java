@@ -17,8 +17,13 @@ public final class BuiltInBlockCatalog {
     public static final String TRIGGER_MANUAL_TEST = "trigger.manual_test";
     public static final String CONDITION_STATE_EQUALS = "condition.state.equals";
     public static final String ACTION_MESSAGE_CHAT = "action.message.chat";
+    public static final String ACTION_MESSAGE_TITLE = "action.message.title";
+    public static final String ACTION_MESSAGE_SUBTITLE = "action.message.subtitle";
+    public static final String ACTION_MESSAGE_ACTIONBAR = "action.message.actionbar";
     public static final String CONDITION_PLAYER_HAS_TAG = "condition.player.has_tag";
+    public static final String CONDITION_PLAYER_IS_ADMIN = "condition.player.is_admin";
     public static final String ACTION_PLAYER_ADD_TAG = "action.player.add_tag";
+    public static final String ACTION_PLAYER_REMOVE_TAG = "action.player.remove_tag";
     public static final String STATE_SET = "state.set";
     public static final String STATE_ADD = "state.add";
     public static final String TIMER_WAIT = "timer.wait";
@@ -65,7 +70,7 @@ public final class BuiltInBlockCatalog {
 
     private static Map<NodeType, String> blockIdByNodeType() {
         EnumMap<NodeType, String> result = new EnumMap<>(NodeType.class);
-        CATALOG.blocks().forEach(block -> result.put(block.nodeType(), block.id()));
+        CATALOG.blocks().forEach(block -> result.putIfAbsent(block.nodeType(), block.id()));
         return Map.copyOf(result);
     }
 
@@ -88,6 +93,7 @@ public final class BuiltInBlockCatalog {
                 subcategory("condition.player", "condition", "玩家条件", "基于当前模拟玩家做判断。", 20),
                 subcategory("player.tag", "player", "标签", "写入当前模拟玩家的标签。", 10),
                 subcategory("message.player", "message", "玩家消息", "面向玩家的文本反馈。", 10),
+                subcategory("message.screen", "message", "屏幕提示", "显示标题、副标题或快捷栏消息。", 20),
                 subcategory("state.write", "state", "写入状态", "设置或累加状态值。", 10),
                 subcategory("timer.basic", "timer", "基础等待", "等待后继续执行。", 10),
                 subcategory("debug.basic", "debug", "调试输出", "记录模拟执行信息。", 10)
@@ -173,21 +179,61 @@ public final class BuiltInBlockCatalog {
                         List.of(BlockSafetyFlag.PLAYER_MUTATING, BlockSafetyFlag.REQUIRES_PLAYER),
                         List.of()
                 ),
+                messageBlock(
+                        ACTION_MESSAGE_TITLE,
+                        "显示标题",
+                        "向当前玩家或模拟玩家显示一条标题。",
+                        "向「{target}」显示标题「{message.plainText}」。",
+                        "action.message.title"
+                ),
+                messageBlock(
+                        ACTION_MESSAGE_SUBTITLE,
+                        "显示副标题",
+                        "向当前玩家或模拟玩家显示一条副标题。",
+                        "向「{target}」显示副标题「{message.plainText}」。",
+                        "action.message.subtitle"
+                ),
+                messageBlock(
+                        ACTION_MESSAGE_ACTIONBAR,
+                        "显示快捷栏消息",
+                        "向当前玩家或模拟玩家显示一条快捷栏消息。",
+                        "向「{target}」显示快捷栏消息「{message.plainText}」。",
+                        "action.message.actionbar"
+                ),
                 block(
                         CONDITION_PLAYER_HAS_TAG,
-                        "玩家拥有标签",
-                        "当当前模拟玩家拥有指定标签时走通过分支。",
+                        "玩家是否拥有标签",
+                        "按当前模拟玩家是否拥有指定标签继续流程。",
                         "condition",
                         "condition.player",
                         "condition",
                         NodeType.PLAYER_HAS_TAG_CONDITION,
                         Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "tag", "runner"),
-                        List.of(conditionMode(), text("tag", "标签", false, "例如 runner")),
-                        "当当前玩家拥有标签「{tag}」时走通过分支。",
+                        List.of(conditionMode("拥有标签时继续", "不拥有标签时继续", "分开执行"), text("tag", "标签", false, "例如 runner")),
+                        "按当前玩家是否拥有标签「{tag}」继续。",
                         "condition.player.has_tag",
                         List.of(in("input")),
                         List.of(out("pass"), out("fail")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER),
+                        List.of()
+                ),
+                block(
+                        CONDITION_PLAYER_IS_ADMIN,
+                        "玩家是否为管理员",
+                        "按当前模拟玩家是否为管理员继续流程。",
+                        "condition",
+                        "condition.player",
+                        "condition",
+                        NodeType.PLAYER_IS_ADMIN_CONDITION,
+                        Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name()),
+                        List.of(conditionMode("是管理员时继续", "不是管理员时继续", "分开执行")),
+                        "按当前玩家是否为管理员继续。",
+                        "condition.player.is_admin",
+                        List.of(in("input")),
+                        List.of(out("pass"), out("fail")),
+                        BlockCapabilityLevel.APPROXIMATE_SIMULATION,
                         BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
                         List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER),
                         List.of()
@@ -204,6 +250,25 @@ public final class BuiltInBlockCatalog {
                         List.of(text("tag", "标签", false, "例如 runner")),
                         "给当前玩家添加标签「{tag}」。",
                         "action.player.add_tag",
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.PLAYER_MUTATING, BlockSafetyFlag.REQUIRES_PLAYER),
+                        List.of()
+                ),
+                block(
+                        ACTION_PLAYER_REMOVE_TAG,
+                        "移除玩家标签",
+                        "从当前模拟玩家移除一个标签。",
+                        "player",
+                        "player.tag",
+                        "action",
+                        NodeType.PLAYER_REMOVE_TAG_ACTION,
+                        Map.of("tag", "runner"),
+                        List.of(text("tag", "标签", false, "例如 runner")),
+                        "移除当前玩家的标签「{tag}」。",
+                        "action.player.remove_tag",
                         List.of(in("input")),
                         List.of(out("done")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
@@ -352,6 +417,34 @@ public final class BuiltInBlockCatalog {
         );
     }
 
+    private static BlockDefinition messageBlock(String id, String displayName, String description, String summaryTemplate, String summaryFormatter) {
+        return block(
+                id,
+                displayName,
+                description,
+                "message",
+                "message.screen",
+                "action",
+                NodeType.MESSAGE_ACTION,
+                Map.of(
+                        "target", "CURRENT_PLAYER",
+                        "message", RichTextComponentValue.fromPlainText("新消息")
+                ),
+                List.of(
+                        readonly("target", "接收者", "CURRENT_PLAYER", "当前发送给触发这条流程的玩家或 WebUI 模拟玩家。"),
+                        richText("message", "消息内容", "输入要显示给玩家的文本。")
+                ),
+                summaryTemplate,
+                summaryFormatter,
+                List.of(in("input")),
+                List.of(out("done")),
+                BlockCapabilityLevel.APPROXIMATE_SIMULATION,
+                BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                List.of(BlockSafetyFlag.PLAYER_MUTATING, BlockSafetyFlag.REQUIRES_PLAYER),
+                List.of()
+        );
+    }
+
     private static SlotDefinition in(String id) {
         return new SlotDefinition(id, SlotDirection.INPUT, EdgeType.CONTROL);
     }
@@ -381,6 +474,10 @@ public final class BuiltInBlockCatalog {
     }
 
     private static BlockFormFieldDefinition conditionMode() {
+        return conditionMode("满足时继续", "不满足时继续", "分成两路");
+    }
+
+    private static BlockFormFieldDefinition conditionMode(String passLabel, String failLabel, String branchLabel) {
         return field(
                 ConditionOutputMode.CONFIG_KEY,
                 "segmented",
@@ -390,9 +487,9 @@ public final class BuiltInBlockCatalog {
                 ConditionOutputMode.BRANCH.name(),
                 "",
                 List.of(
-                        option(ConditionOutputMode.PASS_ONLY.name(), "满足时继续"),
-                        option(ConditionOutputMode.FAIL_ONLY.name(), "不满足时继续"),
-                        option(ConditionOutputMode.BRANCH.name(), "分成两路")
+                        option(ConditionOutputMode.PASS_ONLY.name(), passLabel),
+                        option(ConditionOutputMode.FAIL_ONLY.name(), failLabel),
+                        option(ConditionOutputMode.BRANCH.name(), branchLabel)
                 ),
                 "",
                 "",

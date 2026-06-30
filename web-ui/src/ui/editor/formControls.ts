@@ -2,7 +2,7 @@ import { catalogBlock } from '../../model/blockCatalog';
 import type { BlockCatalog, CatalogFormField, EditableField, EditorSection, FieldOption, GraphNode } from '../../model/graphTypes';
 import { richTextPlainText } from '../../model/richText';
 import { escapeAttr, escapeHtml } from '../../utils/dom';
-import { booleanLabel, booleanOptions, conditionOutputModeLabel, nodeTypeLabel, stateScopeOptions, targetLabel, valueTypeOptions } from '../humanize/labels';
+import { booleanLabel, booleanOptions, conditionOutputModeLabel, nodeTypeLabel, nodeTypeMetaLabel, stateScopeOptions, targetLabel, valueTypeOptions } from '../humanize/labels';
 
 export function renderNodeEditor(nodeItem: GraphNode, catalog: BlockCatalog): string {
   const section = editorSection(nodeItem, catalog);
@@ -12,7 +12,7 @@ export function renderNodeEditor(nodeItem: GraphNode, catalog: BlockCatalog): st
       <b>基础信息</b>
       <div class="field-grid">
         <label class="field-row is-full">名称<input value="${escapeAttr(nodeItem.displayName)}" data-node-field="displayName" /></label>
-        <div class="readonly-field"><span>积木类型</span><b>${escapeHtml(catalogBlock(catalog, nodeItem.blockId ?? '')?.displayName ?? nodeTypeLabel(nodeItem.type))}</b></div>
+        <div class="static-meta is-full"><span>积木类型</span><b>${escapeHtml(nodeTypeMetaLabel(nodeItem, catalog))}</b></div>
       </div>
     </section>
     <section class="form-card editor-section">
@@ -223,7 +223,7 @@ export function displayFieldValue(field: EditableField): string {
     return targetLabel(value);
   }
   if (field.key === 'outputMode') {
-    return conditionOutputModeLabel(value);
+    return fieldOptions(field).find((option) => option.value === value)?.label ?? conditionOutputModeLabel(value);
   }
   if (field.control === 'rich_text_component') {
     return richTextPlainText(value) || '未填写';

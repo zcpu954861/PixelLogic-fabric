@@ -37,7 +37,7 @@ It still does not implement arbitrary graph create/delete editing, Region, old T
 The v1 block catalog skeleton separates Block Catalog definitions from the current demo node families:
 
 - `core/catalog` owns the built-in registry records for categories, subcategories, concrete blocks, form fields, simulation capability, Minecraft capability, and safety flags.
-- Only the current demo concrete block ids are registered: `trigger.manual_test`, `condition.state.equals`, `action.message.chat`, `state.set`, `state.add`, `timer.wait`, and `debug.log`.
+- Current concrete block ids include the demo set plus the first player/message expansion: `trigger.manual_test`, `condition.state.equals`, `condition.player.has_tag`, `condition.player.is_admin`, `action.player.add_tag`, `action.player.remove_tag`, `action.message.chat`, `action.message.title`, `action.message.subtitle`, `action.message.actionbar`, `state.set`, `state.add`, `timer.wait`, and `debug.log`.
 - Graph JSON keeps legacy `node.type` and adds `blockId`; old graph documents without `blockId` infer it from `node.type`.
 - GraphRuntime still dispatches on `NodeType` in this checkpoint. The catalog is a registry and compatibility layer, not a runtime rewrite.
 - `GET /api/pixellogic/catalog` exposes the readonly catalog to the independent WebUI.
@@ -46,7 +46,7 @@ The catalog form schema checkpoint keeps that runtime boundary:
 
 - `BlockDefinition` exposes `formSchema`, `summaryTemplate`, and `summaryFormatter` metadata.
 - The WebUI editor resolves known `blockId` values through catalog schema first and uses legacy `NodeType` builders only as fallback.
-- `action.message.chat` stores message config as a rich text component payload while the current string-valued graph config schema is preserved.
+- Message actions store message config as a rich text component payload while the current string-valued graph config schema is preserved.
 - `GraphRuntime` still extracts plain text and dispatches through the existing `MESSAGE_ACTION` path; no real Minecraft Text adapter is implemented.
 
 ## Lifecycle / Capacity Safety
@@ -136,7 +136,8 @@ The condition output mode checkpoint keeps the same direct edge runtime and adds
 - New condition catalog nodes default to `PASS_ONLY`; the seeded demo graph explicitly stays `BRANCH`.
 - Unconnected condition outputs mean that path ends gracefully and are not validation blockers.
 - Unconnected condition inputs are allowed during editing like other loose placed blocks; they are unreachable until connected to a trigger path.
-- `condition.player.has_tag` is categorized as `条件判断 / 玩家条件`; `action.player.add_tag` remains `玩家操作 / 标签`.
+- `condition.player.has_tag` is categorized as `条件判断 / 玩家条件`; `condition.player.is_admin` uses the same player condition group; `action.player.add_tag` and `action.player.remove_tag` remain `玩家操作 / 标签`.
+- Player conditions may provide block-specific `outputMode` labels so normal UI says `拥有标签时继续` or `是管理员时继续` instead of only generic labels.
 
 ## WebUI Rule
 

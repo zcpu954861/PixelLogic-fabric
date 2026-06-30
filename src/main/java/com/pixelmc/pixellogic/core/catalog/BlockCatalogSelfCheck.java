@@ -26,8 +26,13 @@ public final class BlockCatalogSelfCheck {
                 BuiltInBlockCatalog.TRIGGER_MANUAL_TEST,
                 BuiltInBlockCatalog.CONDITION_STATE_EQUALS,
                 BuiltInBlockCatalog.ACTION_MESSAGE_CHAT,
+                BuiltInBlockCatalog.ACTION_MESSAGE_TITLE,
+                BuiltInBlockCatalog.ACTION_MESSAGE_SUBTITLE,
+                BuiltInBlockCatalog.ACTION_MESSAGE_ACTIONBAR,
                 BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG,
+                BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN,
                 BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG,
+                BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG,
                 BuiltInBlockCatalog.STATE_SET,
                 BuiltInBlockCatalog.STATE_ADD,
                 BuiltInBlockCatalog.TIMER_WAIT,
@@ -36,7 +41,7 @@ public final class BlockCatalogSelfCheck {
         Set<String> actual = new HashSet<>();
         catalog.blocks().forEach(block -> actual.add(block.id()));
 
-        require(actual.equals(expected), "catalog should contain the demo and player tag concrete block ids");
+        require(actual.equals(expected), "catalog should contain demo, player, and message concrete block ids");
         catalog.blocks().forEach(block -> {
             require(catalog.categories().stream().anyMatch(category -> category.id().equals(block.categoryId())),
                     "block category should exist: " + block.id());
@@ -77,20 +82,37 @@ public final class BlockCatalogSelfCheck {
                 "blockId/node.type mismatch should fail validation");
 
         BlockDefinition hasTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG).orElseThrow();
+        BlockDefinition isAdmin = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN).orElseThrow();
         BlockDefinition addTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG).orElseThrow();
+        BlockDefinition removeTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG).orElseThrow();
         require(hasTag.categoryId().equals("condition") && hasTag.subcategoryId().equals("condition.player"),
                 "player tag condition should be under condition/player condition");
+        require(isAdmin.categoryId().equals("condition") && isAdmin.subcategoryId().equals("condition.player"),
+                "player admin condition should be under condition/player condition");
         require(addTag.categoryId().equals("player") && addTag.subcategoryId().equals("player.tag"),
                 "player tag action should stay under player/tag");
+        require(removeTag.categoryId().equals("player") && removeTag.subcategoryId().equals("player.tag"),
+                "player remove tag action should stay under player/tag");
         require(hasTag.formSchema().stream().anyMatch(field -> field.key().equals("tag") && field.type().equals("string")),
                 "player tag condition should expose tag field");
         require(hasTag.formSchema().stream().anyMatch(field -> field.key().equals(ConditionOutputMode.CONFIG_KEY) && field.type().equals("segmented")),
                 "player tag condition should expose condition output mode field");
         require(addTag.formSchema().stream().anyMatch(field -> field.key().equals("tag") && field.type().equals("string")),
                 "player tag action should expose tag field");
+        require(removeTag.formSchema().stream().anyMatch(field -> field.key().equals("tag") && field.type().equals("string")),
+                "player remove tag action should expose tag field");
         require(hasTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE
-                        && addTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        && addTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE
+                        && removeTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE,
                 "player tag blocks should be fully simulatable");
+        require(messageBlock(BuiltInBlockCatalog.ACTION_MESSAGE_TITLE).subcategoryId().equals("message.screen"),
+                "title message block should live under message/screen prompt");
+        require(messageBlock(BuiltInBlockCatalog.ACTION_MESSAGE_SUBTITLE).formSchema().stream()
+                        .anyMatch(field -> field.key().equals("message") && field.type().equals("rich_text_component")),
+                "subtitle message block should use rich_text_component");
+        require(messageBlock(BuiltInBlockCatalog.ACTION_MESSAGE_ACTIONBAR).formSchema().stream()
+                        .anyMatch(field -> field.key().equals("message") && field.type().equals("rich_text_component")),
+                "actionbar message block should use rich_text_component");
     }
 
     private static GraphDocument legacyWithoutBlockId(GraphDocument document) {
@@ -141,6 +163,10 @@ public final class BlockCatalogSelfCheck {
         return new GraphValidator().validate(graph).stream()
                 .map(ValidationIssue::code)
                 .anyMatch(code::equals);
+    }
+
+    private static BlockDefinition messageBlock(String blockId) {
+        return BuiltInBlockCatalog.block(blockId).orElseThrow();
     }
 
     private static void require(boolean condition, String message) {

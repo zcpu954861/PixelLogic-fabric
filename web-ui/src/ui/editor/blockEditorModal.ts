@@ -1,10 +1,13 @@
 import type { BlockCatalog, GraphNode } from '../../model/graphTypes';
 import { escapeHtml } from '../../utils/dom';
-import { nodeSummary, nodeTypeLabel } from '../humanize/labels';
+import { nodeOfficialLabel, nodeSummary } from '../humanize/labels';
 import { renderNodeEditor } from './formControls';
 
 export function renderEditorModal(nodeItem: GraphNode, catalog: BlockCatalog, options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string }): string {
-  const title = `${nodeTypeLabel(nodeItem.type)}：${nodeItem.displayName || nodeItem.id}`;
+  const officialName = nodeOfficialLabel(nodeItem, catalog);
+  const customName = nodeItem.displayName.trim();
+  const titleName = customName && customName !== officialName ? customName : '未命名';
+  const title = `${titleName}(${officialName})`;
   const modalIssue = options.modalIssue;
 
   return `

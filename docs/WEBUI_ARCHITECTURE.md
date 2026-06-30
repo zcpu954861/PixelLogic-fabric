@@ -95,13 +95,18 @@ Important user semantics:
 - The editor modal uses humanized Chinese form labels and controls. Internal graph values such as `PLAYER`, `BOOLEAN`, and `true` remain storage/runtime values, but normal UI renders them as labels such as `玩家`, `是或否`, and `是`.
 - The editor modal now prefers Block Catalog `formSchema` for known `blockId` values. Legacy `NodeType` form builders remain only as fallback for old or unknown nodes.
 - `action.message.chat` uses a `rich_text_component` field: multiline plain text editing, structured storage, and a simple preview. The normal UI does not expose raw JSON.
+- `action.message.title`, `action.message.subtitle`, and `action.message.actionbar` use the same `rich_text_component` field and remain separate blocks; no combined title+subtitle block or timing controls are included yet.
 - Rich text typing updates only the modal-local draft and preview; one click on `保存` creates one graph edit/history entry.
 - Short configuration fields use compact two-column layout where space allows; long text fields remain full-width.
 - Condition blocks expose `条件用途` in the same catalog form path:
   - `满足时继续` renders a normal-height single green output condition card.
   - `不满足时继续` renders a normal-height single red output condition card.
   - `分成两路` keeps the current dual-branch condition shape.
+- Player condition blocks override those labels through catalog schema, such as `拥有标签时继续` / `不拥有标签时继续` / `分开执行` and `是管理员时继续` / `不是管理员时继续` / `分开执行`.
 - Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
+- Card gray type labels and the right-panel selected-block badge show the catalog top-level category, such as `条件判断`, `玩家操作`, or `消息显示`, instead of repeating the concrete block name.
+- The block editor title uses `未命名(官方积木名)` when the current display name still equals the catalog name, and `自定义名称(官方积木名)` after the user renames it.
+- The editor base-info block type is static metadata in the format `积木类别：官方积木名`; it is not styled as an editable or readonly input.
 
 Safety bounds:
 

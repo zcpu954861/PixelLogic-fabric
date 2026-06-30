@@ -70,7 +70,7 @@ public final class SimulationRunner {
 
         @Override
         public Optional<NodeExecution> executeSimulationNode(NodeDefinition node, UUID playerId, String sessionId) {
-            return registry.execute(node, context);
+            return registry.execute(node, context, delegate);
         }
 
         @Override
@@ -98,6 +98,11 @@ public final class SimulationRunner {
         @Override
         public void recordMessageResult(String nodeId, UUID playerId, String message) {
             context.addMessageResult(new SimulationMessageResult(nodeId, playerId, message));
+        }
+
+        @Override
+        public void recordMessageResult(String nodeId, UUID playerId, String message, String channel) {
+            context.addMessageResult(new SimulationMessageResult(nodeId, playerId, message, channel));
         }
 
         @Override

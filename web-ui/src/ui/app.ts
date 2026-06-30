@@ -69,8 +69,8 @@ import {
   booleanLabel,
   booleanOptions,
   humanizeTraceMessage,
+  nodeCategoryLabel,
   nodeSummary,
-  nodeTypeLabel,
   slotLabel,
   stateScopeOptions,
   stateValueLabel,
@@ -138,7 +138,7 @@ function buildBlocks(graph: GraphDocument): SlotBlock[] {
       id: nodeItem.id,
       kind,
       branch: branchForNode(graph, nodeItem),
-      type: nodeTypeLabel(nodeItem.type),
+      type: nodeCategoryLabel(nodeItem, activeCatalog()),
       title: nodeItem.displayName || nodeItem.id,
       summary: nodeSummary(nodeItem, activeCatalog()),
       x: position.x,
@@ -267,7 +267,7 @@ function renderApp(): void {
       <aside class="right-panel" aria-label="选中积木信息">
         <div class="panel-title">
           <span>选中积木</span>
-          <b>${selectedNode ? escapeHtml(nodeTypeLabel(selectedNode.type)) : '未选中'}</b>
+          <b>${selectedNode ? escapeHtml(nodeCategoryLabel(selectedNode, activeCatalog())) : '未选中'}</b>
         </div>
         ${selectedNode ? renderNodeInfo(selectedNode, graph, state.selectedNodeId, activeCatalog()) : '<section class="info-card">单击积木选中，拖动积木移动，双击积木编辑。</section>'}
         ${renderSimulationTestResultSummary(state.simulationResult)}

@@ -134,6 +134,7 @@ export const fallbackCatalog: BlockCatalog = {
     subcategory('condition.player', 'condition', '玩家条件', '基于当前模拟玩家做判断。', 20),
     subcategory('player.tag', 'player', '标签', '写入当前模拟玩家的标签。', 10),
     subcategory('message.player', 'message', '玩家消息', '面向玩家的文本反馈。', 10),
+    subcategory('message.screen', 'message', '屏幕提示', '显示标题、副标题或快捷栏消息。', 20),
     subcategory('state.write', 'state', '写入状态', '设置或累加状态值。', 10),
     subcategory('timer.basic', 'timer', '基础等待', '等待后继续执行。', 10),
     subcategory('debug.basic', 'debug', '调试输出', '记录模拟执行信息。', 10),
@@ -154,13 +155,22 @@ export const fallbackCatalog: BlockCatalog = {
       readonlyField('target', '接收者', 'CURRENT_PLAYER', '当前发送给触发这条流程的玩家或 WebUI 模拟玩家。'),
       field('message', '消息内容', 'rich_text_component', [], 'fullWidth textareaRows:4'),
     ], '向「{target}」发送「{message.plainText}」。', 'action.message.chat', 'APPROXIMATE_SIMULATION', ['PLAYER_MUTATING', 'REQUIRES_PLAYER']),
-    block('condition.player.has_tag', '玩家拥有标签', '当当前模拟玩家拥有指定标签时走通过分支。', 'condition', 'condition.player', 'condition', 'PLAYER_HAS_TAG_CONDITION', { outputMode: 'PASS_ONLY', tag: 'runner' }, [input('input')], [out('pass'), out('fail')], [
-      conditionModeField(),
+    messageBlock('action.message.title', '显示标题', '向当前玩家或模拟玩家显示一条标题。', '向「{target}」显示标题「{message.plainText}」。'),
+    messageBlock('action.message.subtitle', '显示副标题', '向当前玩家或模拟玩家显示一条副标题。', '向「{target}」显示副标题「{message.plainText}」。'),
+    messageBlock('action.message.actionbar', '显示快捷栏消息', '向当前玩家或模拟玩家显示一条快捷栏消息。', '向「{target}」显示快捷栏消息「{message.plainText}」。'),
+    block('condition.player.has_tag', '玩家是否拥有标签', '按当前模拟玩家是否拥有指定标签继续流程。', 'condition', 'condition.player', 'condition', 'PLAYER_HAS_TAG_CONDITION', { outputMode: 'PASS_ONLY', tag: 'runner' }, [input('input')], [out('pass'), out('fail')], [
+      conditionModeField('拥有标签时继续', '不拥有标签时继续', '分开执行'),
       field('tag', '标签', 'string'),
-    ], '当当前玩家拥有标签「{tag}」时走通过分支。', 'condition.player.has_tag', 'FULLY_SIMULATABLE', ['READ_ONLY', 'REQUIRES_PLAYER']),
+    ], '按当前玩家是否拥有标签「{tag}」继续。', 'condition.player.has_tag', 'FULLY_SIMULATABLE', ['READ_ONLY', 'REQUIRES_PLAYER']),
+    block('condition.player.is_admin', '玩家是否为管理员', '按当前模拟玩家是否为管理员继续流程。', 'condition', 'condition.player', 'condition', 'PLAYER_IS_ADMIN_CONDITION', { outputMode: 'PASS_ONLY' }, [input('input')], [out('pass'), out('fail')], [
+      conditionModeField('是管理员时继续', '不是管理员时继续', '分开执行'),
+    ], '按当前玩家是否为管理员继续。', 'condition.player.is_admin', 'APPROXIMATE_SIMULATION', ['READ_ONLY', 'REQUIRES_PLAYER']),
     block('action.player.add_tag', '添加玩家标签', '给当前模拟玩家添加一个标签。', 'player', 'player.tag', 'action', 'PLAYER_ADD_TAG_ACTION', { tag: 'runner' }, [input('input')], [out('done')], [
       field('tag', '标签', 'string'),
     ], '给当前玩家添加标签「{tag}」。', 'action.player.add_tag', 'FULLY_SIMULATABLE', ['PLAYER_MUTATING', 'REQUIRES_PLAYER']),
+    block('action.player.remove_tag', '移除玩家标签', '从当前模拟玩家移除一个标签。', 'player', 'player.tag', 'action', 'PLAYER_REMOVE_TAG_ACTION', { tag: 'runner' }, [input('input')], [out('done')], [
+      field('tag', '标签', 'string'),
+    ], '移除当前玩家的标签「{tag}」。', 'action.player.remove_tag', 'FULLY_SIMULATABLE', ['PLAYER_MUTATING', 'REQUIRES_PLAYER']),
     block('state.set', '设置状态', '把一个状态写成指定值。', 'state', 'state.write', 'state', 'STATE_SET_ACTION', { scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', value: 'true' }, [input('input')], [out('done')], [
       field('scope', '作用对象', 'scope', [option('PLAYER', '玩家'), option('GLOBAL', '全局'), option('SESSION', '当前会话')]),
       field('key', '状态名', 'string'),
@@ -182,12 +192,19 @@ export const fallbackCatalog: BlockCatalog = {
   ],
 };
 
-function conditionModeField(): CatalogBlock['formSchema'][number] {
+function messageBlock(id: string, displayName: string, description: string, summaryTemplate: string): CatalogBlock {
+  return block(id, displayName, description, 'message', 'message.screen', 'action', 'MESSAGE_ACTION', { target: 'CURRENT_PLAYER', message: richTextConfig('新消息') }, [input('input')], [out('done')], [
+    readonlyField('target', '接收者', 'CURRENT_PLAYER', '当前发送给触发这条流程的玩家或 WebUI 模拟玩家。'),
+    field('message', '消息内容', 'rich_text_component', [], 'fullWidth textareaRows:4'),
+  ], summaryTemplate, id, 'APPROXIMATE_SIMULATION', ['PLAYER_MUTATING', 'REQUIRES_PLAYER']);
+}
+
+function conditionModeField(passLabel = '满足时继续', failLabel = '不满足时继续', branchLabel = '分成两路'): CatalogBlock['formSchema'][number] {
   return {
     ...field(conditionOutputModeKey, '条件用途', 'segmented', [
-      option('PASS_ONLY', '满足时继续'),
-      option('FAIL_ONLY', '不满足时继续'),
-      option('BRANCH', '分成两路'),
+      option('PASS_ONLY', passLabel),
+      option('FAIL_ONLY', failLabel),
+      option('BRANCH', branchLabel),
     ], 'segmented fullWidth'),
     description: '选择条件满足、不满足或双分支时如何继续流程。',
     defaultValue: 'BRANCH',

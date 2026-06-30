@@ -89,7 +89,8 @@ The WebUI now also uses a local graph version and save sequence before applying 
 
 Known message config compatibility:
 
-- New `action.message.chat` nodes store `config.message` as a rich text component payload string containing `version`, `plainText`, and `segments`.
+- Message action nodes store `config.message` as a rich text component payload string containing `version`, `plainText`, and `segments`.
+- `action.message.title`, `action.message.subtitle`, and `action.message.actionbar` use the same message field and are separate blocks.
 - Old graph documents with a plain string `config.message` remain valid and are treated as `plainText`.
 - The normal WebUI does not expose raw JSON editing for this field.
 
@@ -99,7 +100,7 @@ Known condition config compatibility:
 - Old graph documents without `outputMode` remain valid and run as `BRANCH`.
 - Unconnected condition outputs are valid and mean that path ends.
 - Unconnected condition inputs are valid during editing; the block is saved but unreachable until connected into a trigger path.
-- The normal WebUI renders this as `条件用途`: `满足时继续`, `不满足时继续`, or `分成两路`.
+- The normal WebUI renders this as `条件用途`; catalog blocks may override option labels, for example `拥有标签时继续` / `不拥有标签时继续` / `分开执行` or `是管理员时继续` / `不是管理员时继续` / `分开执行`.
 
 ## Endpoints
 
@@ -207,6 +208,8 @@ The response includes the simulation summary:
 - final actor tags after simulated actions.
 
 `action.player.add_tag` changes only this run's actor result. It does not persist to graph storage and does not become the next run's initial tags unless the user manually edits the test-player input.
+
+`action.player.remove_tag` follows the same boundary: it only changes the current run result and does not rewrite graph JSON or the WebUI test-player input.
 
 ## Lifecycle / Capacity Safety
 

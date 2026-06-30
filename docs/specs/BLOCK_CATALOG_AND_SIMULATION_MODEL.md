@@ -6,7 +6,7 @@
 
 - 让 PixelLogic 能承载未来大量具体积木，而不是把左侧入口永久写死为“触发器 / 条件 / 动作 / 状态 / 计时器 / 调试”六类。
 - 把“分类”和“具体积木”分开：分类只负责找东西，具体积木才是可拖拽、可放置、可验证、可执行的节点。
-- 避免一个万能大块承载过多配置。用户应拖入“发送聊天消息”“玩家拥有标签”“等待 30 秒”这种小而清楚的积木，而不是拖入“动作”后在表单里选择一切。
+- 避免一个万能大块承载过多配置。用户应拖入“发送聊天消息”“玩家是否拥有标签”“等待 30 秒”这种小而清楚的积木，而不是拖入“动作”后在表单里选择一切。
 - 为 WebUI 先行开发提供模拟后端能力模型，让未接真实 Minecraft adapter 的积木也能完成配置校验、流程模拟、trace 展示和分支验证。
 - 让每个积木未来都能同时拥有模拟执行器 / Simulation Executor 与真实执行器 / Minecraft Executor，而不是重写 GraphRuntime 或推翻 catalog。
 
@@ -89,6 +89,19 @@ This checkpoint still does not add a real Minecraft adapter, draft simulation, n
 - Condition outputs are optional in validation; an unconnected selected output ends the path and writes a trace step.
 - Condition inputs are also optional while editing, matching other placed blocks; an unconnected condition is saved but unreachable until attached to a trigger path.
 - `condition.player.has_tag` now belongs to `条件判断 / 玩家条件`; `action.player.add_tag` remains `玩家操作 / 标签`.
+
+## Implementation Checkpoint: Catalog Expansion v1 Player + Message
+
+`feature/v1-catalog-expansion-player-message` expands the small player/message catalog slice without changing the graph model:
+
+- `condition.player.has_tag` keeps its stable block id and is renamed to `玩家是否拥有标签`.
+- The tag condition uses block-specific output labels: `拥有标签时继续`, `不拥有标签时继续`, and `分开执行`.
+- `condition.player.is_admin` is added under `条件判断 / 玩家条件` and reads the per-run simulation actor administrator flag.
+- No separate `玩家没有标签` or `玩家不是管理员` block is added.
+- `action.player.remove_tag` is added beside `action.player.add_tag`; both mutate only the current run actor tags.
+- `action.message.title`, `action.message.subtitle`, and `action.message.actionbar` are added under `消息显示 / 屏幕提示`.
+- The new message blocks reuse `rich_text_component`; color and formatting toolbar remain future work.
+- The title/subtitle/actionbar blocks are separate; there is no combined title+subtitle block.
 
 ## Product Principles
 
@@ -258,11 +271,15 @@ trigger.block_interact
 
 condition.state.equals
 condition.player.has_tag
+condition.player.is_admin
 condition.inventory.has_item
 
 action.message.chat
 action.message.title
+action.message.subtitle
+action.message.actionbar
 action.player.add_tag
+action.player.remove_tag
 action.player.teleport
 action.world.play_sound
 action.world.set_block
@@ -335,7 +352,7 @@ Current MVP supports `string`, `textarea`, `number`, `integer`, `boolean`, `sele
 
 ```text
 发送聊天消息：向「当前玩家」发送「欢迎开始游戏」
-玩家拥有标签：当「当前玩家」拥有标签「runner」
+玩家是否拥有标签：按「当前玩家」是否拥有标签「runner」
 设置状态：把「玩家」的 started 设置为「是」
 等待：等待 30 秒后继续
 ```

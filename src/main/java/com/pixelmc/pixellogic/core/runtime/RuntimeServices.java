@@ -25,6 +25,10 @@ public interface RuntimeServices {
     default void recordMessageResult(String nodeId, UUID playerId, String message) {
     }
 
+    default void recordMessageResult(String nodeId, UUID playerId, String message, String channel) {
+        recordMessageResult(nodeId, playerId, message);
+    }
+
     default void recordStateChange(String nodeId, StateKey key, String value) {
     }
 

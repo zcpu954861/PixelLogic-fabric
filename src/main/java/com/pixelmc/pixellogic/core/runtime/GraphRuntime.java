@@ -1,6 +1,7 @@
 package com.pixelmc.pixellogic.core.runtime;
 
 import com.pixelmc.pixellogic.core.graph.CompiledGraph;
+import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
 import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
@@ -148,7 +149,7 @@ public final class GraphRuntime {
             case STATE_ADD_ACTION -> executeStateAdd(node, context);
             case TIMER_START_ACTION -> executeTimer(node, context);
             case DEBUG_LOG_ACTION -> executeDebug(node, context);
-            case PLAYER_HAS_TAG_CONDITION, PLAYER_ADD_TAG_ACTION ->
+            case PLAYER_HAS_TAG_CONDITION, PLAYER_IS_ADMIN_CONDITION, PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION ->
                     throw new IllegalStateException("缺少模拟执行器：" + node.type());
         };
     }
@@ -171,10 +172,19 @@ public final class GraphRuntime {
 
     private String executeMessage(NodeDefinition node, ExecutionContext context) {
         String message = RichTextComponentValue.plainText(node.config().getOrDefault("message", ""));
-        services.sendPlayerMessage(context.playerId(), message);
-        traces.add(context.traceId(), node.id(), "发送消息：" + message);
-        services.recordMessageResult(node.id(), context.playerId(), message);
-        services.recordActionResult(node.id(), "message", "发送消息：" + message);
+        String channel = messageResultKind(node.blockId());
+        if ("CHAT".equals(channel)) {
+            services.sendPlayerMessage(context.playerId(), message);
+        }
+        String traceMessage = switch (channel) {
+            case "TITLE" -> "显示标题：" + message;
+            case "SUBTITLE" -> "显示副标题：" + message;
+            case "ACTIONBAR" -> "显示快捷栏消息：" + message;
+            default -> "发送消息：" + message;
+        };
+        traces.add(context.traceId(), node.id(), traceMessage);
+        services.recordMessageResult(node.id(), context.playerId(), message, channel);
+        services.recordActionResult(node.id(), "message", traceMessage);
         return "done";
     }
 
@@ -268,5 +278,14 @@ public final class GraphRuntime {
 
     private String displayStateKey(StateKey key) {
         return key.scope() + "." + key.key();
+    }
+
+    private String messageResultKind(String blockId) {
+        return switch (blockId) {
+            case BuiltInBlockCatalog.ACTION_MESSAGE_TITLE -> "TITLE";
+            case BuiltInBlockCatalog.ACTION_MESSAGE_SUBTITLE -> "SUBTITLE";
+            case BuiltInBlockCatalog.ACTION_MESSAGE_ACTIONBAR -> "ACTIONBAR";
+            default -> "CHAT";
+        };
     }
 }

@@ -13,6 +13,9 @@ public record SimulationExecutionResult(
         boolean success,
         String traceId,
         String message,
+        String actorDisplayName,
+        boolean actorOperator,
+        Set<String> initialActorTags,
         List<SimulationActionResult> actionResults,
         List<SimulationMessageResult> messageResults,
         List<SimulationStateChangeResult> stateChanges,
@@ -20,11 +23,14 @@ public record SimulationExecutionResult(
         boolean timerScheduled,
         List<String> errors
 ) {
-    public static SimulationExecutionResult from(RuntimeResult result, SimulationContext context) {
+    public static SimulationExecutionResult from(RuntimeResult result, SimulationContext context, Set<String> initialActorTags) {
         return new SimulationExecutionResult(
                 result.success(),
                 result.traceId(),
                 result.message(),
+                context.actor().displayName(),
+                context.actor().operator(),
+                Set.copyOf(initialActorTags),
                 context.actionResults(),
                 context.messageResults(),
                 context.stateChanges(),

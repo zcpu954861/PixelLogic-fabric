@@ -33,10 +33,28 @@ public record SimulationExecutionRequest(
             String sessionId,
             long generation
     ) {
+        return manual(
+                graphId,
+                triggerType,
+                commandText,
+                SimulationActor.player(playerId, playerName),
+                sessionId,
+                generation
+        );
+    }
+
+    public static SimulationExecutionRequest manual(
+            String graphId,
+            String triggerType,
+            String commandText,
+            SimulationActor actor,
+            String sessionId,
+            long generation
+    ) {
         return new SimulationExecutionRequest(
                 graphId,
                 SimulationEvent.manual(triggerType, commandText, sessionId),
-                SimulationActor.player(playerId, playerName),
+                actor,
                 SimulationWorld.overworld(),
                 SimulationRunOptions.realTime(),
                 generation

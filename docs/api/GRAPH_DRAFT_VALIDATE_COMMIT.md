@@ -143,6 +143,7 @@ Error shape:
 - Commit loads the draft, validates it, writes committed JSON, and swaps the runtime compiled graph only after validation passes.
 - If validation fails, committed graph and current runtime remain unchanged.
 - Test run uses the committed graph, even when a draft exists.
+- Test run may receive a per-run `testContext.actor` with display name, tags, and administrator flag. This context is runtime input only and is not stored in graph JSON.
 - Condition runtime follows `outputMode`: `PASS_ONLY` only follows `pass` when true, `FAIL_ONLY` only follows `fail` when false, and `BRANCH` selects `pass` or `fail`.
 - If the selected condition output has no edge, runtime records that no next block is connected and ends successfully.
 
@@ -153,7 +154,7 @@ The WebUI keeps the Slot-Based horizontal block flow. It loads the graph from th
 The API layer still exposes draft, validate, and commit as separate operations, but the normal user UI does not expose that engineering sequence as separate buttons. The user-facing actions are:
 
 - `保存`: save the current edits, validate them, and promote them only when validation passes.
-- `测试运行`: if there are unsaved edits, save/validate/promote them first; then reset the demo test state, start the test run, and refresh the trace.
+- `测试运行`: if there are unsaved edits, save/validate/promote them first; then reset the demo test state, start the test run with the current `测试玩家` input, and refresh the trace.
 
 Block fields are edited in a focused modal opened from the Slot-Based canvas. The right panel only shows selected-block information and status.
 
@@ -172,6 +173,40 @@ The slot flow drag/insert checkpoint keeps the same API contract. The WebUI may 
 - condition node `config.outputMode`, and when confirmed by the user, removal of edges on outputs that become inactive.
 
 These edits are still submitted as the same graph draft JSON. `保存` continues to run draft save, validation, and commit. Invalid drag/edit outcomes do not replace the committed runtime graph.
+
+## Simulation Test Context Payload
+
+`POST /api/pixellogic/test/start` accepts an optional body:
+
+```json
+{
+  "testContext": {
+    "actor": {
+      "id": "webui-sim-player",
+      "displayName": "WebUI 模拟玩家",
+      "tags": ["runner"],
+      "operator": false
+    }
+  }
+}
+```
+
+If the body or actor is missing, the API uses the default `WebUI 模拟玩家`.
+
+Validation:
+
+- display name is trimmed, required when provided, max 64 characters, and cannot contain control characters.
+- tags are trimmed, deduplicated, capped at 32 values, max 64 characters each, and cannot contain control characters.
+- administrator defaults to `false`.
+
+The response includes the simulation summary:
+
+- actor display name.
+- administrator flag.
+- initial actor tags.
+- final actor tags after simulated actions.
+
+`action.player.add_tag` changes only this run's actor result. It does not persist to graph storage and does not become the next run's initial tags unless the user manually edits the test-player input.
 
 ## Lifecycle / Capacity Safety
 

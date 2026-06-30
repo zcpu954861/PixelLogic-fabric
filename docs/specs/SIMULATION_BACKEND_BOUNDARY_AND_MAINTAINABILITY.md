@@ -20,7 +20,19 @@ Still not implemented:
 - Minecraft adapter.
 - inventory/world/container simulation.
 - timer fast-forward.
-- public simulation UI panel.
+- full scenario/world simulation UI panel.
+
+## Implementation Checkpoint: Simulation Test Context MVP
+
+`feature/v1-simulation-test-context` adds the first WebUI-editable per-run simulation input without changing the graph model:
+
+- `POST /api/pixellogic/test/start` accepts optional `testContext.actor`.
+- The actor can provide display name, initial tags, and an administrator flag.
+- Missing request body still uses the default `WebUI 模拟玩家`.
+- The request actor is passed into `SimulationRunner`; `GraphRuntime` remains the execution engine.
+- `condition.player.has_tag` reads the actor's initial tags, and `action.player.add_tag` mutates only the current run actor.
+- `SimulationExecutionResult` returns display name, administrator flag, initial tags, and final tags for the WebUI summary.
+- No named scenarios, persistence, draft simulation, Minecraft adapter, multiplayer, inventory, world, or container simulation are added.
 
 ## Goals
 
@@ -252,6 +264,8 @@ web-ui/src/ui/simulation/
 Do not add simulation business logic to `web-ui/src/ui/app.ts`. `app.ts` may orchestrate screen assembly and bind high-level actions, but simulated actor/world/event editing belongs in `ui/simulation`, and API details belong in `api/simulationApi.ts`.
 
 WebUI can display and edit simulation inputs. It must not become the source of truth for Minecraft rules.
+
+The Simulation Test Context MVP follows this boundary with `web-ui/src/model/simulationTestContext.ts` and `web-ui/src/ui/simulation/simulationTestContextPanel.ts`. It keeps only the minimal actor fields needed by current player-tag blocks.
 
 ## Logical Receiver Runner
 

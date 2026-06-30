@@ -43,7 +43,24 @@ GET  /api/pixellogic/traces/latest
 GET  /api/pixellogic/traces
 ```
 
-The Vite dev server proxies `/api` to `http://127.0.0.1:18111`. The UI shows the fixed `WebUI 模拟玩家` context so browser tests are not confused with real player events.
+The Vite dev server proxies `/api` to `http://127.0.0.1:18111`. The UI defaults to `WebUI 模拟玩家`. The `测试运行` control is a split button: the left side starts the run, and the right arrow opens a small dropdown with brief helper copy and `编辑测试玩家`.
+
+`POST /api/pixellogic/test/start` may include:
+
+```json
+{
+  "testContext": {
+    "actor": {
+      "id": "webui-sim-player",
+      "displayName": "WebUI 模拟玩家",
+      "tags": ["runner"],
+      "operator": false
+    }
+  }
+}
+```
+
+This context is temporary input for the next run only. It is not written to graph JSON, not saved as a named scenario, and not reused from the previous run result. The result summary displays the run actor, initial tags, final tags, tag changes, and administrator status.
 
 ## Graph Draft Flow
 
@@ -69,6 +86,8 @@ Important user semantics:
 - Invalid edits do not replace the committed runtime graph.
 - `上一步` / `下一步` plus `Ctrl+Z`, `Ctrl+Y`, and `Ctrl+Shift+Z` roll back and reapply graph operations such as naming, configuration, add/delete, drag, and connection edits.
 - `测试运行` waits for pending automatic save, resets the demo test state, starts the run, and refreshes the trace.
+- `编辑测试玩家` opens a modal using the same local-draft, save, close animation, and unsaved-close confirmation pattern as block editing.
+- The test-player modal sends display name, tags, and administrator status with the test run; tag chips use a left-side `×` remove button, and final tags from `action.player.add_tag` stay in the result summary and do not rewrite the input tags.
 - Reset remains an internal API step, not a primary user button.
 - The right panel is an information surface, not the main field editor.
 - Closing the editor modal without saving discards only the modal-local draft and does not mutate the graph.
@@ -129,11 +148,13 @@ Current responsibility boundaries:
 - `model/`: graph/API types, seeded demo graph, pure graph layout, connection, and cloning helpers.
 - `model/blockCatalog.ts`: frontend fallback catalog and catalog-block-to-graph-node conversion.
 - `model/richText.ts`: rich text component MVP helpers for structured storage and plain text display.
+- `model/simulationTestContext.ts`: per-run WebUI test actor model, validation, tag normalization, and request payload.
 - `state/`: mutable app state and canvas world dimensions.
 - `ui/app.ts`: orchestration, app shell assembly, event binding, autosave, undo/redo, and API actions.
 - `ui/canvas/`: puzzle block view, block constants, and drag/insert graph rules.
 - `ui/editor/`: editor modal shell and humanized form controls.
 - `ui/sidebar/`: selected-block summary and connection actions.
+- `ui/simulation/`: test-run split dropdown, test-player modal, and simulation result summary.
 - `ui/trace/`: trace rendering.
 - `ui/humanize/`: labels and trace message humanization.
 - `ui/validation/`: validation/draft status copy.

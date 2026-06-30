@@ -127,7 +127,12 @@ public final class ApiWebUiSelfCheck {
     private static CheckedResponse send(HttpClient client, String method, String uri, String body) throws Exception {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(uri));
         if ("POST".equals(method)) {
-            request.POST(HttpRequest.BodyPublishers.noBody());
+            if (body == null || body.isBlank()) {
+                request.POST(HttpRequest.BodyPublishers.noBody());
+            } else {
+                request.header("Content-Type", "application/json");
+                request.POST(HttpRequest.BodyPublishers.ofString(body));
+            }
         } else if ("PUT".equals(method)) {
             request.header("Content-Type", "application/json");
             request.PUT(HttpRequest.BodyPublishers.ofString(body));

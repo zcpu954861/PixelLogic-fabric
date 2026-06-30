@@ -1,3 +1,5 @@
+import type { SimulationTestContext, SimulationTestResult } from './simulationTestContext';
+
 export type ApiStatus = 'checking' | 'online' | 'offline';
 export type BlockKind = 'trigger' | 'condition' | 'action' | 'state' | 'timer' | 'debug';
 export type Branch = 'main' | 'pass' | 'fail';
@@ -173,13 +175,7 @@ export type ApiResponse = {
   traceId?: string;
   trace?: ApiTrace | null;
   traces?: ApiTrace[];
-  simulation?: {
-    success: boolean;
-    traceId: string;
-    message: string;
-    timerScheduled: boolean;
-    actorTags: string[];
-  };
+  simulation?: SimulationTestResult;
   catalog?: BlockCatalog;
   api?: string;
   demoActor?: {
@@ -196,6 +192,14 @@ export type UiState = {
   apiStatus: ApiStatus;
   statusMessage: string;
   demoActor: string;
+  simulationTestContext: SimulationTestContext;
+  simulationTestContextError: string;
+  simulationResult: SimulationTestResult | null;
+  simulationMenuOpen: boolean;
+  simulationEditorOpen: boolean;
+  simulationEditorClosing: boolean;
+  simulationDraftContext: SimulationTestContext | null;
+  simulationOriginalContext: SimulationTestContext | null;
   busyAction: string | null;
   lastAction: string;
   error: string;

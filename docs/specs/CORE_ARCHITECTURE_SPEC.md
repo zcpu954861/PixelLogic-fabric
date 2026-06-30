@@ -527,7 +527,7 @@ Rules:
 
 - It is bound to `127.0.0.1:18111`.
 - It serves the in-memory `demo-start-flow` only.
-- It uses the fixed `WebUI 模拟玩家` actor.
+- It defaults to `WebUI 模拟玩家` and may accept a per-run test actor for WebUI simulation.
 - It returns JSON success/error envelopes.
 - It is not the final project/graph persistence API.
 - It does not introduce Channel, Region, or old TZZ concepts.

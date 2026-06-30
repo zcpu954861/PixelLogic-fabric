@@ -69,17 +69,17 @@ Example error:
 }
 ```
 
-## Demo Actor
+## Test Actor
 
-WebUI test-run uses a fixed demo actor:
+WebUI test-run defaults to:
 
 ```text
 WebUI 模拟玩家
 ```
 
-This is a PLAYER-scope simulation identity for browser testing. It is not an online Minecraft player and does not touch real player objects.
+The WebUI can send a per-run test actor with display name, tags, and administrator status in `POST /api/pixellogic/test/start`. This is a PLAYER-scope simulation identity for browser testing. It is not an online Minecraft player and does not touch real player objects.
 
-The reset endpoint clears the demo actor's `PLAYER.started` and `PLAYER.start_count` state.
+The reset endpoint clears the WebUI demo actor's `PLAYER.started` and `PLAYER.start_count` state. The test actor context itself is not persisted as a scenario and is not written to graph JSON.
 
 ## Runtime Threading
 

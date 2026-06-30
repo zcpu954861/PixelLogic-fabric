@@ -35,11 +35,15 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.require;
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.run;
+
 public final class SimulationBackendSelfCheck {
     private SimulationBackendSelfCheck() {
     }
 
     public static void main(String[] args) {
+        run("simulationBackendSelfCheck", () -> {
         UUID playerId = UUID.randomUUID();
         RunHarness demo = harness(DemoGraphFactory.create(Duration.ofSeconds(1)));
         SimulationExecutionResult demoResult = demo.runner().run(SimulationExecutionRequest.manual(
@@ -94,6 +98,7 @@ public final class SimulationBackendSelfCheck {
                 "player tag action should produce state change result");
         require(addTagHarness.traces().get(added.traceId()).orElseThrow().containsMessage("玩家标签写入"),
                 "trace should include player tag action");
+        });
     }
 
     private static RunHarness harness(GraphDefinition graph) {
@@ -176,12 +181,6 @@ public final class SimulationBackendSelfCheck {
 
     private static EdgeDefinition edge(String id, String sourceNode, String sourceSlot, String targetNode, String targetSlot) {
         return new EdgeDefinition(id, sourceNode, sourceSlot, targetNode, targetSlot, EdgeType.CONTROL);
-    }
-
-    private static void require(boolean condition, String message) {
-        if (!condition) {
-            throw new IllegalStateException(message);
-        }
     }
 
     private record RunHarness(

@@ -3,6 +3,7 @@ package com.pixelmc.pixellogic.core.simulation.executor;
 import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
+import com.pixelmc.pixellogic.core.runtime.RuntimeNodeExecutionResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
 import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
@@ -37,7 +38,7 @@ public final class SimulationExecutionRegistry {
         ));
     }
 
-    public Optional<RuntimeServices.NodeExecution> execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+    public Optional<RuntimeNodeExecutionResult> execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
         return Optional.ofNullable(executors.get(node.type()))
                 .map(executor -> executor.execute(node, context, services));
     }
@@ -49,7 +50,7 @@ public final class SimulationExecutionRegistry {
         }
 
         @Override
-        public RuntimeServices.NodeExecution execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             String message = RichTextComponentValue.plainText(node.config().getOrDefault("message", ""));
             String channel = messageResultKind(node.blockId());
             if ("CHAT".equals(channel)) {
@@ -63,7 +64,7 @@ public final class SimulationExecutionRegistry {
             };
             context.addMessageResult(new SimulationMessageResult(node.id(), context.actor().id(), message, channel));
             context.addActionResult(new SimulationActionResult(node.id(), "message", trace));
-            return new RuntimeServices.NodeExecution("done", trace);
+            return new RuntimeNodeExecutionResult("done", trace);
         }
 
         private String messageResultKind(String blockId) {
@@ -83,11 +84,11 @@ public final class SimulationExecutionRegistry {
         }
 
         @Override
-        public RuntimeServices.NodeExecution execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             String tag = tag(node);
             boolean passed = context.actor().hasTag(tag);
             ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
-            return new RuntimeServices.NodeExecution(
+            return new RuntimeNodeExecutionResult(
                     mode.outputSlot(passed),
                     "玩家标签条件" + (passed ? "通过" : "失败") + "：" + context.actor().displayName() + " "
                             + (passed ? "拥有" : "不拥有") + "标签 " + tag + "。"
@@ -103,10 +104,10 @@ public final class SimulationExecutionRegistry {
         }
 
         @Override
-        public RuntimeServices.NodeExecution execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             boolean passed = context.actor().operator();
             ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
-            return new RuntimeServices.NodeExecution(
+            return new RuntimeNodeExecutionResult(
                     mode.outputSlot(passed),
                     "管理员条件" + (passed ? "通过" : "失败") + "：" + context.actor().displayName()
                             + (passed ? " 是管理员。" : " 不是管理员。")
@@ -122,13 +123,13 @@ public final class SimulationExecutionRegistry {
         }
 
         @Override
-        public RuntimeServices.NodeExecution execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             String tag = tag(node);
             context.actor().addTag(tag);
             String message = "玩家标签写入：给 " + context.actor().displayName() + " 添加标签 " + tag;
             context.addActionResult(new SimulationActionResult(node.id(), "player_tag", message));
             context.addStateChange(new SimulationStateChangeResult(node.id(), "actor.tags", String.join(",", context.actor().tags())));
-            return new RuntimeServices.NodeExecution("done", message);
+            return new RuntimeNodeExecutionResult("done", message);
         }
     }
 
@@ -139,7 +140,7 @@ public final class SimulationExecutionRegistry {
         }
 
         @Override
-        public RuntimeServices.NodeExecution execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             String tag = tag(node);
             boolean removed = context.actor().removeTag(tag);
             String message = removed
@@ -147,7 +148,7 @@ public final class SimulationExecutionRegistry {
                     : "玩家标签移除：玩家「" + context.actor().displayName() + "」没有标签「" + tag + "」，未发生变化。";
             context.addActionResult(new SimulationActionResult(node.id(), "player_tag", message));
             context.addStateChange(new SimulationStateChangeResult(node.id(), "actor.tags", String.join(",", context.actor().tags())));
-            return new RuntimeServices.NodeExecution("done", message);
+            return new RuntimeNodeExecutionResult("done", message);
         }
     }
 

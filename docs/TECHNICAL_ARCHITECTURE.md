@@ -46,6 +46,7 @@ The catalog form schema checkpoint keeps that runtime boundary:
 
 - `BlockDefinition` exposes `formSchema`, `summaryTemplate`, and `summaryFormatter` metadata.
 - The WebUI editor resolves known `blockId` values through catalog schema first and uses legacy `NodeType` builders only as fallback.
+- The Java built-in catalog and `/api/pixellogic/catalog` are the catalog authority; the frontend fallback catalog is only an API-offline placeholder, not a duplicate registry.
 - Message actions store message config as a rich text component payload while the current string-valued graph config schema is preserved.
 - `GraphRuntime` still extracts plain text and dispatches through the existing `MESSAGE_ACTION` path; no real Minecraft Text adapter is implemented.
 
@@ -115,11 +116,11 @@ The Simulation Backend skeleton checkpoint adds the first code slice:
 
 - `core/simulation` owns minimal actor/world/event/context/result/runner/executor types.
 - `SimulationRunner` routes manual/WebUI test runs through a simulated context while still calling `GraphRuntime`.
-- `RuntimeServices` provides a small optional simulation-node hook and result collectors; existing services keep no-op defaults.
+- `RuntimeServices` provides a small optional simulation-node hook and result collectors; simulated node output uses top-level `RuntimeNodeExecutionResult` while existing services keep no-op defaults.
 - Player tag condition/action are the first simulation-backed catalog expansion.
 - `SimulationExecutionRegistry` owns player tag simulated behavior so `SimulationRunner` does not become a giant service.
 
-Still out of scope: draft simulation, named scenarios, fast-forward timers, real Minecraft adapter, full inventory/world/container simulation, and new simulation UI.
+Still out of scope: draft simulation, named scenarios, fast-forward timers, real Minecraft adapter, full inventory/world/container simulation, and new simulation UI. The current `SimulationRunOptions` only preserves the real-time timer scheduling choice.
 
 The Simulation Test Context MVP adds the first small WebUI simulation input without widening that boundary:
 

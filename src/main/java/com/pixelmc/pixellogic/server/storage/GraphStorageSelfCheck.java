@@ -12,11 +12,15 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.require;
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.run;
+
 public final class GraphStorageSelfCheck {
     private GraphStorageSelfCheck() {
     }
 
     public static void main(String[] args) throws Exception {
+        run("graphStorageSelfCheck", () -> {
         Path root = Files.createTempDirectory("pixel-logic-graph-storage-");
         UUID playerId = UUID.nameUUIDFromBytes("pixel-logic-graph-storage-self-check".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         try (PixelLogicSpikeService service = new PixelLogicSpikeService(
@@ -86,6 +90,7 @@ public final class GraphStorageSelfCheck {
         } finally {
             deleteRecursively(root);
         }
+        });
     }
 
     private static GraphDocument withConfig(GraphDocument document, String nodeId, String key, String value) {
@@ -128,9 +133,4 @@ public final class GraphStorageSelfCheck {
         }
     }
 
-    private static void require(boolean condition, String message) {
-        if (!condition) {
-            throw new IllegalStateException(message);
-        }
-    }
 }

@@ -2,9 +2,6 @@ import { PixelLogicApiError, api } from '../api/pixelLogicApi';
 import {
   blockKindFromCatalogBlock,
   catalogBlock,
-  catalogBlocksForCategory,
-  catalogCategories,
-  catalogCategory,
   catalogNodeIdPrefix,
   createCatalogNode,
   fallbackCatalog,
@@ -24,60 +21,35 @@ import {
 } from '../model/simulationTestContext';
 import { state, world } from '../state/appState';
 import {
-  blockMetrics,
   blockSize,
-  branchForNode,
   cloneGraph,
   connectedComponentNodeIds,
   connectedGraphEdges,
   downstreamNodeIds,
   fallbackPosition,
-  inputCenterOffset,
   normalizeConditionBranchLayout,
   nodePosition,
-  outputCenterOffset,
-  preferredMainOutput,
 } from '../model/graphLayout';
 import { activeConditionOutputSlots, conditionOutputMode, conditionOutputModeKey } from '../model/conditionOutputMode';
-import { escapeAttr, escapeHtml, formatTime, shortFingerprint, shortTraceId } from '../utils/dom';
+import { escapeHtml, shortFingerprint, shortTraceId } from '../utils/dom';
 import type {
   ApiResponse,
-  ApiStatus,
-  ApiTrace,
   BlockDrag,
   BlockCatalog,
   BlockKind,
-  BlockMetrics,
-  Branch,
-  EditableField,
-  EditorSection,
-  FieldOption,
   GraphDocument,
-  GraphEdge,
   GraphHistoryEntry,
   GraphNode,
   GraphPosition,
-  GraphSlot,
   InsertCandidate,
-  LaneSpan,
-  SlotBlock,
-  SlotJoin,
-  UiState,
 } from '../model/graphTypes';
 import {
-  blockKind,
-  booleanLabel,
-  booleanOptions,
-  humanizeTraceMessage,
   nodeCategoryLabel,
   nodeSummary,
-  slotLabel,
-  stateScopeOptions,
-  stateValueLabel,
-  valueTypeOptions,
 } from './humanize/labels';
-import { autoSaveDelayMs, connectedOverlap, conditionBlockWidth, conditionBranchGap, doubleClickMs, dragThreshold, historyLimit, insertSnapX, insertSnapY, normalBlockHeight, normalBlockWidth, puzzleMouthHalfHeight, reconnectSnapX, reconnectSnapY } from './canvas/blockConstants';
+import { autoSaveDelayMs, doubleClickMs, dragThreshold, historyLimit, normalBlockHeight, normalBlockWidth } from './canvas/blockConstants';
 import { renderBlock, renderSlotJoin } from './canvas/blockView';
+import { buildBlocks, buildJoins, updateWorldSize } from './canvas/slotFlowViewModel';
 import {
   connectedActionText,
   findInsertCandidate,
@@ -86,6 +58,7 @@ import {
   makeInsertionGap,
   snapDraggedGroupToCandidate,
 } from './canvas/dragInsert';
+import { renderCatalogLibrary } from './catalog/catalogLibrary';
 import { renderEditorModal } from './editor/blockEditorModal';
 import { renderSimulationTestContextModal, renderSimulationTestResultSummary, renderTestRunControl } from './simulation/simulationTestContextPanel';
 import { renderTrace } from './trace/traceView';
@@ -128,64 +101,6 @@ function currentGraph(): GraphDocument {
 
 
 
-function buildBlocks(graph: GraphDocument): SlotBlock[] {
-  const metricsCache = new Map<string, BlockMetrics>();
-  return graph.nodes.map((nodeItem) => {
-    const kind = blockKind(nodeItem.type);
-    const position = nodeItem.position ?? fallbackPosition(nodeItem.id);
-    const size = blockMetrics(graph, nodeItem, metricsCache);
-    return {
-      id: nodeItem.id,
-      kind,
-      branch: branchForNode(graph, nodeItem),
-      type: nodeCategoryLabel(nodeItem, activeCatalog()),
-      title: nodeItem.displayName || nodeItem.id,
-      summary: nodeSummary(nodeItem, activeCatalog()),
-      x: position.x,
-      y: position.y,
-      width: size.width,
-      height: size.height,
-      inputY: size.inputY,
-      outputOffsets: size.outputOffsets,
-      selected: nodeItem.id === state.selectedNodeId,
-    };
-  });
-}
-
-function buildJoins(graph: GraphDocument, blocks: SlotBlock[]): SlotJoin[] {
-  const blockById = new Map(blocks.map((block) => [block.id, block]));
-  return connectedGraphEdges(graph)
-    .map((graphEdge): SlotJoin | null => {
-      const source = blockById.get(graphEdge.sourceNodeId);
-      const target = blockById.get(graphEdge.targetNodeId);
-      if (!source || !target) {
-        return null;
-      }
-      const tone = graphEdge.sourceSlotId === 'pass' ? 'pass' : graphEdge.sourceSlotId === 'fail' ? 'fail' : 'normal';
-      return {
-        id: graphEdge.id,
-        from: source.id,
-        to: target.id,
-        branch: tone === 'fail' ? 'fail' : tone === 'pass' ? 'pass' : target.branch,
-        x: target.x - 2,
-        y: target.y + (target.inputY ?? normalBlockHeight / 2) - 15,
-        width: 20,
-        tone,
-      };
-    })
-    .filter((join): join is SlotJoin => join !== null);
-}
-
-function updateWorldSize(blocks: SlotBlock[]): void {
-  const maxRight = blocks.reduce((right, block) => Math.max(right, block.x + block.width), 0);
-  const maxBottom = blocks.reduce((bottom, block) => Math.max(bottom, block.y + block.height), 0);
-  world.width = Math.max(2160, Math.ceil(maxRight + 260));
-  world.height = Math.max(620, Math.ceil(maxBottom + 120));
-}
-
-
-
-
 function renderApp(): void {
   if (!app) {
     return;
@@ -193,8 +108,8 @@ function renderApp(): void {
 
   const simulationEditorWasOpen = Boolean(document.querySelector('[data-sim-modal-overlay]'));
   const graph = currentGraph();
-  const blocks = buildBlocks(graph);
-  updateWorldSize(blocks);
+  const blocks = buildBlocks(graph, activeCatalog(), state.selectedNodeId);
+  updateWorldSize(blocks, world);
   const joins = buildJoins(graph, blocks);
   const selectedNode = selectedNodeFrom(graph);
   const editorNode = state.editorOpen ? state.editorDraftNode ?? selectedNode : null;
@@ -232,7 +147,7 @@ function renderApp(): void {
 
         <section>
           <div class="panel-title"><span>积木库</span><b>${state.catalogCategoryId ? '具体积木' : '全部分类'}</b></div>
-          ${renderCatalogLibrary(activeCatalog())}
+          ${renderCatalogLibrary(activeCatalog(), state.catalogCategoryId)}
         </section>
 
         <section class="quick-start">
@@ -312,57 +227,7 @@ function activeCatalog(): BlockCatalog {
   return state.catalog ?? fallbackCatalog;
 }
 
-function renderCatalogLibrary(catalog: BlockCatalog): string {
-  const selectedCategoryId = state.catalogCategoryId;
-  if (selectedCategoryId) {
-    const categoryItem = catalogCategory(catalog, selectedCategoryId);
-    const blocks = catalogBlocksForCategory(catalog, selectedCategoryId);
-    return `
-      <div class="catalog-nav">
-        <button type="button" class="tiny-button" data-catalog-back>返回分类</button>
-        <span>${escapeHtml(categoryItem?.displayName ?? '分类')}</span>
-      </div>
-      <div class="catalog-list catalog-block-list">
-        ${blocks.length > 0 ? blocks.map((blockItem) => `
-          <button type="button" class="catalog-block" data-catalog-block="${escapeAttr(blockItem.id)}">
-            <b>${escapeHtml(blockItem.displayName)}</b>
-            <span>${escapeHtml(blockItem.description)}</span>
-            <small>${escapeHtml(capabilityLabel(blockItem.simulationCapability))}</small>
-          </button>
-        `).join('') : '<p class="catalog-empty">这个分类暂时没有积木。</p>'}
-      </div>
-    `;
-  }
 
-  const categories = catalogCategories(catalog);
-  return `
-    <div class="catalog-list">
-      ${categories.map((categoryItem) => {
-        const count = catalogBlocksForCategory(catalog, categoryItem.id).length;
-        return `
-          <button type="button" class="catalog-category" data-catalog-category="${escapeAttr(categoryItem.id)}">
-            <b>${escapeHtml(categoryItem.displayName)}</b>
-            <span>${escapeHtml(categoryItem.description)}</span>
-            <small>${count} 个积木</small>
-          </button>
-        `;
-      }).join('')}
-    </div>
-  `;
-}
-
-function capabilityLabel(value: string): string {
-  switch (value) {
-    case 'FULLY_SIMULATABLE':
-      return '可模拟';
-    case 'APPROXIMATE_SIMULATION':
-      return '近似模拟';
-    case 'REQUIRES_MINECRAFT_RUNTIME':
-      return '需要游戏运行时';
-    default:
-      return '目录积木';
-  }
-}
 
 
 
@@ -422,7 +287,7 @@ function centerView(): void {
 
 function focusSelectedBlock(): void {
   const viewport = document.querySelector<HTMLElement>('.canvas-viewport');
-  const selected = buildBlocks(currentGraph()).find((block) => block.selected);
+  const selected = buildBlocks(currentGraph(), activeCatalog(), state.selectedNodeId).find((block) => block.selected);
 
   if (!viewport || !selected) {
     return;
@@ -693,7 +558,7 @@ function beginBlockPointerDown(event: PointerEvent, nodeId: string, viewport: HT
     startWorld: pointerToWorld(event),
     startPositions,
     previewPositions: new Map(startPositions),
-    joins: buildJoins(graph, buildBlocks(graph)),
+    joins: buildJoins(graph, buildBlocks(graph, activeCatalog(), state.selectedNodeId)),
     candidate: null,
   };
   viewport.setPointerCapture(event.pointerId);

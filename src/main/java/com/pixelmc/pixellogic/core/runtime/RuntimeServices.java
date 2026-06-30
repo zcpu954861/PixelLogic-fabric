@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface RuntimeServices {
-    default Optional<NodeExecution> executeSimulationNode(NodeDefinition node, UUID playerId, String sessionId) {
+    default Optional<RuntimeNodeExecutionResult> executeSimulationNode(NodeDefinition node, UUID playerId, String sessionId) {
         return Optional.empty();
     }
 
@@ -35,6 +35,4 @@ public interface RuntimeServices {
     default void recordTimerScheduled(String nodeId, Duration delay, TimerContinuation continuation) {
     }
 
-    record NodeExecution(String outputSlot, String traceMessage) {
-    }
 }

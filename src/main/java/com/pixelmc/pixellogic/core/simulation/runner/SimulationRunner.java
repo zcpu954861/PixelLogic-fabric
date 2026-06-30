@@ -3,6 +3,7 @@ package com.pixelmc.pixellogic.core.simulation.runner;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.runtime.GraphRuntime;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
+import com.pixelmc.pixellogic.core.runtime.RuntimeNodeExecutionResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
 import com.pixelmc.pixellogic.core.runtime.TriggerEvent;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationContext;
@@ -69,7 +70,7 @@ public final class SimulationRunner {
         }
 
         @Override
-        public Optional<NodeExecution> executeSimulationNode(NodeDefinition node, UUID playerId, String sessionId) {
+        public Optional<RuntimeNodeExecutionResult> executeSimulationNode(NodeDefinition node, UUID playerId, String sessionId) {
             return registry.execute(node, context, delegate);
         }
 

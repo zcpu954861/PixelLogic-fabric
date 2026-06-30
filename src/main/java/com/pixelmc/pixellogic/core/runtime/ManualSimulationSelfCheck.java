@@ -27,8 +27,12 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.require;
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.run;
+
 public final class ManualSimulationSelfCheck {
     public static void main(String[] args) {
+        run("manualSimulationSelfCheck", () -> {
         UUID playerId = UUID.randomUUID();
         InMemoryStateStore state = new InMemoryStateStore();
         BoundedTraceBuffer traces = new BoundedTraceBuffer(2, 20);
@@ -182,12 +186,7 @@ public final class ManualSimulationSelfCheck {
         RuntimeResult stale = generatedRuntime.resumeTimer(new TimerContinuation(graph.id(), "debug-finished", "stale", playerId, "self-check", 1, 1L));
         require(!stale.success() && !staleTraces.get("stale").orElseThrow().containsMessage("计时器完成"),
                 "stale timer generation should not resume graph execution");
-    }
-
-    private static void require(boolean condition, String message) {
-        if (!condition) {
-            throw new IllegalStateException(message);
-        }
+        });
     }
 
     private static GraphDefinition withNodeConfig(GraphDefinition graph, String nodeId, String key, String value) {

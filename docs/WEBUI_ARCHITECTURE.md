@@ -20,7 +20,7 @@ Current behavior:
 - categories come from `BlockCatalog.categories`;
 - clicking a category opens concrete blocks for that category;
 - clicking a concrete block creates a graph node with `blockId`, `nodeType`, default config, and slots from catalog data;
-- API catalog failures keep the local fallback catalog visible while showing the normal Chinese API disconnected error;
+- API catalog failures show a minimal offline catalog placeholder while the normal Chinese API disconnected error explains that the full catalog is unavailable;
 - technical block ids are not primary user-facing copy.
 
 Still future:
@@ -93,7 +93,7 @@ Important user semantics:
 - Closing the editor modal without saving discards only the modal-local draft and does not mutate the graph.
 - Modal open/close uses short CSS animation and respects reduced motion.
 - The editor modal uses humanized Chinese form labels and controls. Internal graph values such as `PLAYER`, `BOOLEAN`, and `true` remain storage/runtime values, but normal UI renders them as labels such as `玩家`, `是或否`, and `是`.
-- The editor modal now prefers Block Catalog `formSchema` for known `blockId` values. Legacy `NodeType` form builders remain only as fallback for old or unknown nodes.
+- The editor modal now prefers Block Catalog `formSchema` for known `blockId` values. Nodes without `blockId` only infer catalog schema when their `node.type` maps to one catalog block; legacy `NodeType` form builders remain only as fallback for old or unknown nodes.
 - `action.message.chat` uses a `rich_text_component` field: multiline plain text editing, structured storage, and a simple preview. The normal UI does not expose raw JSON.
 - `action.message.title`, `action.message.subtitle`, and `action.message.actionbar` use the same `rich_text_component` field and remain separate blocks; no combined title+subtitle block or timing controls are included yet.
 - Rich text typing updates only the modal-local draft and preview; one click on `保存` creates one graph edit/history entry.
@@ -151,12 +151,13 @@ Current responsibility boundaries:
 
 - `api/`: localhost PixelLogic API client and connection/content-type errors.
 - `model/`: graph/API types, seeded demo graph, pure graph layout, connection, and cloning helpers.
-- `model/blockCatalog.ts`: frontend fallback catalog and catalog-block-to-graph-node conversion.
+- `model/blockCatalog.ts`: catalog sorting/lookup helpers, catalog-block-to-graph-node conversion, and a minimal API-offline fallback placeholder.
 - `model/richText.ts`: rich text component MVP helpers for structured storage and plain text display.
 - `model/simulationTestContext.ts`: per-run WebUI test actor model, validation, tag normalization, and request payload.
 - `state/`: mutable app state and canvas world dimensions.
 - `ui/app.ts`: orchestration, app shell assembly, event binding, autosave, undo/redo, and API actions.
-- `ui/canvas/`: puzzle block view, block constants, and drag/insert graph rules.
+- `ui/canvas/`: puzzle block view, slot-flow view-model building, block constants, and drag/insert graph rules.
+- `ui/catalog/`: catalog library rendering for category and block lists.
 - `ui/editor/`: editor modal shell and humanized form controls.
 - `ui/sidebar/`: selected-block summary and connection actions.
 - `ui/simulation/`: test-run split dropdown, test-player modal, and simulation result summary.

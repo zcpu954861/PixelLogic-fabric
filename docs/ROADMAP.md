@@ -12,7 +12,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Active Baseline
 
-`mc-1.21.11` now contains the v1 editor baseline: graph draft/save/load, modal editing, humanized forms, auto save/validate/apply, undo/redo, slot-flow drag/insert, WebUI structure split, lifecycle/capacity safety cleanup, and Apache-2.0 metadata.
+`mc-1.21.11` now contains the v1 editor baseline: graph draft/save/load, modal editing, humanized forms, auto save/validate/apply, undo/redo, slot-flow drag/insert, WebUI structure split, lifecycle/capacity safety cleanup, catalog expansion v1, and Apache-2.0 metadata.
 
 ## Next
 
@@ -46,12 +46,14 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - Condition output mode branch adds `满足时继续` / `不满足时继续` / `分成两路`, makes unconnected condition outputs end gracefully, allows unconnected condition inputs during editing, moves `condition.player.has_tag` to 条件判断 / 玩家条件, and keeps the demo graph as explicit dual-branch.
 - Simulation Test Context MVP lets WebUI test runs send a temporary simulated player display name, tags, and administrator flag; results show initial/final tags without writing the context into graph JSON or saving scenarios.
 - Catalog Expansion v1 adds `玩家是否拥有标签`, `玩家是否为管理员`, `移除玩家标签`, and the title/subtitle/actionbar message blocks; message color and formatting toolbar remains a follow-up.
+- Maintainability Cleanup v1 reduces frontend catalog duplication, extracts slot-flow/catalog rendering helpers from `app.ts`, consolidates self-check support, and removes runtime future-switch naming noise without changing product behavior.
 
 ## Follow-Ups
 
 P2 before broader runtime use:
 
 - The current simulation runtime now has a small `SimulationRunner` wrapper, but most demo behavior still lives in `GraphRuntime`; move behavior out gradually only when the executor split is useful.
+- `web-ui/src/ui/app.ts` remains the composition root and largest frontend file; keep extracting cohesive helpers only when new work would otherwise make it larger.
 - Rich text message blocks still have only the base multiline text component editor; add color and formatting controls later when the text component editor expands.
 - Pending timers now have a spike-level max pending count plus reset/commit/stop cleanup. Broader runtime still needs a real capacity/backpressure policy.
 - In-memory state now has a spike-level cap and reset/stop cleanup. Broader runtime still needs durable lifecycle and persistence policy before non-spike use.

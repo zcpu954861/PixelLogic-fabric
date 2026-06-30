@@ -26,6 +26,9 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.require;
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.run;
+
 public final class SimulationTestContextSelfCheck {
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
 
@@ -33,6 +36,7 @@ public final class SimulationTestContextSelfCheck {
     }
 
     public static void main(String[] args) throws Exception {
+        run("simulationTestContextSelfCheck", () -> {
         Path storageRoot = Files.createTempDirectory("pixel-logic-simulation-context-self-check-");
         try (PixelLogicSpikeService service = new PixelLogicSpikeService((playerId, message) -> {
         }, Runnable::run, ignored -> {
@@ -93,6 +97,7 @@ public final class SimulationTestContextSelfCheck {
             require(!badTag.get("ok").getAsBoolean() && badTag.getAsJsonObject("error").get("code").getAsString().equals("BAD_TEST_CONTEXT"),
                     "control characters in tags should be rejected");
         }
+        });
     }
 
     private static void installTagGraph(HttpClient client, String base) throws Exception {
@@ -187,9 +192,4 @@ public final class SimulationTestContextSelfCheck {
         return new EdgeDefinition(id, sourceNode, sourceSlot, targetNode, targetSlot, EdgeType.CONTROL);
     }
 
-    private static void require(boolean condition, String message) {
-        if (!condition) {
-            throw new IllegalStateException(message);
-        }
-    }
 }

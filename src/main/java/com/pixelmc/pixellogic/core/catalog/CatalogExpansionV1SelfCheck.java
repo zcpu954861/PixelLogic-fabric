@@ -34,6 +34,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.require;
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.run;
+
 public final class CatalogExpansionV1SelfCheck {
     private static final String TRIGGER_TYPE = "manual.test.start";
 
@@ -41,11 +44,13 @@ public final class CatalogExpansionV1SelfCheck {
     }
 
     public static void main(String[] args) {
+        run("catalogExpansionV1SelfCheck", () -> {
         checkCatalog();
         checkPlayerTagConditionModes();
         checkAdminConditionModes();
         checkRemoveTagAction();
         checkMessageResults();
+        });
     }
 
     private static void checkCatalog() {
@@ -90,19 +95,19 @@ public final class CatalogExpansionV1SelfCheck {
 
     private static void checkPlayerTagConditionModes() {
         require(valid(tagConditionGraph(ConditionOutputMode.PASS_ONLY.name(), true)), "has_tag PASS_ONLY graph should validate");
-        SimulationExecutionResult pass = run(
+        SimulationExecutionResult pass = runGraph(
                 tagConditionGraph(ConditionOutputMode.PASS_ONLY.name(), true),
                 new SimulationActor(UUID.randomUUID(), "有标签玩家", true, false, Set.of("runner"))
         );
         require(pass.success(), "has_tag PASS_ONLY should pass for actor with tag");
 
-        SimulationExecutionResult failOnly = run(
+        SimulationExecutionResult failOnly = runGraph(
                 tagConditionGraph(ConditionOutputMode.FAIL_ONLY.name(), false),
                 new SimulationActor(UUID.randomUUID(), "无标签玩家", true, false, Set.of())
         );
         require(failOnly.success(), "has_tag FAIL_ONLY should continue for actor without tag");
 
-        SimulationExecutionResult branch = run(
+        SimulationExecutionResult branch = runGraph(
                 tagConditionGraph(ConditionOutputMode.BRANCH.name(), false),
                 new SimulationActor(UUID.randomUUID(), "分支玩家", true, false, Set.of())
         );
@@ -111,13 +116,13 @@ public final class CatalogExpansionV1SelfCheck {
 
     private static void checkAdminConditionModes() {
         require(valid(adminConditionGraph(ConditionOutputMode.PASS_ONLY.name(), true)), "is_admin graph should validate with no extra field");
-        SimulationExecutionResult adminPass = run(
+        SimulationExecutionResult adminPass = runGraph(
                 adminConditionGraph(ConditionOutputMode.PASS_ONLY.name(), true),
                 new SimulationActor(UUID.randomUUID(), "管理员玩家", true, true, Set.of())
         );
         require(adminPass.success(), "is_admin PASS_ONLY should continue for admin actor");
 
-        SimulationExecutionResult notAdminPass = run(
+        SimulationExecutionResult notAdminPass = runGraph(
                 adminConditionGraph(ConditionOutputMode.FAIL_ONLY.name(), false),
                 new SimulationActor(UUID.randomUUID(), "普通玩家", true, false, Set.of())
         );
@@ -128,16 +133,16 @@ public final class CatalogExpansionV1SelfCheck {
         GraphDefinition graph = removeTagGraph();
         require(valid(graph), "remove_tag graph should validate");
 
-        SimulationExecutionResult removed = run(graph, new SimulationActor(UUID.randomUUID(), "带标签玩家", true, false, Set.of("runner", "ready")));
+        SimulationExecutionResult removed = runGraph(graph, new SimulationActor(UUID.randomUUID(), "带标签玩家", true, false, Set.of("runner", "ready")));
         require(!removed.actorTags().contains("runner") && removed.actorTags().contains("ready"),
                 "remove_tag should remove only the configured tag in this run result");
         require(removed.stateChanges().stream().anyMatch(change -> change.target().equals("actor.tags")),
                 "remove_tag should record actor tag state change");
 
-        SimulationExecutionResult missing = run(graph, new SimulationActor(UUID.randomUUID(), "无标签玩家", true, false, Set.of()));
+        SimulationExecutionResult missing = runGraph(graph, new SimulationActor(UUID.randomUUID(), "无标签玩家", true, false, Set.of()));
         require(missing.success(), "remove_tag should not fail when the tag is absent");
 
-        SimulationExecutionResult nextRun = run(graph, new SimulationActor(UUID.randomUUID(), "新运行玩家", true, false, Set.of("runner")));
+        SimulationExecutionResult nextRun = runGraph(graph, new SimulationActor(UUID.randomUUID(), "新运行玩家", true, false, Set.of("runner")));
         require(nextRun.initialActorTags().contains("runner") && !nextRun.actorTags().contains("runner"),
                 "remove_tag should not persist outside the supplied run actor");
     }
@@ -145,7 +150,7 @@ public final class CatalogExpansionV1SelfCheck {
     private static void checkMessageResults() {
         GraphDefinition graph = messageGraph();
         require(valid(graph), "message title/subtitle/actionbar graph should validate");
-        SimulationExecutionResult result = run(graph, new SimulationActor(UUID.randomUUID(), "消息玩家", true, false, Set.of()));
+        SimulationExecutionResult result = runGraph(graph, new SimulationActor(UUID.randomUUID(), "消息玩家", true, false, Set.of()));
         Set<String> channels = result.messageResults().stream()
                 .map(message -> message.channel())
                 .collect(java.util.stream.Collectors.toSet());
@@ -159,7 +164,7 @@ public final class CatalogExpansionV1SelfCheck {
         return !validator.hasErrors(issues);
     }
 
-    private static SimulationExecutionResult run(GraphDefinition graph, SimulationActor actor) {
+    private static SimulationExecutionResult runGraph(GraphDefinition graph, SimulationActor actor) {
         CompiledGraph compiled = new GraphCompiler().compile(graph);
         BoundedTraceBuffer traces = new BoundedTraceBuffer(4, 80);
         List<String> messages = new ArrayList<>();
@@ -310,9 +315,4 @@ public final class CatalogExpansionV1SelfCheck {
                 .toList();
     }
 
-    private static void require(boolean condition, String message) {
-        if (!condition) {
-            throw new IllegalStateException(message);
-        }
-    }
 }

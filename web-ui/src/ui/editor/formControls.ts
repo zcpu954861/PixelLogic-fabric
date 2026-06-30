@@ -223,7 +223,7 @@ export function displayFieldValue(field: EditableField): string {
     return targetLabel(value);
   }
   if (field.key === 'outputMode') {
-    return conditionOutputModeLabel(value);
+    return fieldOptions(field).find((option) => option.value === value)?.label ?? conditionOutputModeLabel(value);
   }
   if (field.control === 'rich_text_component') {
     return richTextPlainText(value) || '未填写';

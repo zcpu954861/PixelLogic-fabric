@@ -8,5 +8,5 @@ import com.pixelmc.pixellogic.core.simulation.context.SimulationContext;
 public interface SimulationBlockExecutor {
     NodeType nodeType();
 
-    RuntimeServices.NodeExecution execute(NodeDefinition node, SimulationContext context);
+    RuntimeServices.NodeExecution execute(NodeDefinition node, SimulationContext context, RuntimeServices services);
 }

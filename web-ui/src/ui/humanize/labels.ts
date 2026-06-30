@@ -67,9 +67,13 @@ export function nodeTypeLabel(type: string): string {
     case 'MESSAGE_ACTION':
       return '发送消息';
     case 'PLAYER_HAS_TAG_CONDITION':
-      return '玩家标签判断';
+      return '玩家是否拥有标签';
+    case 'PLAYER_IS_ADMIN_CONDITION':
+      return '玩家是否为管理员';
     case 'PLAYER_ADD_TAG_ACTION':
       return '添加玩家标签';
+    case 'PLAYER_REMOVE_TAG_ACTION':
+      return '移除玩家标签';
     case 'STATE_SET_ACTION':
       return '状态写入';
     case 'STATE_ADD_ACTION':
@@ -97,6 +101,9 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   }
   if (blockItem.id === 'condition.player.has_tag') {
     return playerTagConditionSummary(nodeItem);
+  }
+  if (blockItem.id === 'condition.player.is_admin') {
+    return playerAdminConditionSummary(nodeItem);
   }
   const template = blockItem.summaryTemplate;
   if (!template) {
@@ -127,8 +134,12 @@ function legacyNodeTypeSummary(nodeItem: GraphNode): string {
       return `向当前玩家发送：${richTextPlainText(config.message ?? '')}`;
     case 'PLAYER_HAS_TAG_CONDITION':
       return playerTagConditionSummary(nodeItem);
+    case 'PLAYER_IS_ADMIN_CONDITION':
+      return playerAdminConditionSummary(nodeItem);
     case 'PLAYER_ADD_TAG_ACTION':
       return `给当前玩家添加标签“${config.tag ?? '标签'}”。`;
+    case 'PLAYER_REMOVE_TAG_ACTION':
+      return `移除当前玩家的标签“${config.tag ?? '标签'}”。`;
     case 'STATE_SET_ACTION':
       return `把“${scopeLabel(config.scope)}”的 ${config.key ?? '状态名'} 设置为“${stateValueLabel(config.value ?? '', config.valueType ?? 'BOOLEAN')}”。`;
     case 'STATE_ADD_ACTION':
@@ -174,11 +185,22 @@ function playerTagConditionSummary(nodeItem: GraphNode): string {
   const tag = nodeItem.config.tag || '标签';
   switch (conditionOutputMode(nodeItem)) {
     case 'PASS_ONLY':
-      return `当当前玩家拥有标签「${tag}」时继续。`;
+      return `当拥有标签「${tag}」时继续。`;
     case 'FAIL_ONLY':
-      return `当当前玩家没有标签「${tag}」时继续。`;
+      return `当当前玩家不拥有标签「${tag}」时继续。`;
     case 'BRANCH':
-      return `按当前玩家是否拥有标签「${tag}」分成两路。`;
+      return `按当前玩家是否拥有标签「${tag}」分开执行。`;
+  }
+}
+
+function playerAdminConditionSummary(nodeItem: GraphNode): string {
+  switch (conditionOutputMode(nodeItem)) {
+    case 'PASS_ONLY':
+      return '当当前玩家是管理员时继续。';
+    case 'FAIL_ONLY':
+      return '当不是管理员时继续。';
+    case 'BRANCH':
+      return '按当前玩家是否为管理员分开执行。';
   }
 }
 

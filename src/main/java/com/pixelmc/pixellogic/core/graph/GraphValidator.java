@@ -91,7 +91,8 @@ public final class GraphValidator {
             switch (node.type()) {
                 case STATE_COMPARE_CONDITION -> validateCondition(node, issues);
                 case PLAYER_HAS_TAG_CONDITION -> validatePlayerTagCondition(node, issues);
-                case PLAYER_ADD_TAG_ACTION -> validatePlayerTagConfig(node, issues);
+                case PLAYER_IS_ADMIN_CONDITION -> validateConditionOutputMode(node, issues);
+                case PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION -> validatePlayerTagConfig(node, issues);
                 case STATE_SET_ACTION -> validateStateAction(node, issues, true);
                 case STATE_ADD_ACTION -> validateStateAction(node, issues, false);
                 case TIMER_START_ACTION -> validateTimer(graph, node, issues);
@@ -205,6 +206,12 @@ public final class GraphValidator {
         }
         if (tag.chars().anyMatch(Character::isWhitespace)) {
             error(issues, "player_tag_invalid", "玩家标签不能包含空白字符：" + node.id());
+        }
+        if (tag.chars().anyMatch(Character::isISOControl)) {
+            error(issues, "player_tag_invalid", "玩家标签不能包含控制字符：" + node.id());
+        }
+        if (tag.length() > 64) {
+            error(issues, "player_tag_invalid", "玩家标签不能超过 64 个字符：" + node.id());
         }
     }
 

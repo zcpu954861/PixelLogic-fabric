@@ -8,7 +8,7 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 | timer | `timer.wait`, future named timers | `FULLY_SIMULATABLE` | yes | no | Current wall-clock timer works for spike; future simulation may add fast-forward. |
 | trace | debug steps, action summaries, branch path | `FULLY_SIMULATABLE` | yes | no | Trace is a PixelLogic output and must stay bounded. |
 | message/chat component | `action.message.chat`, rich text plain output | `APPROXIMATE_SIMULATION` | yes | yes, for real delivery | Simulation records target and plain text; real adapter later converts to Minecraft Text/tellraw-equivalent. |
-| title/actionbar | title, subtitle, actionbar | `APPROXIMATE_SIMULATION` | yes, when blocks exist | yes, for real display | Model visible output and timing summary; do not implement client rendering. |
+| title/actionbar | title, subtitle, actionbar | `APPROXIMATE_SIMULATION` | yes | yes, for real display | Model visible output and channel summary; do not implement client rendering, timing, fade, or combo blocks yet. |
 | player tag | has/add/remove tag | `FULLY_SIMULATABLE` | yes | yes, for real server tags | Good first expansion because it is state-like and common in minigames. |
 | player gamemode | check/set gamemode | `APPROXIMATE_SIMULATION` | maybe | yes | Check can be simulated; mutation must be clearly approximate until MC adapter. |
 | player position | check position, teleport result | `APPROXIMATE_SIMULATION` | maybe | yes | Simulate dimension/coordinates and teleport result, not collision safety. |
@@ -41,7 +41,7 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 
 - `condition.player.has_tag`: fully simulatable against `SimulationActor.tags`.
 - `action.player.add_tag`: fully simulatable by mutating the per-run simulated actor and recording action/state results.
-- `remove tag` remains future work.
+- `action.player.remove_tag`: fully simulatable by removing a tag from the per-run simulated actor and recording action/state results.
 - Real server tag read/write remains future Minecraft adapter work.
 
 ## Simulation Test Context MVP Status
@@ -53,3 +53,9 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 - administrator flag: accepted and returned for future permission blocks; no OP-sensitive behavior exists yet.
 - `action.player.add_tag`: still mutates only the current run actor and returns final tags.
 - no scenario persistence, multiplayer, inventory, world, container, or game mode context is implemented.
+
+## Catalog Expansion v1 Player + Message Status
+
+- `condition.player.is_admin`: approximate simulation against the per-run actor administrator flag.
+- `action.message.title`, `action.message.subtitle`, and `action.message.actionbar`: approximate simulation records message result channels `TITLE`, `SUBTITLE`, and `ACTIONBAR`.
+- The rich text payload remains the same base text component structure; color and formatting controls are still pending.

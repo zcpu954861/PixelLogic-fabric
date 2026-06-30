@@ -51,6 +51,10 @@ public final class SimulationActor {
         return tags.add(tag);
     }
 
+    public boolean removeTag(String tag) {
+        return tags.remove(tag);
+    }
+
     public Set<String> tags() {
         return Collections.unmodifiableSet(new LinkedHashSet<>(tags));
     }

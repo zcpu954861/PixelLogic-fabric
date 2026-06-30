@@ -18,7 +18,7 @@ Implementation status: this mapping is now registered by the Java built-in catal
 | --- | --- | --- | --- | --- | --- |
 | `trigger.manual_test` | 手动测试触发 | 触发事件 | 测试 | `FULLY_SIMULATABLE` | 当前 WebUI/命令测试入口 |
 | `condition.state.equals` | 状态等于 | 条件判断 | 状态数据 | `FULLY_SIMULATABLE` | 当前 demo 只比较 BOOLEAN |
-| `action.message.chat` | 发送聊天消息 | 消息显示 | 聊天 | `APPROXIMATE_SIMULATION` | 模拟环境记录消息，真实 adapter 后发送给玩家 |
+| `action.message.chat` | 发送聊天消息 | 消息显示 | 聊天 | `APPROXIMATE_SIMULATION` | `message` 已采用 `rich_text_component` MVP；模拟环境记录 plain text，真实 adapter 后转换为 Minecraft Text / tellraw equivalent |
 | `state.set` | 设置状态 | 状态数据 | 写入 | `FULLY_SIMULATABLE` | 写入 GLOBAL/PLAYER/SESSION state |
 | `state.add` | 累加状态 | 状态数据 | 写入 | `FULLY_SIMULATABLE` | 只用于 INTEGER |
 | `timer.wait` | 等待一段时间 | 时间调度 | 等待 | `FULLY_SIMULATABLE` | 当前为 wall-clock spike timer |
@@ -46,7 +46,7 @@ Implementation status: this mapping is now registered by the Java built-in catal
 
 | Block ID | 中文名 | Priority | Simulation level | Notes |
 | --- | --- | --- | --- | --- |
-| `action.message.chat` | 发送聊天消息 | P0 | `APPROXIMATE_SIMULATION` | 当前消息动作的 catalog 目标 |
+| `action.message.chat` | 发送聊天消息 | P0 | `APPROXIMATE_SIMULATION` | 当前消息动作的 catalog 目标；配置语义是 vanilla text component，不是 `/say` |
 | `action.message.title` | 显示标题 | P1 | `APPROXIMATE_SIMULATION` | 模拟 trace 可验证内容，真实 adapter 后显示 |
 | `action.message.actionbar` | 显示快捷提示 | P2 | `APPROXIMATE_SIMULATION` | 与 title 类似，先不做 rich text |
 
@@ -120,5 +120,7 @@ Implementation status: this mapping is now registered by the Java built-in catal
 - `generic.world_mutation`: 一个块修改所有世界对象。
 - `raw_json_message`: 让普通用户写 JSON 文本组件。
 - `script.run`: 在 v1/vNext 早期引入脚本执行。
+
+当前 rich text MVP 不暴露 raw JSON 编辑路径。它只提供多行文本、结构化存储和预览，为后续轻量 Word-style editor 留出 style runs 扩展位。
 
 如果某个积木需要太多模式切换，应拆成多个具体积木，或先不做。

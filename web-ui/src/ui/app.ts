@@ -10,6 +10,7 @@ import {
   fallbackCatalog,
 } from '../model/blockCatalog';
 import { fallbackGraph, graphId } from '../model/demoGraph';
+import { richTextConfig, richTextPlainText } from '../model/richText';
 import { state, world } from '../state/appState';
 import {
   blockMetrics,
@@ -73,7 +74,6 @@ import {
   snapDraggedGroupToCandidate,
 } from './canvas/dragInsert';
 import { renderEditorModal } from './editor/blockEditorModal';
-import { nodeConfigItems, renderNodeEditor } from './editor/formControls';
 import { renderTrace } from './trace/traceView';
 import { draftStatusText, uncommittedNotice, validationErrorText, validationList, validationSummaryText, validationTitle } from './validation/validationView';
 import { renderNodeInfo } from './sidebar/selectionSummary';
@@ -125,7 +125,7 @@ function buildBlocks(graph: GraphDocument): SlotBlock[] {
       branch: branchForNode(graph, nodeItem),
       type: nodeTypeLabel(nodeItem.type),
       title: nodeItem.displayName || nodeItem.id,
-      summary: nodeSummary(nodeItem),
+      summary: nodeSummary(nodeItem, activeCatalog()),
       x: position.x,
       y: position.y,
       width: size.width,
@@ -181,6 +181,7 @@ function renderApp(): void {
   updateWorldSize(blocks);
   const joins = buildJoins(graph, blocks);
   const selectedNode = selectedNodeFrom(graph);
+  const editorNode = state.editorOpen ? state.editorDraftNode ?? selectedNode : null;
   const validationItems = validationList(state, autoSaveInFlight);
   const graphCount = graph.nodes.length;
 
@@ -252,7 +253,7 @@ function renderApp(): void {
           <span>选中积木</span>
           <b>${selectedNode ? escapeHtml(nodeTypeLabel(selectedNode.type)) : '未选中'}</b>
         </div>
-        ${selectedNode ? renderNodeInfo(selectedNode, graph, state.selectedNodeId) : '<section class="info-card">单击积木选中，拖动积木移动，双击积木编辑。</section>'}
+        ${selectedNode ? renderNodeInfo(selectedNode, graph, state.selectedNodeId, activeCatalog()) : '<section class="info-card">单击积木选中，拖动积木移动，双击积木编辑。</section>'}
         <section class="preview-card">
           <b>API 状态</b>
           <p>${escapeHtml(state.statusMessage)}</p>
@@ -280,7 +281,7 @@ function renderApp(): void {
           </ol>
         </section>
       </footer>
-      ${state.editorOpen && selectedNode ? renderEditorModal(selectedNode, { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation), modalIssue: state.error || validationSummaryText(state) }) : ''}
+      ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation), modalIssue: state.error || validationSummaryText(state) }) : ''}
     </section>
   `;
 
@@ -533,6 +534,9 @@ function bindInteractions(): void {
   document.querySelector('[data-graph-action="delete-selected"]')?.addEventListener('click', deleteSelectedNode);
   document.querySelector('[data-modal-action="close"]')?.addEventListener('click', requestCloseEditor);
   document.querySelector('[data-modal-action="cancel"]')?.addEventListener('click', requestCloseEditor);
+  document.querySelector('[data-modal-action="save"]')?.addEventListener('click', () => void saveEditorDraft());
+  document.querySelector('[data-modal-action="continue-edit"]')?.addEventListener('click', hideUnsavedConfirm);
+  document.querySelector('[data-modal-action="discard"]')?.addEventListener('click', discardEditorDraft);
   document.querySelectorAll<HTMLButtonElement>('[data-catalog-category]').forEach((buttonEl) => {
     buttonEl.addEventListener('click', () => {
       if (buttonEl.dataset.catalogCategory) {
@@ -559,6 +563,10 @@ function bindInteractions(): void {
   });
 
   document.onkeydown = (event) => {
+    const editableTarget = isEditableTarget(event.target);
+    if (state.editorOpen && editableTarget && (isUndoShortcut(event) || isRedoShortcut(event))) {
+      return;
+    }
     if (isUndoShortcut(event)) {
       event.preventDefault();
       undoGraphEdit();
@@ -579,17 +587,17 @@ function bindInteractions(): void {
   };
   window.onbeforeunload = state.dirty || state.hasDraft || autoSaveInFlight ? () => '还有修改正在自动保存，确定要离开吗？' : null;
 
-  document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-node-field], [data-config-key]').forEach((inputEl) => {
+  document.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('[data-node-field], [data-config-key]').forEach((inputEl) => {
     if (inputEl instanceof HTMLSelectElement) {
-      inputEl.addEventListener('change', () => updateSelectedNode(inputEl));
+      inputEl.addEventListener('change', () => updateEditorDraft(inputEl));
       return;
     }
-    inputEl.addEventListener('input', () => updateSelectedNode(inputEl));
+    inputEl.addEventListener('input', () => updateEditorDraft(inputEl));
   });
   document.querySelectorAll<HTMLButtonElement>('[data-config-value]').forEach((buttonEl) => {
     buttonEl.addEventListener('click', () => {
       if (buttonEl.dataset.configKey && buttonEl.dataset.configValue) {
-        updateSelectedNodeValue(buttonEl.dataset.configKey, buttonEl.dataset.configValue);
+        updateEditorDraftValue(buttonEl.dataset.configKey, buttonEl.dataset.configValue);
         document.querySelectorAll<HTMLButtonElement>(`[data-config-key="${buttonEl.dataset.configKey}"][data-config-value]`).forEach((item) => {
           item.setAttribute('aria-pressed', String(item === buttonEl));
         });
@@ -799,6 +807,10 @@ function resetGraphHistory(): void {
   undoStack.length = 0;
   redoStack.length = 0;
   graphVersion = 0;
+  clearPendingAutoSaveTimer();
+}
+
+function clearPendingAutoSaveTimer(): void {
   if (autoSaveTimer !== null) {
     window.clearTimeout(autoSaveTimer);
     autoSaveTimer = null;
@@ -879,6 +891,12 @@ function isRedoShortcut(event: KeyboardEvent): boolean {
     && (event.ctrlKey || event.metaKey)
     && !event.altKey
     && (key === 'y' || (event.shiftKey && key === 'z'));
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLInputElement
+    || target instanceof HTMLTextAreaElement
+    || target instanceof HTMLSelectElement;
 }
 
 
@@ -1031,17 +1049,29 @@ function deleteSelectedNode(): void {
 }
 
 function openEditor(nodeId: string): void {
+  const nodeItem = currentGraph().nodes.find((item) => item.id === nodeId);
+  if (!nodeItem) {
+    return;
+  }
   state.selectedNodeId = nodeId;
+  state.editorDraftNode = cloneNode(nodeItem);
+  state.editorOriginalNode = cloneNode(nodeItem);
+  state.editorSaving = false;
   state.editorOpen = true;
   state.editorClosing = false;
   renderApp();
 }
 
 function requestCloseEditor(): void {
+  if (hasEditorDraftChanges()) {
+    showUnsavedConfirm();
+    return;
+  }
   closeEditor();
 }
 
 function closeEditor(): void {
+  hideUnsavedConfirm();
   state.editorClosing = true;
   const overlayEl = document.querySelector<HTMLElement>('.editor-overlay');
   if (overlayEl) {
@@ -1050,8 +1080,26 @@ function closeEditor(): void {
   window.setTimeout(() => {
     state.editorOpen = false;
     state.editorClosing = false;
+    state.editorDraftNode = null;
+    state.editorOriginalNode = null;
+    state.editorSaving = false;
     renderApp();
   }, 160);
+}
+
+function showUnsavedConfirm(): void {
+  const confirmEl = document.querySelector<HTMLElement>('[data-unsaved-confirm]');
+  confirmEl?.removeAttribute('hidden');
+  document.querySelector<HTMLElement>('[data-modal-action="continue-edit"]')?.focus();
+}
+
+function hideUnsavedConfirm(): void {
+  document.querySelector<HTMLElement>('[data-unsaved-confirm]')?.setAttribute('hidden', '');
+}
+
+function discardEditorDraft(): void {
+  state.editorDraftNode = state.editorOriginalNode ? cloneNode(state.editorOriginalNode) : null;
+  closeEditor();
 }
 
 function focusEditor(): void {
@@ -1059,13 +1107,13 @@ function focusEditor(): void {
     return;
   }
   window.setTimeout(() => {
-    const target = document.querySelector<HTMLElement>('.editor-dialog input, .editor-dialog select, #block-editor-title');
+    const target = document.querySelector<HTMLElement>('.editor-dialog input, .editor-dialog textarea, .editor-dialog select, #block-editor-title');
     target?.focus();
   }, 0);
 }
 
 function trapEditorFocus(event: KeyboardEvent): void {
-  const focusSelector = '.editor-dialog button:not([disabled]), .editor-dialog input:not([disabled]), .editor-dialog select:not([disabled]), #block-editor-title';
+  const focusSelector = '.editor-dialog button:not([disabled]), .editor-dialog input:not([disabled]), .editor-dialog textarea:not([disabled]), .editor-dialog select:not([disabled]), #block-editor-title';
   const focusables = Array.from(
     document.querySelectorAll<HTMLElement>(focusSelector),
   ).filter((item) => item.offsetParent !== null);
@@ -1083,39 +1131,122 @@ function trapEditorFocus(event: KeyboardEvent): void {
   }
 }
 
-function updateSelectedNode(inputEl: HTMLInputElement | HTMLSelectElement): void {
+function updateEditorDraft(inputEl: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): void {
   if (inputEl.dataset.nodeField === 'displayName') {
-    updateSelectedNodeValue('displayName', inputEl.value, 'node');
+    updateEditorDraftValue('displayName', inputEl.value, 'node');
   }
   if (inputEl.dataset.configKey) {
-    updateSelectedNodeValue(inputEl.dataset.configKey, inputEl.value);
+    const value = inputEl.dataset.richText === 'true' ? richTextConfig(inputEl.value) : inputEl.value;
+    updateEditorDraftValue(inputEl.dataset.configKey, value);
+    if (inputEl.dataset.richText === 'true') {
+      const preview = document.querySelector<HTMLElement>('[data-rich-preview]');
+      if (preview) {
+        preview.textContent = inputEl.value || '未填写';
+      }
+    }
   }
 }
 
-function updateSelectedNodeValue(key: string, value: string, target: 'config' | 'node' = 'config'): void {
-  const graph = currentGraph();
-  const selected = selectedNodeFrom(graph);
-  if (!selected) {
-    return;
-  }
-  const nextGraph = cloneGraph(graph);
-  const nextNode = nextGraph.nodes.find((item) => item.id === selected.id);
-  if (!nextNode) {
+function updateEditorDraftValue(key: string, value: string, target: 'config' | 'node' = 'config'): void {
+  const draftNode = state.editorDraftNode;
+  if (!draftNode) {
     return;
   }
 
   if (target === 'node' && key === 'displayName') {
-    if (nextNode.displayName === value) {
+    if (draftNode.displayName === value) {
       return;
     }
-    nextNode.displayName = value;
+    draftNode.displayName = value;
   } else {
-    if (nextNode.config[key] === value) {
+    if (draftNode.config[key] === value) {
       return;
     }
-    nextNode.config[key] = value;
+    draftNode.config[key] = value;
+    if (key === 'valueType') {
+      if (value === 'BOOLEAN' && !['true', 'false'].includes(draftNode.config.value ?? '')) {
+        draftNode.config.value = 'true';
+      }
+      if (value === 'INTEGER' && ['true', 'false', ''].includes(draftNode.config.value ?? '')) {
+        draftNode.config.value = '1';
+      }
+      if (value === 'STRING' && ['true', 'false'].includes(draftNode.config.value ?? '')) {
+        draftNode.config.value = '';
+      }
+    }
   }
-  applyGraphEdit(nextGraph, '内容已修改，正在自动保存。', { refreshOnly: true });
+  state.error = '';
+  hideUnsavedConfirm();
+  if (key === 'valueType') {
+    renderApp();
+    return;
+  }
+  refreshEditorDraftIndicators();
+}
+
+async function saveEditorDraft(): Promise<void> {
+  if (state.editorSaving || !state.editorDraftNode || !state.editorOriginalNode) {
+    return;
+  }
+  if (!hasEditorDraftChanges()) {
+    closeEditor();
+    return;
+  }
+
+  const graph = currentGraph();
+  const nextGraph = cloneGraph(graph);
+  const nextNode = nextGraph.nodes.find((item) => item.id === state.editorOriginalNode?.id);
+  if (!nextNode) {
+    state.error = '保存失败：当前积木不存在。';
+    renderApp();
+    return;
+  }
+
+  nextNode.displayName = state.editorDraftNode.displayName;
+  nextNode.config = { ...state.editorDraftNode.config };
+  state.editorOriginalNode = cloneNode(state.editorDraftNode);
+  state.editorSaving = true;
+  applyGraphEdit(nextGraph, '内容已修改，正在保存。', { selectedNodeId: nextNode.id });
+  clearPendingAutoSaveTimer();
+
+  try {
+    const saved = await saveAndCommit({ version: graphVersion });
+    state.apiStatus = 'online';
+    state.statusMessage = 'API 已连接';
+    if (saved) {
+      closeEditor();
+    } else {
+      state.editorSaving = false;
+      renderApp();
+    }
+  } catch (error) {
+    const connected = error instanceof PixelLogicApiError ? error.connected : false;
+    state.apiStatus = connected ? 'online' : 'offline';
+    state.statusMessage = connected ? 'API 已连接' : 'API 未连接';
+    state.error = error instanceof Error ? error.message : 'API 未连接';
+    state.lastAction = '保存失败，请确认 API 连接或修复检查问题。';
+    state.editorSaving = false;
+    renderApp();
+  }
+}
+
+function refreshEditorDraftIndicators(): void {
+  const draftNode = state.editorDraftNode;
+  if (!draftNode) {
+    return;
+  }
+  const modalSummary = document.querySelector<HTMLElement>('[data-modal-summary]');
+  const modalError = document.querySelector<HTMLElement>('[data-modal-error]');
+  const richPreview = document.querySelector<HTMLElement>('[data-rich-preview]');
+  if (modalSummary) {
+    modalSummary.textContent = nodeSummary(draftNode, activeCatalog());
+  }
+  if (richPreview) {
+    richPreview.textContent = richTextPlainText(draftNode.config.message ?? '') || '未填写';
+  }
+  if (modalError) {
+    modalError.textContent = state.error || validationSummaryText(state);
+  }
 }
 
 function refreshDraftIndicators(): void {
@@ -1127,6 +1258,7 @@ function refreshDraftIndicators(): void {
   const issueList = document.querySelector<HTMLElement>('[data-issue-list]');
   const modalSummary = document.querySelector<HTMLElement>('[data-modal-summary]');
   const modalError = document.querySelector<HTMLElement>('[data-modal-error]');
+  const richPreview = document.querySelector<HTMLElement>('[data-rich-preview]');
   const undoButton = document.querySelector<HTMLButtonElement>('[data-history-action="undo"]');
   const redoButton = document.querySelector<HTMLButtonElement>('[data-history-action="redo"]');
 
@@ -1154,8 +1286,12 @@ function refreshDraftIndicators(): void {
     `;
   }
   if (modalSummary) {
-    const selected = selectedNodeFrom(currentGraph());
-    modalSummary.textContent = selected ? nodeSummary(selected) : '';
+    const selected = state.editorDraftNode ?? selectedNodeFrom(currentGraph());
+    modalSummary.textContent = selected ? nodeSummary(selected, activeCatalog()) : '';
+  }
+  if (richPreview) {
+    const selected = state.editorDraftNode ?? selectedNodeFrom(currentGraph());
+    richPreview.textContent = selected ? richTextPlainText(selected.config.message ?? '') || '未填写' : '未填写';
   }
   if (modalError) {
     modalError.textContent = state.error || validationSummaryText(state);
@@ -1426,6 +1562,20 @@ async function runAction(label: string, action: () => Promise<void>, options: { 
 
 function selectedNodeFrom(graph: GraphDocument): GraphNode | null {
   return graph.nodes.find((nodeItem) => nodeItem.id === state.selectedNodeId) ?? graph.nodes[0] ?? null;
+}
+
+function cloneNode(nodeItem: GraphNode): GraphNode {
+  return {
+    ...nodeItem,
+    config: { ...nodeItem.config },
+    position: nodeItem.position ? { ...nodeItem.position } : undefined,
+    slots: nodeItem.slots.map((slot) => ({ ...slot })),
+  };
+}
+
+function hasEditorDraftChanges(): boolean {
+  return Boolean(state.editorDraftNode && state.editorOriginalNode)
+    && JSON.stringify(state.editorDraftNode) !== JSON.stringify(state.editorOriginalNode);
 }
 
 function ensureSelectedNode(): void {

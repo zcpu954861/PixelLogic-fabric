@@ -42,6 +42,13 @@ The v1 block catalog skeleton separates Block Catalog definitions from the curre
 - GraphRuntime still dispatches on `NodeType` in this checkpoint. The catalog is a registry and compatibility layer, not a runtime rewrite.
 - `GET /api/pixellogic/catalog` exposes the readonly catalog to the independent WebUI.
 
+The catalog form schema checkpoint keeps that runtime boundary:
+
+- `BlockDefinition` exposes `formSchema`, `summaryTemplate`, and `summaryFormatter` metadata.
+- The WebUI editor resolves known `blockId` values through catalog schema first and uses legacy `NodeType` builders only as fallback.
+- `action.message.chat` stores message config as a rich text component payload while the current string-valued graph config schema is preserved.
+- `GraphRuntime` still extracts plain text and dispatches through the existing `MESSAGE_ACTION` path; no real Minecraft Text adapter is implemented.
+
 ## Lifecycle / Capacity Safety
 
 The v1 editor baseline now has spike-level safety bounds:

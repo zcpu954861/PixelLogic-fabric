@@ -31,6 +31,17 @@
 - The WebUI left library is catalog-driven: category navigation first, then concrete blocks such as `发送聊天消息`, `设置状态`, or `等待一段时间`.
 - `blockCatalogSelfCheck` verifies demo block registration, graph/document compatibility, and validation failures for unknown or mismatched `blockId`.
 
+## Implementation Checkpoint: Catalog Form Schema + Rich Text Field
+
+`feature/v1-catalog-form-schema-rich-text` adopts the catalog schema for the current editor path:
+
+- Current demo blocks resolve `node.blockId` into Block Catalog `formSchema` before falling back to legacy `NodeType` field builders.
+- Block definitions now expose `summaryTemplate` metadata used by the WebUI card, modal, and sidebar summaries.
+- `action.message.chat` uses a `rich_text_component` field for its `message` config.
+- The rich text MVP supports multiline plain text, a structured `{ version, plainText, segments }` payload, and a simple preview.
+- Legacy string messages remain compatible and are interpreted as rich text plain text.
+- Runtime still dispatches by `NodeType`; this is not a Minecraft executor split or real Text adapter.
+
 ## Product Principles
 
 - 分类不是积木。
@@ -266,6 +277,8 @@ debug.trace_marker
 - 危险字段需要二次确认或高级标记。
 - 表单只展示该具体积木需要的字段，不展示万能动作的全部可能配置。
 
+Current MVP supports `string`, `textarea`, `number`, `integer`, `boolean`, `select`, `segmented`, `readonly`, `hidden`, `scope`, and `rich_text_component`. The frontend uses catalog schema as the main path and reserves legacy `NodeType` builders for unknown old nodes only.
+
 ## Summary Direction
 
 每个积木都应生成一句人话摘要，用于卡片、右侧栏、搜索结果和 trace。
@@ -280,6 +293,8 @@ debug.trace_marker
 ```
 
 摘要应来自 shared summary template，WebUI 和 backend trace 共享同一套语义，不各写一份互相漂移的文案。
+
+Current MVP stores `summaryTemplate` in the built-in catalog and formats it in the WebUI. Backend trace wording still remains in `GraphRuntime`; a later executor/trace split should move trace formatting toward the same catalog metadata.
 
 ## Safety Flags
 

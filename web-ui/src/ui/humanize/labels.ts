@@ -1,4 +1,7 @@
-import type { BlockKind, FieldOption, GraphNode } from '../../model/graphTypes';
+import { catalogBlock } from '../../model/blockCatalog';
+import type { BlockCatalog, BlockKind, CatalogBlock, FieldOption, GraphNode } from '../../model/graphTypes';
+import { richTextPlainText, shortRichText } from '../../model/richText';
+
 export function blockKind(type: string): BlockKind {
   if (type.includes('TRIGGER')) {
     return 'trigger';
@@ -41,6 +44,17 @@ export function valueTypeOptions(): FieldOption[] {
   ];
 }
 
+export function targetLabel(value = 'CURRENT_PLAYER'): string {
+  switch (value) {
+    case 'CURRENT_PLAYER':
+      return '当前玩家';
+    case 'SIMULATED_PLAYER':
+      return '模拟玩家';
+    default:
+      return value;
+  }
+}
+
 export function nodeTypeLabel(type: string): string {
   switch (type) {
     case 'MANUAL_TRIGGER':
@@ -64,7 +78,33 @@ export function nodeTypeLabel(type: string): string {
   }
 }
 
-export function nodeSummary(nodeItem: GraphNode): string {
+export function nodeSummary(nodeItem: GraphNode, catalog?: BlockCatalog): string {
+  const blockItem = catalog ? catalogBlock(catalog, nodeItem.blockId ?? '') : null;
+  if (blockItem) {
+    return catalogSummary(blockItem, nodeItem);
+  }
+  return legacyNodeTypeSummary(nodeItem);
+}
+
+function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
+  const template = blockItem.summaryTemplate;
+  if (!template) {
+    return legacyNodeTypeSummary(nodeItem);
+  }
+  return template
+    .replaceAll('{scope}', scopeLabel(nodeItem.config.scope))
+    .replaceAll('{key}', nodeItem.config.key || '状态名')
+    .replaceAll('{expected}', booleanLabel(nodeItem.config.expected ?? 'false'))
+    .replaceAll('{missing}', booleanLabel(nodeItem.config.missing ?? 'false'))
+    .replaceAll('{value}', stateValueLabel(nodeItem.config.value ?? '', nodeItem.config.valueType ?? 'BOOLEAN'))
+    .replaceAll('{amount}', nodeItem.config.amount ?? '1')
+    .replaceAll('{durationSeconds}', nodeItem.config.durationSeconds ?? '30')
+    .replaceAll('{target}', targetLabel(nodeItem.config.target ?? 'CURRENT_PLAYER'))
+    .replaceAll('{message.plainText}', shortRichText(nodeItem.config.message ?? ''))
+    .replaceAll('{message}', shortRichText(nodeItem.config.message ?? ''));
+}
+
+function legacyNodeTypeSummary(nodeItem: GraphNode): string {
   const config = nodeItem.config;
   switch (nodeItem.type) {
     case 'MANUAL_TRIGGER':
@@ -72,7 +112,7 @@ export function nodeSummary(nodeItem: GraphNode): string {
     case 'STATE_COMPARE_CONDITION':
       return `当“${scopeLabel(config.scope)}”的 ${config.key ?? '状态名'} 等于“${booleanLabel(config.expected ?? 'false')}”时，走“通过”分支。`;
     case 'MESSAGE_ACTION':
-      return `向模拟玩家显示：${config.message ?? ''}`;
+      return `向当前玩家发送：${richTextPlainText(config.message ?? '')}`;
     case 'STATE_SET_ACTION':
       return `把“${scopeLabel(config.scope)}”的 ${config.key ?? '状态名'} 设置为“${stateValueLabel(config.value ?? '', config.valueType ?? 'BOOLEAN')}”。`;
     case 'STATE_ADD_ACTION':

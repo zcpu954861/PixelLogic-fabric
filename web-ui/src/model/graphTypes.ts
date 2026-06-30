@@ -64,11 +64,17 @@ export type CatalogSubcategory = {
 
 export type CatalogFormField = {
   key: string;
+  type: 'string' | 'textarea' | 'number' | 'integer' | 'boolean' | 'select' | 'segmented' | 'readonly' | 'hidden' | 'scope' | 'rich_text_component';
   label: string;
-  control: 'text' | 'number' | 'select' | 'boolean';
+  description: string;
+  defaultValue: string;
+  placeholder: string;
   options: FieldOption[];
   required: boolean;
-  full: boolean;
+  min: string;
+  max: string;
+  step: string;
+  ui: string;
   suffix: string;
 };
 
@@ -83,7 +89,9 @@ export type CatalogBlock = {
   nodeKind: string;
   nodeType: string;
   defaultConfig: Record<string, string>;
-  formFields: CatalogFormField[];
+  formSchema: CatalogFormField[];
+  summaryTemplate: string;
+  summaryFormatter: string;
   inputSlots: GraphSlot[];
   outputSlots: GraphSlot[];
   simulationCapability: string;
@@ -104,9 +112,17 @@ export type EditableField = {
   label: string;
   key: string;
   value: string;
-  control: 'text' | 'number' | 'select' | 'boolean';
+  control: CatalogFormField['type'];
+  description?: string;
+  defaultValue?: string;
+  placeholder?: string;
+  required?: boolean;
   options?: FieldOption[];
   full?: boolean;
+  min?: string;
+  max?: string;
+  step?: string;
+  ui?: string;
   suffix?: string;
 };
 
@@ -187,6 +203,9 @@ export type UiState = {
   selectedNodeId: string;
   editorOpen: boolean;
   editorClosing: boolean;
+  editorDraftNode: GraphNode | null;
+  editorOriginalNode: GraphNode | null;
+  editorSaving: boolean;
   recentNodeId: string | null;
 };
 

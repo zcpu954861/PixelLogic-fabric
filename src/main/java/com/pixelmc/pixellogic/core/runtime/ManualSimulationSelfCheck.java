@@ -5,6 +5,7 @@ import com.pixelmc.pixellogic.core.graph.DemoGraphFactory;
 import com.pixelmc.pixellogic.core.graph.GraphCompiler;
 import com.pixelmc.pixellogic.core.graph.GraphValidator;
 import com.pixelmc.pixellogic.core.graph.ValidationIssue;
+import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.StateScope;
@@ -67,6 +68,31 @@ public final class ManualSimulationSelfCheck {
         require(state.get(StateKey.of(StateScope.PLAYER, playerId.toString(), "start_count")).map(value -> value.asInteger(0)).orElse(0) == 1,
                 "State Add should increment PLAYER.start_count");
         require(traces.get(first.traceId()).map(trace -> trace.containsMessage("计时器完成")).orElse(false), "trace should include timer completed");
+
+        List<String> richMessages = new ArrayList<>();
+        GraphRuntime richRuntime = new GraphRuntime(
+                new GraphCompiler().compile(withNodeConfig(DemoGraphFactory.create(Duration.ofSeconds(1)), "welcome-message", "message", RichTextComponentValue.fromPlainText("富文本消息\n第二行"))),
+                new InMemoryStateStore(),
+                new BoundedTraceBuffer(2, 20),
+                new RuntimeServices() {
+                    @Override
+                    public void sendPlayerMessage(UUID targetPlayerId, String message) {
+                        richMessages.add(message);
+                    }
+
+                    @Override
+                    public void debug(String message) {
+                    }
+
+                    @Override
+                    public void scheduleTimer(Duration delay, TimerContinuation continuation) {
+                    }
+                },
+                RuntimeLimits.spikeDefaults()
+        );
+        require(richRuntime.start(new TriggerEvent(DemoGraphFactory.TRIGGER_TYPE, "/pixellogic test start", playerId, "self-check")).success(),
+                "structured rich text message graph should run");
+        require(richMessages.contains("富文本消息\n第二行"), "runtime should send rich text plainText");
 
         RuntimeResult second = runtime.start(new TriggerEvent(DemoGraphFactory.TRIGGER_TYPE, "/pixellogic test start", playerId, "self-check"));
         require(second.success(), "second run should fail branch cleanly");

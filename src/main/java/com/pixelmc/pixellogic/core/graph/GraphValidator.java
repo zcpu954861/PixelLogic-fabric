@@ -1,7 +1,9 @@
 package com.pixelmc.pixellogic.core.graph;
 
 import com.pixelmc.pixellogic.core.catalog.BlockDefinition;
+import com.pixelmc.pixellogic.core.catalog.BlockFormFieldDefinition;
 import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
+import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
@@ -104,6 +106,76 @@ public final class GraphValidator {
         }
         if (block.nodeType() != node.type()) {
             error(issues, "block_type_mismatch", "积木 blockId 与节点类型不匹配：" + node.id());
+        }
+        validateCatalogConfig(node, block, issues);
+    }
+
+    private void validateCatalogConfig(NodeDefinition node, BlockDefinition block, List<ValidationIssue> issues) {
+        for (BlockFormFieldDefinition field : block.formSchema()) {
+            String key = field.key();
+            if (key == null || key.isBlank() || "hidden".equals(field.type()) || "readonly".equals(field.type())) {
+                continue;
+            }
+            String value = node.config().get(key);
+            if (value == null || value.isBlank()) {
+                if (field.required()) {
+                    error(issues, "config_required_missing", "积木配置缺少必填项：" + node.id() + "." + key);
+                }
+                continue;
+            }
+            if (node.type() == NodeType.STATE_SET_ACTION && "value".equals(key) && !"BOOLEAN".equals(node.config().get("valueType"))) {
+                continue;
+            }
+            switch (field.type()) {
+                case "boolean" -> validateOptionValue(node, key, value, field, issues, "config_boolean_invalid");
+                case "select", "segmented" -> validateOptionValue(node, key, value, field, issues, "config_option_invalid");
+                case "scope" -> validateScopeValue(node, key, value, issues);
+                case "number", "integer" -> validateNumberValue(node, key, value, field, issues);
+                case "rich_text_component" -> {
+                    if (RichTextComponentValue.plainText(value).isBlank() && field.required()) {
+                        error(issues, "config_rich_text_empty", "富文本消息不能为空：" + node.id() + "." + key);
+                    }
+                }
+                case "string", "textarea" -> {
+                }
+                default -> {
+                }
+            }
+        }
+    }
+
+    private void validateOptionValue(
+            NodeDefinition node,
+            String key,
+            String value,
+            BlockFormFieldDefinition field,
+            List<ValidationIssue> issues,
+            String code
+    ) {
+        if (field.options().stream().noneMatch(option -> option.value().equals(value))) {
+            error(issues, code, "积木配置选项无效：" + node.id() + "." + key);
+        }
+    }
+
+    private void validateScopeValue(NodeDefinition node, String key, String value, List<ValidationIssue> issues) {
+        try {
+            StateScope.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            error(issues, "config_scope_invalid", "状态作用对象无效：" + node.id() + "." + key);
+        }
+    }
+
+    private void validateNumberValue(NodeDefinition node, String key, String value, BlockFormFieldDefinition field, List<ValidationIssue> issues) {
+        try {
+            double numeric = "integer".equals(field.type()) ? Integer.parseInt(value) : Double.parseDouble(value);
+            if (!field.min().isBlank() && numeric < Double.parseDouble(field.min())) {
+                error(issues, "config_number_range", "数值低于允许范围：" + node.id() + "." + key);
+            }
+            if (!field.max().isBlank() && numeric > Double.parseDouble(field.max())) {
+                error(issues, "config_number_range", "数值高于允许范围：" + node.id() + "." + key);
+            }
+        } catch (NumberFormatException exception) {
+            error(issues, "config_number_invalid", "数值配置无效：" + node.id() + "." + key);
         }
     }
 

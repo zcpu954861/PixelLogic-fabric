@@ -16,11 +16,10 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Next
 
-1. Audit the Simulation Backend skeleton branch and keep it small before adding more Minecraft-facing blocks.
-2. Move more current demo block behavior toward per-block simulation executors only when it reduces real duplication.
-3. Audit and user-test the condition output mode branch before adding more block families.
-4. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
-5. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+1. Move more current demo block behavior toward per-block simulation executors only when it reduces real duplication.
+2. Add more simulation context fields only when a concrete block requires them.
+3. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
+4. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
 
 ## Completed Checkpoints
 
@@ -45,6 +44,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - Simulation Backend boundary docs define the next backend direction: simulated actor/world/inventory/container/event abstractions, a logical receiver runner, per-block simulation executors, capability matrix, and maintenance rules against mega files.
 - Simulation Backend skeleton branch adds minimal `core/simulation` context/event/runner/result/executor code, routes manual/WebUI test-run through `SimulationRunner`, and registers the first simulation-backed player tag condition/action blocks.
 - Condition output mode branch adds `满足时继续` / `不满足时继续` / `分成两路`, makes unconnected condition outputs end gracefully, allows unconnected condition inputs during editing, moves `condition.player.has_tag` to 条件判断 / 玩家条件, and keeps the demo graph as explicit dual-branch.
+- Simulation Test Context MVP lets WebUI test runs send a temporary simulated player display name, tags, and administrator flag; results show initial/final tags without writing the context into graph JSON or saving scenarios.
 
 ## Follow-Ups
 

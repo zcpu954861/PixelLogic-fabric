@@ -1,0 +1,44 @@
+# PixelLogic Simulation Test Context MVP
+
+## Scope
+
+- WebUI test actor: a per-run simulated player context sent with `POST /api/pixellogic/test/start`.
+- Display name: editable in the WebUI and returned in `SimulationExecutionResult`.
+- Tags: editable as simple chips, trimmed/deduplicated, and used by `condition.player.has_tag`.
+- Administrator flag: editable and returned with the run result; no OP-only block exists yet.
+- Run payload: optional `testContext.actor`; old no-body requests still use `WebUI 模拟玩家`.
+- Result summary: returns initial tags, final tags, display name, admin flag, trace id, and status.
+
+## Architecture
+
+- Test context is per-run input.
+- It is not graph data and is not written into committed or draft graph JSON.
+- It is not named scenario persistence.
+- `SimulationRunner` still calls the real `GraphRuntime`.
+- `action.player.add_tag` mutates only the request actor for the current run result.
+- `/pixellogic test start` keeps the default simulated player path.
+- No Minecraft adapter is added.
+
+## UX
+
+- The right panel now includes a compact `测试玩家` card near the test status surface.
+- Labels are Chinese: `玩家名`, `标签`, `管理员`, `恢复默认`.
+- Tags use chips plus a small input and `添加` button.
+- Running a test shows `本次玩家`, `初始标签`, `结束标签`, `标签变化`, and `管理员`.
+- Result tags are not written back into the test context inputs.
+
+## Validation
+
+- `.\gradlew.bat simulationTestContextSelfCheck`: covers default request, custom display name, request tags, empty tags, add-tag result, non-persistence, admin flag, tag trim/dedupe, and invalid tag rejection.
+- `.\gradlew.bat build`: required before merge readiness.
+- `npm install` and `npm run build`: required before merge readiness.
+- Existing self-checks remain required: API/WebUI, graph storage, manual simulation, block catalog, simulation backend, and condition output modes.
+
+## Known Limitations
+
+- No named scenarios.
+- No persistence.
+- No multiplayer simulation.
+- No inventory, world, or container context.
+- No game mode in this MVP.
+- No real OP/permission-sensitive block behavior yet.

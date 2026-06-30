@@ -66,6 +66,17 @@
 
 This checkpoint still does not add a real Minecraft adapter, draft simulation, named scenarios, inventory/world/container simulation, or a new WebUI simulation panel.
 
+## Implementation Checkpoint: Simulation Test Context MVP
+
+`feature/v1-simulation-test-context` adds a lightweight WebUI test actor for the existing simulation runner:
+
+- WebUI `测试玩家` edits display name, tags, and administrator status.
+- `POST /api/pixellogic/test/start` accepts optional `testContext.actor`; old no-body requests still use the default actor.
+- `SimulationRunner` receives the actor as run input and still delegates graph execution to `GraphRuntime`.
+- `condition.player.has_tag` reads the actor tags supplied for this run.
+- `action.player.add_tag` returns final tags in the run result, but does not persist tags or write them back into the WebUI input.
+- The MVP does not add named scenarios, scenario save/load, multiplayer, inventory, world, container, game mode, or real Minecraft adapter support.
+
 ## Implementation Checkpoint: Condition Output Modes
 
 `feature/v1-condition-output-modes` makes condition outputs a per-condition config instead of forcing every condition to look and validate like a dual branch:

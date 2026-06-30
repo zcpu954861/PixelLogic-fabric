@@ -43,3 +43,13 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 - `action.player.add_tag`: fully simulatable by mutating the per-run simulated actor and recording action/state results.
 - `remove tag` remains future work.
 - Real server tag read/write remains future Minecraft adapter work.
+
+## Simulation Test Context MVP Status
+
+`feature/v1-simulation-test-context` lets the WebUI send a per-run simulated actor into the existing test-run API:
+
+- display name: returned in the simulation result and used by player-tag trace messages.
+- tags: used as the initial actor tag set for `condition.player.has_tag`.
+- administrator flag: accepted and returned for future permission blocks; no OP-sensitive behavior exists yet.
+- `action.player.add_tag`: still mutates only the current run actor and returns final tags.
+- no scenario persistence, multiplayer, inventory, world, container, or game mode context is implemented.

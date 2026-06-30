@@ -46,7 +46,7 @@ GET  /api/pixellogic/traces/latest
 GET  /api/pixellogic/traces
 ```
 
-This API is bound to `127.0.0.1:18111`, uses the fixed `WebUI 模拟玩家` actor, and is not the final graph save/load API.
+This API is bound to `127.0.0.1:18111`. WebUI test runs default to `WebUI 模拟玩家` and may send a per-run test actor with display name, tags, and administrator status. This is not named scenario persistence.
 
 ## Current Graph Draft API
 

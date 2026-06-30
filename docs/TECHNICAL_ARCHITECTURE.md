@@ -121,6 +121,14 @@ The Simulation Backend skeleton checkpoint adds the first code slice:
 
 Still out of scope: draft simulation, named scenarios, fast-forward timers, real Minecraft adapter, full inventory/world/container simulation, and new simulation UI.
 
+The Simulation Test Context MVP adds the first small WebUI simulation input without widening that boundary:
+
+- WebUI sends per-run display name, tags, and administrator flag with `POST /api/pixellogic/test/start`.
+- Backend validates the request, builds a `SimulationActor`, and passes it into `SimulationRunner`.
+- The run result returns initial and final actor tags so the UI can show tag changes.
+- The context is not stored in graph JSON, not persisted as a scenario, and not shared with the CLI test command.
+- `web-ui/src/ui/app.ts` only orchestrates the panel; the model and panel live under `model/simulationTestContext.ts` and `ui/simulation/`.
+
 The condition output mode checkpoint keeps the same direct edge runtime and adds only a condition-local config:
 
 - `outputMode` supports `PASS_ONLY` / 满足时继续, `FAIL_ONLY` / 不满足时继续, and `BRANCH` / 分成两路.

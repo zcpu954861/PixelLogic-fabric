@@ -1,6 +1,7 @@
 package com.pixelmc.pixellogic.core.simulation.context;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -51,6 +52,6 @@ public final class SimulationActor {
     }
 
     public Set<String> tags() {
-        return Set.copyOf(tags);
+        return Collections.unmodifiableSet(new LinkedHashSet<>(tags));
     }
 }

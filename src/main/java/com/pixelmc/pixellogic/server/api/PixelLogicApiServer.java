@@ -3,10 +3,12 @@ package com.pixelmc.pixellogic.server.api;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
+import com.pixelmc.pixellogic.core.simulation.context.SimulationActor;
 import com.pixelmc.pixellogic.core.trace.ExecutionTrace;
 import com.pixelmc.pixellogic.core.trace.TraceStep;
 import com.pixelmc.pixellogic.server.PixelLogicSpikeService;
@@ -20,6 +22,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +40,10 @@ public final class PixelLogicApiServer implements AutoCloseable {
     public static final int DEFAULT_PORT = 18111;
     public static final UUID WEBUI_DEMO_PLAYER_ID = UUID.nameUUIDFromBytes("pixel-logic-webui-demo-player".getBytes(StandardCharsets.UTF_8));
 
+    private static final String WEBUI_DEMO_PLAYER_NAME = "WebUI 模拟玩家";
+    private static final int MAX_TEST_PLAYER_NAME_LENGTH = 64;
+    private static final int MAX_TEST_TAGS = 32;
+    private static final int MAX_TEST_TAG_LENGTH = 64;
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     private static final Pattern GRAPH_PATH = Pattern.compile("^/api/pixellogic/graphs/([A-Za-z0-9_-]+)(?:/(draft|validate|commit))?$");
 
@@ -100,8 +107,14 @@ public final class PixelLogicApiServer implements AutoCloseable {
             });
         }
         if ("POST".equals(method) && "/api/pixellogic/test/start".equals(path)) {
+            SimulationActor actor;
+            try {
+                actor = parseTestActor(body);
+            } catch (IllegalArgumentException exception) {
+                return error(400, "BAD_TEST_CONTEXT", exception.getMessage());
+            }
             return onServerThread(() -> {
-                RuntimeResult result = service.startManualTest(WEBUI_DEMO_PLAYER_ID);
+                RuntimeResult result = service.startManualTest(actor);
                 Optional<ExecutionTrace> trace = result.traceId().isBlank() ? Optional.empty() : service.trace(result.traceId());
                 Map<String, Object> fields = fields(
                         "message", result.message(),
@@ -250,6 +263,95 @@ public final class PixelLogicApiServer implements AutoCloseable {
         }
     }
 
+    private static SimulationActor parseTestActor(String body) {
+        if (body == null || body.isBlank()) {
+            return defaultTestActor();
+        }
+        try {
+            JsonElement element = JsonParser.parseString(body);
+            if (!element.isJsonObject()) {
+                throw new IllegalArgumentException("测试玩家请求格式无效。");
+            }
+            JsonObject root = element.getAsJsonObject();
+            JsonElement contextElement = root.get("testContext");
+            if (contextElement == null || contextElement.isJsonNull()) {
+                return defaultTestActor();
+            }
+            if (!contextElement.isJsonObject()) {
+                throw new IllegalArgumentException("测试玩家上下文格式无效。");
+            }
+            JsonElement actorElement = contextElement.getAsJsonObject().get("actor");
+            if (actorElement == null || actorElement.isJsonNull()) {
+                return defaultTestActor();
+            }
+            if (!actorElement.isJsonObject()) {
+                throw new IllegalArgumentException("测试玩家格式无效。");
+            }
+            TestActorRequest actor = GSON.fromJson(actorElement, TestActorRequest.class);
+            return new SimulationActor(
+                    WEBUI_DEMO_PLAYER_ID,
+                    displayName(actor.displayName()),
+                    true,
+                    Boolean.TRUE.equals(actor.operator()),
+                    tags(actor.tags())
+            );
+        } catch (JsonParseException exception) {
+            throw new IllegalArgumentException("测试玩家请求无法解析。", exception);
+        }
+    }
+
+    private static SimulationActor defaultTestActor() {
+        return new SimulationActor(WEBUI_DEMO_PLAYER_ID, WEBUI_DEMO_PLAYER_NAME, true, false, List.of());
+    }
+
+    private static String displayName(String raw) {
+        if (raw == null) {
+            return WEBUI_DEMO_PLAYER_NAME;
+        }
+        String value = raw.trim();
+        if (value.isEmpty()) {
+            throw new IllegalArgumentException("测试玩家名称不能为空。");
+        }
+        if (value.length() > MAX_TEST_PLAYER_NAME_LENGTH) {
+            throw new IllegalArgumentException("测试玩家名称不能超过 64 个字符。");
+        }
+        if (hasControlCharacter(value)) {
+            throw new IllegalArgumentException("测试玩家名称不能包含换行或控制字符。");
+        }
+        return value;
+    }
+
+    private static List<String> tags(List<String> rawTags) {
+        if (rawTags == null || rawTags.isEmpty()) {
+            return List.of();
+        }
+        LinkedHashSet<String> tags = new LinkedHashSet<>();
+        for (String rawTag : rawTags) {
+            if (rawTag == null) {
+                continue;
+            }
+            String tag = rawTag.trim();
+            if (tag.isEmpty()) {
+                continue;
+            }
+            if (tag.length() > MAX_TEST_TAG_LENGTH) {
+                throw new IllegalArgumentException("单个标签不能超过 64 个字符。");
+            }
+            if (hasControlCharacter(tag)) {
+                throw new IllegalArgumentException("标签不能包含换行或控制字符。");
+            }
+            tags.add(tag);
+            if (tags.size() > MAX_TEST_TAGS) {
+                throw new IllegalArgumentException("标签数量不能超过 32 个。");
+            }
+        }
+        return List.copyOf(tags);
+    }
+
+    private static boolean hasControlCharacter(String value) {
+        return value.chars().anyMatch(Character::isISOControl);
+    }
+
     private static void send(HttpExchange exchange, int status, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
@@ -282,7 +384,7 @@ public final class PixelLogicApiServer implements AutoCloseable {
     }
 
     private static Map<String, Object> demoActor() {
-        return fields("id", WEBUI_DEMO_PLAYER_ID.toString(), "label", "WebUI 模拟玩家");
+        return fields("id", WEBUI_DEMO_PLAYER_ID.toString(), "label", WEBUI_DEMO_PLAYER_NAME);
     }
 
     private static Map<String, Object> fields(Object... pairs) {
@@ -321,5 +423,8 @@ public final class PixelLogicApiServer implements AutoCloseable {
     }
 
     private record TraceStepView(String timestamp, String nodeId, String message) {
+    }
+
+    private record TestActorRequest(String displayName, List<String> tags, Boolean operator) {
     }
 }

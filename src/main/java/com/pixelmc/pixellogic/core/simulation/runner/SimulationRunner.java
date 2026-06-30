@@ -15,6 +15,7 @@ import com.pixelmc.pixellogic.core.timer.TimerContinuation;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public final class SimulationRunner {
@@ -33,6 +34,7 @@ public final class SimulationRunner {
     }
 
     public SimulationExecutionResult run(SimulationExecutionRequest request) {
+        Set<String> initialActorTags = request.actor().tags();
         SimulationContext context = new SimulationContext(
                 UUID.randomUUID().toString(),
                 request.generation(),
@@ -48,7 +50,7 @@ public final class SimulationRunner {
                 request.actor().id(),
                 request.event().sessionId()
         ));
-        return SimulationExecutionResult.from(result, context);
+        return SimulationExecutionResult.from(result, context, initialActorTags);
     }
 
     public interface RuntimeFactory {

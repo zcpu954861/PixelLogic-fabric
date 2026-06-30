@@ -11,6 +11,7 @@ import {
 } from '../model/blockCatalog';
 import { fallbackGraph, graphId } from '../model/demoGraph';
 import { richTextConfig, richTextPlainText } from '../model/richText';
+import { simulationTestPayload, validateSimulationTestContext } from '../model/simulationTestContext';
 import { state, world } from '../state/appState';
 import {
   blockMetrics,
@@ -76,6 +77,7 @@ import {
   snapDraggedGroupToCandidate,
 } from './canvas/dragInsert';
 import { renderEditorModal } from './editor/blockEditorModal';
+import { bindSimulationTestContextPanel, renderSimulationTestContextPanel } from './simulation/simulationTestContextPanel';
 import { renderTrace } from './trace/traceView';
 import { draftStatusText, uncommittedNotice, validationErrorText, validationList, validationSummaryText, validationTitle } from './validation/validationView';
 import { renderNodeInfo } from './sidebar/selectionSummary';
@@ -238,7 +240,7 @@ function renderApp(): void {
           </div>
           <div class="canvas-tools" aria-label="画布状态">
             <span>缩放 <b data-zoom>92%</b></span>
-            <span class="actor-chip">${escapeHtml(state.demoActor)}</span>
+            <span class="actor-chip">${escapeHtml(state.simulationTestContext.actor.displayName || state.demoActor)}</span>
             <button type="button" data-action="focus">聚焦选中</button>
           </div>
         </div>
@@ -257,6 +259,7 @@ function renderApp(): void {
           <b>${selectedNode ? escapeHtml(nodeTypeLabel(selectedNode.type)) : '未选中'}</b>
         </div>
         ${selectedNode ? renderNodeInfo(selectedNode, graph, state.selectedNodeId, activeCatalog()) : '<section class="info-card">单击积木选中，拖动积木移动，双击积木编辑。</section>'}
+        ${renderSimulationTestContextPanel(state.simulationTestContext, state.simulationResult, state.simulationTestContextError)}
         <section class="preview-card">
           <b>API 状态</b>
           <p>${escapeHtml(state.statusMessage)}</p>
@@ -531,6 +534,20 @@ function bindInteractions(): void {
   document.querySelector('[data-action="center"]')?.addEventListener('click', centerView);
   document.querySelector('[data-action="focus"]')?.addEventListener('click', focusSelectedBlock);
   document.querySelector('[data-api-action="start"]')?.addEventListener('click', () => void startTest());
+  bindSimulationTestContextPanel(document, {
+    getContext: () => state.simulationTestContext,
+    setContext: (context, options = {}) => {
+      state.simulationTestContext = context;
+      state.simulationTestContextError = '';
+      if (options.render ?? true) {
+        renderApp();
+      }
+    },
+    setError: (message) => {
+      state.simulationTestContextError = message;
+      renderApp();
+    },
+  });
   document.querySelector('[data-history-action="undo"]')?.addEventListener('click', undoGraphEdit);
   document.querySelector('[data-history-action="redo"]')?.addEventListener('click', redoGraphEdit);
   document.querySelector('[data-graph-action="disconnect-input"]')?.addEventListener('click', disconnectSelectedInput);
@@ -1535,6 +1552,15 @@ async function persistDraft(saveVersion = graphVersion, sequence = saveSequence)
 
 async function startTest(): Promise<void> {
   await runAction('测试运行', async () => {
+    const contextError = validateSimulationTestContext(state.simulationTestContext);
+    if (contextError) {
+      state.simulationTestContextError = contextError;
+      state.error = contextError;
+      state.lastAction = '测试玩家信息需要调整';
+      return;
+    }
+    state.simulationTestContextError = '';
+    state.simulationResult = null;
     await waitForPendingAutoSave();
     if (state.dirty || state.hasDraft) {
       const saved = await saveAndCommit({ version: graphVersion });
@@ -1543,9 +1569,13 @@ async function startTest(): Promise<void> {
       }
     }
     await api('/api/pixellogic/test/reset', { method: 'POST' });
-    const data = await api('/api/pixellogic/test/start', { method: 'POST' });
+    const data = await api('/api/pixellogic/test/start', {
+      method: 'POST',
+      body: JSON.stringify(simulationTestPayload(state.simulationTestContext)),
+    });
     state.apiStatus = 'online';
     state.latestTrace = data.trace ?? null;
+    state.simulationResult = data.simulation ?? null;
     state.lastAction = data.message || '测试运行已执行';
   });
 }

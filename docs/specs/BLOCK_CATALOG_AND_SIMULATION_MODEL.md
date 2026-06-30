@@ -42,6 +42,17 @@
 - Legacy string messages remain compatible and are interpreted as rich text plain text.
 - Runtime still dispatches by `NodeType`; this is not a Minecraft executor split or real Text adapter.
 
+## Implementation Checkpoint: Simulation Backend Boundary Docs
+
+`docs/simulation-backend-boundary-maintainability` defines the next backend design boundary before code work:
+
+- Simulation Backend is simulated input/context/executors on the real PixelLogic runtime path, not a fake frontend-only backend.
+- It models PixelLogic-visible gameplay abstractions such as actor/player, world facts, inventory summaries, container slots, events, state, timer, trace, and action results.
+- It explicitly does not model full Minecraft mechanics such as full redstone propagation, entity AI, collision, lighting, chunk lifecycle, physics, pathfinding, full NBT, full commands, or secure chat.
+- Simulation, Block Catalog, GraphRuntime, WebUI, and future Minecraft Adapter keep separate responsibilities.
+- Future implementation should add a small logical receiver runner and per-block simulation executors before adding many new blocks.
+- Maintainability gates forbid new mega files, giant services, endless block-id switches, and new simulation business logic inside `web-ui/src/ui/app.ts`.
+
 ## Product Principles
 
 - 分类不是积木。
@@ -357,6 +368,11 @@ Simulation Model 是 PixelLogic 的抽象测试环境，不是 Minecraft 克隆�
 - shared trace format: trace 说同一件事，必要时标注“模拟结果”或“真实服务器结果”。
 
 GraphRuntime 不应直接依赖 Minecraft 类。未来真实 MC adapter 负责把 Minecraft event 转成 PixelLogic trigger，把 PixelLogic action 请求落到真实服务器。
+
+See also:
+
+- `docs/specs/SIMULATION_BACKEND_BOUNDARY_AND_MAINTAINABILITY.md`
+- `docs/specs/SIMULATION_CAPABILITY_MATRIX.md`
 
 ## WebUI Library UX
 

@@ -96,6 +96,21 @@ The intended split for future concrete blocks is:
 
 GraphRuntime and WebUI must not directly bind to Minecraft classes.
 
+The next Simulation Backend design is recorded in:
+
+- `docs/specs/SIMULATION_BACKEND_BOUNDARY_AND_MAINTAINABILITY.md`
+- `docs/specs/SIMULATION_CAPABILITY_MATRIX.md`
+
+The intended next slice is a small simulation skeleton: simulated event request/result types, a manual simulation receiver, a minimal actor/world/inventory/container context, and per-block simulation executors for the current demo blocks. This should be done before expanding many new block families or adding a real Minecraft adapter.
+
+Maintainability requirements for that slice:
+
+- `GraphRuntime` remains graph traversal/runtime core, not a Minecraft model.
+- `SimulationRunner` orchestrates one simulated run; it must not own all block behavior.
+- Simulation block behavior belongs in executor classes by block family or block id.
+- `web-ui/src/ui/app.ts` must not absorb simulation UI business logic.
+- New backend or frontend files over about 500 lines require split review; files over about 800 lines should be split unless clearly justified.
+
 ## WebUI Rule
 
 Java / Fabric owns mod initialization, runtime, API, permission, storage, validation, audit/debug, and static resource serving.

@@ -16,11 +16,11 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Next
 
-1. Review the first Block Catalog skeleton implementation.
-2. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
-3. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
-4. Catalog form schema adoption and rich text component field MVP now move the current seven demo blocks onto schema-driven editing while preserving legacy fallback.
-5. Catalog form manual-save fix keeps rich text and schema fields local to the editor modal until the user clicks `保存`.
+1. Define and then implement the Simulation Backend skeleton without turning it into a Minecraft clone.
+2. Add a manual simulation event receiver and a small simulated actor/player/world context model.
+3. Move the current demo block behavior toward per-block simulation executors while preserving the current GraphRuntime path.
+4. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
+5. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
 
 ## Completed Checkpoints
 
@@ -42,11 +42,13 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - Block Catalog / Simulation Model docs define the next direction: concrete catalog blocks, registry-driven categories, and simulation executors separated from future Minecraft executors.
 - Block Catalog skeleton branch adds the Java built-in catalog registry, `blockId` compatibility, readonly catalog API, catalog-driven WebUI library, and `blockCatalogSelfCheck` for the current seven demo blocks.
 - Catalog form schema + rich text field branch adopts `formSchema` as the editor main path for the current seven demo blocks, adds catalog summaries, upgrades message text to a structured rich text component MVP, and restores modal-local draft + manual save semantics for configuration edits.
+- Simulation Backend boundary docs define the next backend direction: simulated actor/world/inventory/container/event abstractions, a logical receiver runner, per-block simulation executors, capability matrix, and maintenance rules against mega files.
 
 ## Follow-Ups
 
 P2 before broader runtime use:
 
+- The current simulation runtime is still a demo GraphRuntime path. Add a Simulation Backend skeleton before expanding many block families.
 - Pending timers now have a spike-level max pending count plus reset/commit/stop cleanup. Broader runtime still needs a real capacity/backpressure policy.
 - In-memory state now has a spike-level cap and reset/stop cleanup. Broader runtime still needs durable lifecycle and persistence policy before non-spike use.
 - Draft saves return fingerprints but do not yet enforce `expectedFingerprint`; add optimistic conflict handling before multi-user or multi-tab editing.

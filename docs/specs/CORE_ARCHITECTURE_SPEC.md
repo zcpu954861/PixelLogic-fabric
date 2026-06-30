@@ -347,6 +347,21 @@ The intended executor split is:
 - Minecraft executor for real server side effects;
 - capability and safety flags to warn, restrict, or require real runtime.
 
+The detailed Simulation Backend boundary and maintainability rules are now defined in:
+
+- `docs/specs/SIMULATION_BACKEND_BOUNDARY_AND_MAINTAINABILITY.md`
+- `docs/specs/SIMULATION_CAPABILITY_MATRIX.md`
+
+Future Simulation Backend work should add a logical receiver runner that accepts a simulated event, builds a simulation context, calls GraphRuntime, collects action results, and returns bounded trace/state/timer/result data. The runner is not a replacement for GraphRuntime, not a Channel/event bus, and not a real Minecraft listener.
+
+Maintenance gates:
+
+- Do not place all simulation behavior in one service.
+- Do not grow an endless switch over all block ids.
+- Do not put simulated Minecraft rules into WebUI.
+- Do not import Minecraft classes into core runtime or core simulation.
+- Review any new file over about 500 lines for splitting; split files over about 800 lines unless there is a documented reason.
+
 ### ValidationIssue
 
 ValidationIssue is a user-facing problem found before commit or simulation.

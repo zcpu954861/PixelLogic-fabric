@@ -8,6 +8,7 @@
 - simulation result: result includes success, trace id, action results, message results, state changes, actor tags, timer scheduling, and errors.
 - player tag block: added `condition.player.has_tag` and `action.player.add_tag`.
 - existing manual test migration: `/pixellogic test start` and WebUI test-run still use the committed graph, now through `SimulationRunner`.
+- follow-up in `feature/v1-condition-output-modes`: `condition.player.has_tag` is categorized under `条件判断 / 玩家条件`, and both state/tag conditions support condition output modes.
 
 ## Architecture
 
@@ -30,6 +31,7 @@
 - no mega service: `SimulationRunner` delegates block behavior to `SimulationExecutionRegistry`.
 - no giant switch over block ids: player tag behavior is registry-backed by `NodeType`.
 - no WebUI simulation panel: frontend changes are limited to catalog fallback and labels.
+- condition output mode remains a GraphRuntime traversal choice and does not change SimulationRunner ownership.
 
 ## Validation
 

@@ -66,6 +66,18 @@
 
 This checkpoint still does not add a real Minecraft adapter, draft simulation, named scenarios, inventory/world/container simulation, or a new WebUI simulation panel.
 
+## Implementation Checkpoint: Condition Output Modes
+
+`feature/v1-condition-output-modes` makes condition outputs a per-condition config instead of forcing every condition to look and validate like a dual branch:
+
+- `outputMode=PASS_ONLY`: 满足时继续；不满足时自然结束。
+- `outputMode=FAIL_ONLY`: 不满足时继续；满足时自然结束。
+- `outputMode=BRANCH`: 分成两路，保留当前 pass/fail 双分支语义。
+- Old graphs without `outputMode` default to `BRANCH` for compatibility.
+- New condition catalog entries default to `PASS_ONLY`, while the seeded demo graph explicitly stores `BRANCH`.
+- Condition outputs are optional in validation; an unconnected selected output ends the path and writes a trace step.
+- `condition.player.has_tag` now belongs to `条件判断 / 玩家条件`; `action.player.add_tag` remains `玩家操作 / 标签`.
+
 ## Product Principles
 
 - 分类不是积木。

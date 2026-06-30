@@ -1,5 +1,6 @@
 package com.pixelmc.pixellogic.core.simulation.executor;
 
+import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
@@ -45,9 +46,11 @@ public final class SimulationExecutionRegistry {
         public RuntimeServices.NodeExecution execute(NodeDefinition node, SimulationContext context) {
             String tag = tag(node);
             boolean passed = context.actor().hasTag(tag);
+            ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
             return new RuntimeServices.NodeExecution(
-                    passed ? "pass" : "fail",
-                    "玩家标签条件" + (passed ? "通过" : "失败") + "：" + context.actor().displayName() + " 拥有标签 " + tag
+                    mode.outputSlot(passed),
+                    "玩家标签条件" + (passed ? "通过" : "失败") + "：" + context.actor().displayName() + " 拥有标签 " + tag + "。"
+                            + mode.traceMessage(passed)
             );
         }
     }

@@ -2,7 +2,7 @@ import { catalogBlock } from '../../model/blockCatalog';
 import type { BlockCatalog, CatalogFormField, EditableField, EditorSection, FieldOption, GraphNode } from '../../model/graphTypes';
 import { richTextPlainText } from '../../model/richText';
 import { escapeAttr, escapeHtml } from '../../utils/dom';
-import { booleanLabel, booleanOptions, nodeTypeLabel, stateScopeOptions, targetLabel, valueTypeOptions } from '../humanize/labels';
+import { booleanLabel, booleanOptions, conditionOutputModeLabel, nodeTypeLabel, stateScopeOptions, targetLabel, valueTypeOptions } from '../humanize/labels';
 
 export function renderNodeEditor(nodeItem: GraphNode, catalog: BlockCatalog): string {
   const section = editorSection(nodeItem, catalog);
@@ -221,6 +221,9 @@ export function displayFieldValue(field: EditableField): string {
   }
   if (field.key === 'target') {
     return targetLabel(value);
+  }
+  if (field.key === 'outputMode') {
+    return conditionOutputModeLabel(value);
   }
   if (field.control === 'rich_text_component') {
     return richTextPlainText(value) || '未填写';

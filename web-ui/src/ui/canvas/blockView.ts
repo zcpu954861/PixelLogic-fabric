@@ -12,7 +12,7 @@ export function puzzlePath(block: SlotBlock): string {
     return `M0 0 H${width - tab} V${notchTop} H${width} V${notchBottom} H${width - tab} V${height} H0 Z`;
   }
 
-  if (kind === 'condition') {
+  if (kind === 'condition' && 'pass' in block.outputOffsets && 'fail' in block.outputOffsets) {
     const headHeight = 150;
     const inputY = block.inputY ?? height / 2;
     const passY = block.outputOffsets.pass ?? 75;
@@ -37,18 +37,18 @@ export function puzzlePath(block: SlotBlock): string {
 
 export function conditionBranchTabs(block: SlotBlock): string {
   const width = block.width;
-  const passY = block.outputOffsets.pass ?? 75;
-  const failY = block.outputOffsets.fail ?? 329;
-  const passTop = passY - puzzleMouthHalfHeight;
-  const passBottom = passY + puzzleMouthHalfHeight;
-  const failTop = failY - puzzleMouthHalfHeight;
-  const failBottom = failY + puzzleMouthHalfHeight;
-  return `
-      <path class="branch-tab-fill pass" d="M${width - 20} ${passTop} H${width} V${passBottom} H${width - 20} Z" />
-      <path class="branch-tab pass" d="M${width - 18} ${passTop} H${width} V${passBottom} H${width - 18}" />
-      <path class="branch-tab-fill fail" d="M${width - 20} ${failTop} H${width} V${failBottom} H${width - 20} Z" />
-      <path class="branch-tab fail" d="M${width - 18} ${failTop} H${width} V${failBottom} H${width - 18}" />
-    `;
+  return Object.entries(block.outputOffsets)
+    .filter(([slotId]) => slotId === 'pass' || slotId === 'fail')
+    .map(([slotId, centerY]) => {
+      const top = centerY - puzzleMouthHalfHeight;
+      const bottom = centerY + puzzleMouthHalfHeight;
+      const tone = slotId === 'pass' ? 'pass' : 'fail';
+      return `
+        <path class="branch-tab-fill ${tone}" d="M${width - 20} ${top} H${width} V${bottom} H${width - 20} Z" />
+        <path class="branch-tab ${tone}" d="M${width - 18} ${top} H${width} V${bottom} H${width - 18}" />
+      `;
+    })
+    .join('');
 }
 
 export function renderShape(path: string, width: number, height: number, extraPaths = ''): string {
@@ -77,10 +77,11 @@ export function renderSlotJoin(join: SlotJoin): string {
 
 export function renderBlock(block: SlotBlock, recentNodeId: string | null): string {
   const branchTabs = block.kind === 'condition' ? conditionBranchTabs(block) : '';
+  const conditionClass = block.kind === 'condition' && !('pass' in block.outputOffsets && 'fail' in block.outputOffsets) ? ' condition-single' : '';
 
   return `
     <article
-      class="logic-block ${block.kind} ${block.branch}${block.selected ? ' selected' : ''}${recentNodeId === block.id ? ' newly-added' : ''}"
+      class="logic-block ${block.kind} ${block.branch}${conditionClass}${block.selected ? ' selected' : ''}${recentNodeId === block.id ? ' newly-added' : ''}"
       data-block="${escapeAttr(block.id)}"
       data-branch="${block.branch}"
       style="left:${block.x}px; top:${block.y}px; width:${block.width}px; height:${block.height}px; --condition-content-top:${Math.max(18, (block.inputY ?? 202) - 57)}px; z-index:${3000 - block.x + (block.selected ? 1000 : 0)}"

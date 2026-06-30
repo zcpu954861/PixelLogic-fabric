@@ -121,6 +121,14 @@ The Simulation Backend skeleton checkpoint adds the first code slice:
 
 Still out of scope: draft simulation, named scenarios, fast-forward timers, real Minecraft adapter, full inventory/world/container simulation, and new simulation UI.
 
+The condition output mode checkpoint keeps the same direct edge runtime and adds only a condition-local config:
+
+- `outputMode` supports `PASS_ONLY` / 满足时继续, `FAIL_ONLY` / 不满足时继续, and `BRANCH` / 分成两路.
+- Missing `outputMode` on old graphs defaults to `BRANCH`.
+- New condition catalog nodes default to `PASS_ONLY`; the seeded demo graph explicitly stays `BRANCH`.
+- Unconnected condition outputs mean that path ends gracefully and are not validation blockers.
+- `condition.player.has_tag` is categorized as `条件判断 / 玩家条件`; `action.player.add_tag` remains `玩家操作 / 标签`.
+
 ## WebUI Rule
 
 Java / Fabric owns mod initialization, runtime, API, permission, storage, validation, audit/debug, and static resource serving.

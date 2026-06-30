@@ -70,6 +70,12 @@ tasks.register('simulationBackendSelfCheck', JavaExec) {
 	classpath = sourceSets.main.runtimeClasspath
 }
 
+tasks.register('conditionOutputModeSelfCheck', JavaExec) {
+	dependsOn classes
+	mainClass = 'com.pixelmc.pixellogic.core.runtime.ConditionOutputModeSelfCheck'
+	classpath = sourceSets.main.runtimeClasspath
+}
+
 tasks.register('apiWebUiDevServer', JavaExec) {
 	dependsOn classes
 	mainClass = 'com.pixelmc.pixellogic.server.api.ApiWebUiDevServer'
@@ -81,6 +87,7 @@ check.dependsOn tasks.named('apiWebUiSelfCheck')
 check.dependsOn tasks.named('graphStorageSelfCheck')
 check.dependsOn tasks.named('blockCatalogSelfCheck')
 check.dependsOn tasks.named('simulationBackendSelfCheck')
+check.dependsOn tasks.named('conditionOutputModeSelfCheck')
 
 java {
 	withSourcesJar()

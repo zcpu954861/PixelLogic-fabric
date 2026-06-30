@@ -4,6 +4,7 @@ import com.pixelmc.pixellogic.core.graph.DemoGraphFactory;
 import com.pixelmc.pixellogic.core.graph.GraphValidator;
 import com.pixelmc.pixellogic.core.graph.ValidationIssue;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
+import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.SlotDefinition;
 import com.pixelmc.pixellogic.server.storage.GraphDocument;
@@ -77,8 +78,14 @@ public final class BlockCatalogSelfCheck {
 
         BlockDefinition hasTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG).orElseThrow();
         BlockDefinition addTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG).orElseThrow();
+        require(hasTag.categoryId().equals("condition") && hasTag.subcategoryId().equals("condition.player"),
+                "player tag condition should be under condition/player condition");
+        require(addTag.categoryId().equals("player") && addTag.subcategoryId().equals("player.tag"),
+                "player tag action should stay under player/tag");
         require(hasTag.formSchema().stream().anyMatch(field -> field.key().equals("tag") && field.type().equals("string")),
                 "player tag condition should expose tag field");
+        require(hasTag.formSchema().stream().anyMatch(field -> field.key().equals(ConditionOutputMode.CONFIG_KEY) && field.type().equals("segmented")),
+                "player tag condition should expose condition output mode field");
         require(addTag.formSchema().stream().anyMatch(field -> field.key().equals("tag") && field.type().equals("string")),
                 "player tag action should expose tag field");
         require(hasTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE

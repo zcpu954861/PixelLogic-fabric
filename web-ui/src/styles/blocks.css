@@ -174,7 +174,16 @@
   padding-right: 54px;
 }
 
+.logic-block.condition-single {
+  padding-top: 18px;
+  padding-right: 38px;
+}
+
 .logic-block.condition h3 {
   margin-top: 13px;
   font-size: 1.55rem;
+}
+
+.logic-block.condition-single h3 {
+  font-size: 1.32rem;
 }

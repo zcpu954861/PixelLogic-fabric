@@ -6,6 +6,7 @@ import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
+import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.model.SlotDefinition;
@@ -189,11 +190,13 @@ public final class GraphValidator {
         validateBooleanConfig(node, "expected", issues);
         validateBooleanConfig(node, "missing", issues);
         validateConditionEdges(graph, node, issues);
+        validateConditionOutputMode(node, issues);
     }
 
     private void validatePlayerTagCondition(GraphDefinition graph, NodeDefinition node, List<ValidationIssue> issues) {
         validatePlayerTagConfig(node, issues);
         validateConditionEdges(graph, node, issues);
+        validateConditionOutputMode(node, issues);
     }
 
     private void validatePlayerTagConfig(NodeDefinition node, List<ValidationIssue> issues) {
@@ -211,11 +214,11 @@ public final class GraphValidator {
         if (!hasIncoming(graph, node.id(), "input")) {
             error(issues, "condition_missing_input", "条件节点缺少输入连接：" + node.id());
         }
-        if (!hasOutgoing(graph, node.id(), "pass")) {
-            error(issues, "condition_missing_pass", "条件节点缺少通过分支：" + node.id());
-        }
-        if (!hasOutgoing(graph, node.id(), "fail")) {
-            error(issues, "condition_missing_fail", "条件节点缺少失败分支：" + node.id());
+    }
+
+    private void validateConditionOutputMode(NodeDefinition node, List<ValidationIssue> issues) {
+        if (!ConditionOutputMode.isValid(node.config().get(ConditionOutputMode.CONFIG_KEY))) {
+            error(issues, "condition_output_mode_invalid", "条件用途无效：" + node.id());
         }
     }
 

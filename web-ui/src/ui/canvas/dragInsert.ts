@@ -1,4 +1,5 @@
 import type { BlockDrag, GraphDocument, GraphEdge, GraphNode, GraphPosition, GraphSlot, InsertCandidate, SlotJoin } from '../../model/graphTypes';
+import { activeOutputSlots } from '../../model/conditionOutputMode';
 import { edge } from '../../model/demoGraph';
 import { blockMetrics, branchForNode, connectedGraphEdges, downstreamNodeIds, fallbackPosition, inputCenterOffset, nodePosition, outputCenterOffset, preferredMainOutput } from '../../model/graphLayout';
 import { connectedOverlap, insertSnapX, insertSnapY, normalBlockHeight, reconnectSnapX, reconnectSnapY } from './blockConstants';
@@ -139,8 +140,7 @@ export function appendCandidates(graph: GraphDocument, drag: BlockDrag): InsertC
     }
     const sourcePosition = source.position ?? fallbackPosition(source.id);
     const sourceSize = blockMetrics(graph, source);
-    return source.slots
-      .filter((slot) => slot.direction === 'OUTPUT')
+    return activeOutputSlots(source)
       .filter((slot) => slot.edgeType === rootInput.edgeType)
       .filter((slot) => !connectedEdges.some((edgeItem) => edgeItem.sourceNodeId === source.id && edgeItem.sourceSlotId === slot.id))
       .map((slot): InsertCandidate => ({

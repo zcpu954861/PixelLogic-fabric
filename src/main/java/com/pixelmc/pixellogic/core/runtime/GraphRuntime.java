@@ -2,6 +2,7 @@ package com.pixelmc.pixellogic.core.runtime;
 
 import com.pixelmc.pixellogic.core.graph.CompiledGraph;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
+import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.StateScope;
 import com.pixelmc.pixellogic.core.model.StateValueType;
@@ -118,6 +119,7 @@ public final class GraphRuntime {
                 return new RuntimeResult(false, context.traceId(), message);
             }
             if (next.isEmpty()) {
+                traces.add(context.traceId(), current.id(), "未连接后续积木，流程在此结束。");
                 return new RuntimeResult(true, context.traceId(), "执行完成。");
             }
             current = next.get();
@@ -162,7 +164,9 @@ public final class GraphRuntime {
         boolean actual = stored.map(value -> value.asBoolean(missingValue)).orElse(missingValue);
         boolean passed = actual == expected;
         traces.add(context.traceId(), node.id(), "条件" + (passed ? "通过" : "失败") + "：" + displayStateKey(key) + " == " + expected);
-        return passed ? "pass" : "fail";
+        ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
+        traces.add(context.traceId(), node.id(), mode.traceMessage(passed));
+        return mode.outputSlot(passed);
     }
 
     private String executeMessage(NodeDefinition node, ExecutionContext context) {

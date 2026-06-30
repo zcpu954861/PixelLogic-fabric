@@ -15,7 +15,7 @@ export const fallbackGraph: GraphDocument = {
       'condition-started',
       'STATE_COMPARE_CONDITION',
       '是否未开始',
-      { scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', expected: 'false', missing: 'false' },
+      { outputMode: 'BRANCH', scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', expected: 'false', missing: 'false' },
       { x: 294, y: 78 },
       [input('input'), out('pass'), out('fail')],
       'condition.state.equals',

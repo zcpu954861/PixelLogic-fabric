@@ -8,6 +8,7 @@
 - summary: catalog `summaryTemplate` drives card, modal, and sidebar summaries when available.
 - validation: backend still owns final validation; frontend maps required/min/max/step/options into native controls for basic UX.
 - API dev proxy: Vite `/api` proxy now returns a short JSON 503 when the Java API is offline, so the WebUI shows the normal Chinese disconnected state instead of hanging or parsing HTML.
+- manual-save follow-up: schema-driven modal fields now edit a local draft first. `保存` applies the draft once; typing in rich text no longer mutates the graph or triggers autosave per keypress.
 
 ## Rich Text Semantics
 - tellraw/text component: message output is modeled as vanilla text component semantics.
@@ -23,6 +24,7 @@
 - browser self-check: see `reports/catalog-form-schema-rich-text/REPORT.md`.
 - screenshots: see `reports/catalog-form-schema-rich-text/screenshots/`.
 - API offline: `/api` returns `application/json` with `API 未连接，请确认 PixelLogic API server 已启动。`.
+- manual-save follow-up: see `docs/audits/CATALOG_FORM_MANUAL_SAVE_FIX.md`.
 
 ## Known Limitations
 - no full toolbar.

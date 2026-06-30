@@ -36,7 +36,7 @@ export async function api(path: string, init?: RequestInit): Promise<ApiResponse
   }
 
   if (!response.ok || !data.ok) {
-    throw new PixelLogicApiError(data.error?.message ?? 'PixelLogic API 返回错误。', true);
+    throw new PixelLogicApiError(data.error?.message ?? 'PixelLogic API 返回错误。', response.status !== 503);
   }
   return data;
 }

@@ -203,6 +203,9 @@ export type UiState = {
   selectedNodeId: string;
   editorOpen: boolean;
   editorClosing: boolean;
+  editorDraftNode: GraphNode | null;
+  editorOriginalNode: GraphNode | null;
+  editorSaving: boolean;
   recentNodeId: string | null;
 };
 

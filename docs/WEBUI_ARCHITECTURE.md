@@ -62,18 +62,21 @@ The UI renders the graph as the confirmed Slot-Based horizontal block flow. Sing
 Important user semantics:
 
 - The backend still keeps draft, validate, and commit separated.
-- The normal WebUI does not expose a manual save button; graph edits enter an automatic save, validate, and commit queue.
+- Structural graph edits such as add, delete, drag, insert, and disconnect still enter an automatic save, validate, and commit queue.
+- Block configuration edits inside the editor modal use a local draft and are applied to the graph only when the user clicks `保存`.
+- Closing a modified editor modal asks whether to continue editing or discard the local draft.
 - Automatic save promotes edits only when validation passes, and stale save responses do not overwrite newer local edits.
 - Invalid edits do not replace the committed runtime graph.
 - `上一步` / `下一步` plus `Ctrl+Z`, `Ctrl+Y`, and `Ctrl+Shift+Z` roll back and reapply graph operations such as naming, configuration, add/delete, drag, and connection edits.
 - `测试运行` waits for pending automatic save, resets the demo test state, starts the run, and refreshes the trace.
 - Reset remains an internal API step, not a primary user button.
 - The right panel is an information surface, not the main field editor.
-- Closing the editor modal is just closing the form; field changes are already part of the graph history and automatic save queue.
+- Closing the editor modal without saving discards only the modal-local draft and does not mutate the graph.
 - Modal open/close uses short CSS animation and respects reduced motion.
 - The editor modal uses humanized Chinese form labels and controls. Internal graph values such as `PLAYER`, `BOOLEAN`, and `true` remain storage/runtime values, but normal UI renders them as labels such as `玩家`, `是或否`, and `是`.
 - The editor modal now prefers Block Catalog `formSchema` for known `blockId` values. Legacy `NodeType` form builders remain only as fallback for old or unknown nodes.
 - `action.message.chat` uses a `rich_text_component` field: multiline plain text editing, structured storage, and a simple preview. The normal UI does not expose raw JSON.
+- Rich text typing updates only the modal-local draft and preview; one click on `保存` creates one graph edit/history entry.
 - Short configuration fields use compact two-column layout where space allows; long text fields remain full-width.
 
 Safety bounds:

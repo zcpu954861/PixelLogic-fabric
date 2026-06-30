@@ -21,5 +21,8 @@ export const state: UiState = {
   selectedNodeId: 'condition-started',
   editorOpen: false,
   editorClosing: false,
+  editorDraftNode: null,
+  editorOriginalNode: null,
+  editorSaving: false,
   recentNodeId: null,
 };

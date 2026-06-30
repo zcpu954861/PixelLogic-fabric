@@ -16,9 +16,9 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Next
 
-1. User review `feature/v1-lifecycle-capacity-safety-cleanup`.
-2. Repair any lifecycle/capacity findings reported from review or hand test.
-3. If accepted, run merge-readiness audit before merging back to `mc-1.21.11`.
+1. Complete `audit/v1-rc0-readiness` to decide whether the current `mc-1.21.11` HEAD is ready as the first v1 RC0 candidate baseline.
+2. If no P0/P1 blockers remain, discuss RC0 branch/tag/release preparation separately.
+3. If lifecycle/capacity findings appear during hand testing, fix blockers before release preparation.
 4. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
 
 ## Completed Checkpoints
@@ -37,7 +37,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - WebUI structure split moves the large frontend entry and stylesheet into responsibility-based TypeScript and CSS modules without changing behavior.
 - Apache-2.0 license metadata and full `LICENSE` text are included on `mc-1.21.11`.
 - v1 editor baseline health audit completed with no P0/P1.
-- Lifecycle/capacity safety cleanup is in progress on `feature/v1-lifecycle-capacity-safety-cleanup`.
+- Lifecycle/capacity safety cleanup is merged into `mc-1.21.11` with state/timer/trace/undo/autosave/API lifecycle bounds.
 
 ## Follow-Ups
 

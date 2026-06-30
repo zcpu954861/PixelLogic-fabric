@@ -4,8 +4,8 @@ import com.pixelmc.pixellogic.core.graph.CompiledGraph;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.StateScope;
 import com.pixelmc.pixellogic.core.model.StateValueType;
+import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.state.StateKey;
-import com.pixelmc.pixellogic.core.state.StateStore;
 import com.pixelmc.pixellogic.core.state.StateValue;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
 import com.pixelmc.pixellogic.core.trace.BoundedTraceBuffer;
@@ -16,23 +16,36 @@ import java.util.UUID;
 
 public final class GraphRuntime {
     private final CompiledGraph graph;
-    private final StateStore stateStore;
+    private final InMemoryStateStore stateStore;
     private final BoundedTraceBuffer traces;
     private final RuntimeServices services;
     private final RuntimeLimits limits;
+    private final long generation;
 
     public GraphRuntime(
             CompiledGraph graph,
-            StateStore stateStore,
+            InMemoryStateStore stateStore,
             BoundedTraceBuffer traces,
             RuntimeServices services,
             RuntimeLimits limits
+    ) {
+        this(graph, stateStore, traces, services, limits, 0L);
+    }
+
+    public GraphRuntime(
+            CompiledGraph graph,
+            InMemoryStateStore stateStore,
+            BoundedTraceBuffer traces,
+            RuntimeServices services,
+            RuntimeLimits limits,
+            long generation
     ) {
         this.graph = graph;
         this.stateStore = stateStore;
         this.traces = traces;
         this.services = services;
         this.limits = limits;
+        this.generation = generation;
     }
 
     public RuntimeResult start(TriggerEvent event) {
@@ -51,6 +64,9 @@ public final class GraphRuntime {
     }
 
     public RuntimeResult resumeTimer(TimerContinuation continuation) {
+        if (continuation.generation() != generation) {
+            return new RuntimeResult(false, continuation.traceId(), "计时器已失效。");
+        }
         if (continuation.depth() > limits.maxContinuationDepth()) {
             traces.add(continuation.traceId(), continuation.targetNodeId(), "执行失败：计时器 continuation 深度超限。");
             return new RuntimeResult(false, continuation.traceId(), "计时器 continuation 深度超限。");
@@ -173,7 +189,8 @@ public final class GraphRuntime {
                 context.traceId(),
                 context.playerId(),
                 context.sessionId(),
-                context.continuationDepth() + 1
+                context.continuationDepth() + 1,
+                generation
         );
         traces.add(context.traceId(), node.id(), "计时器启动：" + seconds + " 秒");
         services.scheduleTimer(Duration.ofSeconds(seconds), continuation);

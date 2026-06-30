@@ -8,6 +8,7 @@ public record TimerContinuation(
         String traceId,
         UUID playerId,
         String sessionId,
-        int depth
+        int depth,
+        long generation
 ) {
 }

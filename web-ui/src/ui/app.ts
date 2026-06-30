@@ -84,6 +84,7 @@ let autoSaveTimer: number | null = null;
 let autoSaveInFlight = false;
 let autoSaveAgain = false;
 let autoSavePromise: Promise<void> | null = null;
+let saveSequence = 0;
 const undoStack: GraphHistoryEntry[] = [];
 const redoStack: GraphHistoryEntry[] = [];
 
@@ -713,11 +714,15 @@ function graphHistorySnapshot(): GraphHistoryEntry {
 }
 
 function rememberGraphState(): void {
-  undoStack.push(graphHistorySnapshot());
-  if (undoStack.length > historyLimit) {
-    undoStack.shift();
-  }
+  pushHistory(undoStack, graphHistorySnapshot());
   redoStack.length = 0;
+}
+
+function pushHistory(stack: GraphHistoryEntry[], entry: GraphHistoryEntry): void {
+  stack.push(entry);
+  while (stack.length > historyLimit) {
+    stack.shift();
+  }
 }
 
 function resetGraphHistory(): void {
@@ -776,7 +781,7 @@ function undoGraphEdit(): void {
   if (!previous) {
     return;
   }
-  redoStack.push(graphHistorySnapshot());
+  pushHistory(redoStack, graphHistorySnapshot());
   restoreGraphHistory(previous, `已撤销：${previous.lastAction}`);
 }
 
@@ -785,7 +790,7 @@ function redoGraphEdit(): void {
   if (!next) {
     return;
   }
-  undoStack.push(graphHistorySnapshot());
+  pushHistory(undoStack, graphHistorySnapshot());
   restoreGraphHistory(next, `已重做：${next.lastAction}`);
 }
 
@@ -1225,8 +1230,10 @@ async function loadGraph(): Promise<void> {
   });
 }
 
-async function saveAndCommit(options: { auto?: boolean; version?: number } = {}): Promise<boolean> {
+async function saveAndCommit(options: { auto?: boolean; version?: number; sequence?: number } = {}): Promise<boolean> {
   const saveVersion = options.version ?? graphVersion;
+  const sequence = options.sequence ?? ++saveSequence;
+  const isCurrentSave = () => graphVersion === saveVersion && saveSequence === sequence;
   syncGraphConnectionsToVisual();
 
   if (!state.dirty && !state.hasDraft) {
@@ -1235,14 +1242,14 @@ async function saveAndCommit(options: { auto?: boolean; version?: number } = {})
   }
 
   if (state.dirty) {
-    await persistDraft(saveVersion);
-    if (graphVersion !== saveVersion) {
+    await persistDraft(saveVersion, sequence);
+    if (!isCurrentSave()) {
       return false;
     }
   }
 
   const validationData = await api(`/api/pixellogic/graphs/${graphId}/validate`, { method: 'POST' });
-  if (graphVersion !== saveVersion) {
+  if (!isCurrentSave()) {
     return false;
   }
   state.validation = validationData.validation ?? null;
@@ -1253,7 +1260,7 @@ async function saveAndCommit(options: { auto?: boolean; version?: number } = {})
   }
 
   const data = await api(`/api/pixellogic/graphs/${graphId}/commit`, { method: 'POST' });
-  if (graphVersion !== saveVersion) {
+  if (!isCurrentSave()) {
     return false;
   }
   if (!data.graph) {
@@ -1287,7 +1294,7 @@ function syncGraphConnectionsToVisual(): void {
   state.validation = null;
 }
 
-async function persistDraft(saveVersion = graphVersion): Promise<ApiResponse> {
+async function persistDraft(saveVersion = graphVersion, sequence = saveSequence): Promise<ApiResponse> {
   const graphToSave = cloneGraph(currentGraph());
   const data = await api(`/api/pixellogic/graphs/${graphId}/draft`, {
     method: 'PUT',
@@ -1297,7 +1304,7 @@ async function persistDraft(saveVersion = graphVersion): Promise<ApiResponse> {
     throw new Error('API 未返回已保存内容。');
   }
   state.hasDraft = true;
-  if (graphVersion === saveVersion) {
+  if (graphVersion === saveVersion && saveSequence === sequence) {
     state.graph = data.graph;
     state.dirty = false;
     state.validation = null;

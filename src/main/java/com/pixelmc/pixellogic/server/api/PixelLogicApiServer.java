@@ -3,7 +3,6 @@ package com.pixelmc.pixellogic.server.api;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
@@ -233,13 +232,10 @@ public final class PixelLogicApiServer implements AutoCloseable {
         }
         try {
             JsonElement element = JsonParser.parseString(body);
-            if (element.isJsonObject()) {
-                JsonObject object = element.getAsJsonObject();
-                if (object.has("graph")) {
-                    element = object.get("graph");
-                }
+            if (!element.isJsonObject() || !element.getAsJsonObject().has("graph")) {
+                throw new IllegalArgumentException("请求体缺少 graph JSON。");
             }
-            GraphDocument graph = GSON.fromJson(element, GraphDocument.class);
+            GraphDocument graph = GSON.fromJson(element.getAsJsonObject().get("graph"), GraphDocument.class);
             if (graph == null) {
                 throw new IllegalArgumentException("请求体缺少 graph JSON。");
             }

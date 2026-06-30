@@ -1,6 +1,5 @@
 plugins {
 	id 'fabric-loom' version "${loom_version}"
-	id 'maven-publish'
 }
 
 version = project.mod_version
@@ -73,13 +72,4 @@ java {
 	withSourcesJar()
 	sourceCompatibility = JavaVersion.VERSION_21
 	targetCompatibility = JavaVersion.VERSION_21
-}
-
-publishing {
-	publications {
-		create("mavenJava", MavenPublication) {
-			artifactId = project.archives_base_name
-			from components.java
-		}
-	}
 }

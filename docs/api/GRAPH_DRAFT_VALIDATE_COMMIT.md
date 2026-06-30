@@ -82,6 +82,8 @@ Graph JSON is versioned and readable. It is not a Java object dump.
 
 `fingerprint` is generated from the graph document with the fingerprint field blanked. v1 returns it to the UI but does not yet enforce `expectedFingerprint` on draft saves.
 
+The WebUI now also uses a local graph version and save sequence before applying save, validate, or commit responses. This prevents stale local responses from overwriting newer edits, but it is not a replacement for future server-side optimistic conflict checks.
+
 ## Endpoints
 
 ```text
@@ -148,3 +150,11 @@ The slot flow drag/insert checkpoint keeps the same API contract. The WebUI may 
 - `edges` when inserting a block into an existing slot connection or disconnecting an input.
 
 These edits are still submitted as the same graph draft JSON. `保存` continues to run draft save, validation, and commit. Invalid drag/edit outcomes do not replace the committed runtime graph.
+
+## Lifecycle / Capacity Safety
+
+- Test reset clears the WebUI demo actor's PLAYER state and the manual SESSION state.
+- Test reset, graph commit/reload, and server stop invalidate pending timer generations.
+- Pending timers are capped at 128 in the spike scheduler.
+- Trace history returned by `/api/pixellogic/traces` remains bounded by the backend ring buffer.
+- Invalid draft commit remains fail-closed and does not replace the committed graph.

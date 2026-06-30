@@ -8,6 +8,7 @@ export function renderTrace(trace: ApiTrace | null): string {
   }
 
   return trace.steps
+    .slice(-100)
     .map((step) => `<li>[${escapeHtml(formatTime(step.timestamp))}] ${escapeHtml(humanizeTraceMessage(step.message))}</li>`)
     .join('');
 }

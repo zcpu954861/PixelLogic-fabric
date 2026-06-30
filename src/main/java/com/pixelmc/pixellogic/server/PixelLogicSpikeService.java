@@ -11,7 +11,10 @@ import com.pixelmc.pixellogic.core.runtime.GraphRuntime;
 import com.pixelmc.pixellogic.core.runtime.RuntimeLimits;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
-import com.pixelmc.pixellogic.core.runtime.TriggerEvent;
+import com.pixelmc.pixellogic.core.simulation.executor.SimulationExecutionRegistry;
+import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionRequest;
+import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionResult;
+import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunner;
 import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
 import com.pixelmc.pixellogic.core.timer.WallClockTimerScheduler;
@@ -48,6 +51,8 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     private volatile GraphDocument committedGraph;
     private volatile List<ValidationIssue> validationIssues = List.of();
     private volatile GraphRuntime runtime;
+    private volatile SimulationRunner simulationRunner;
+    private volatile SimulationExecutionResult lastSimulationResult;
 
     public PixelLogicSpikeService(
             BiConsumer<UUID, String> playerMessenger,
@@ -90,14 +95,14 @@ public final class PixelLogicSpikeService implements AutoCloseable {
                 if (continuation.generation() != runtimeGeneration.get()) {
                     return;
                 }
+                GraphRuntime scheduledRuntime = runtime;
                 timerScheduler.schedule(delay, continuation, due -> {
                     if (closed.get() || due.generation() != runtimeGeneration.get()) {
                         return;
                     }
                     serverThreadExecutor.accept(() -> {
-                        GraphRuntime currentRuntime = runtime;
-                        if (!closed.get() && currentRuntime != null && due.generation() == runtimeGeneration.get()) {
-                            currentRuntime.resumeTimer(due);
+                        if (!closed.get() && scheduledRuntime != null && due.generation() == runtimeGeneration.get()) {
+                            scheduledRuntime.resumeTimer(due);
                         }
                     });
                 });
@@ -120,19 +125,25 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     }
 
     public RuntimeResult startManualTest(UUID playerId) {
-        GraphRuntime currentRuntime = runtime;
-        if (validator.hasErrors(validationIssues) || currentRuntime == null) {
+        SimulationRunner currentRunner = simulationRunner;
+        GraphDocument graph = committedGraph;
+        if (validator.hasErrors(validationIssues) || currentRunner == null || graph == null) {
             String message = validationIssues.isEmpty()
                     ? "Graph runtime 未就绪。"
                     : "Committed graph validation failed: " + validationIssues.getFirst().message();
             return new RuntimeResult(false, "", message);
         }
-        return currentRuntime.start(new TriggerEvent(
+        SimulationExecutionResult result = currentRunner.run(SimulationExecutionRequest.manual(
+                graph.id(),
                 DemoGraphFactory.TRIGGER_TYPE,
                 "/pixellogic test start",
                 playerId,
-                MANUAL_SESSION_ID
+                "模拟玩家",
+                MANUAL_SESSION_ID,
+                runtimeGeneration.get()
         ));
+        lastSimulationResult = result;
+        return new RuntimeResult(result.success(), result.traceId(), result.message());
     }
 
     public void resetPlayer(UUID playerId) {
@@ -213,6 +224,10 @@ public final class PixelLogicSpikeService implements AutoCloseable {
         return timerScheduler.pendingTimers();
     }
 
+    public Optional<SimulationExecutionResult> lastSimulationResult() {
+        return Optional.ofNullable(lastSimulationResult);
+    }
+
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
@@ -230,12 +245,25 @@ public final class PixelLogicSpikeService implements AutoCloseable {
         if (validator.hasErrors(issues)) {
             validationIssues = issues;
             runtime = null;
+            simulationRunner = null;
             committedGraph = document;
             return;
         }
 
         CompiledGraph compiledGraph = new GraphCompiler().compile(graph);
         runtime = new GraphRuntime(compiledGraph, stateStore, traces, services, RuntimeLimits.spikeDefaults(), generation);
+        simulationRunner = new SimulationRunner(simulationServices -> {
+            GraphRuntime nextRuntime = new GraphRuntime(
+                    compiledGraph,
+                    stateStore,
+                    traces,
+                    simulationServices,
+                    RuntimeLimits.spikeDefaults(),
+                    generation
+            );
+            runtime = nextRuntime;
+            return nextRuntime;
+        }, services, SimulationExecutionRegistry.playerTags());
         validationIssues = issues;
         committedGraph = document;
     }

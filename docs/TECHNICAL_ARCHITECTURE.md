@@ -111,6 +111,16 @@ Maintainability requirements for that slice:
 - `web-ui/src/ui/app.ts` must not absorb simulation UI business logic.
 - New backend or frontend files over about 500 lines require split review; files over about 800 lines should be split unless clearly justified.
 
+The Simulation Backend skeleton checkpoint adds the first code slice:
+
+- `core/simulation` owns minimal actor/world/event/context/result/runner/executor types.
+- `SimulationRunner` routes manual/WebUI test runs through a simulated context while still calling `GraphRuntime`.
+- `RuntimeServices` provides a small optional simulation-node hook and result collectors; existing services keep no-op defaults.
+- Player tag condition/action are the first simulation-backed catalog expansion.
+- `SimulationExecutionRegistry` owns player tag simulated behavior so `SimulationRunner` does not become a giant service.
+
+Still out of scope: draft simulation, named scenarios, fast-forward timers, real Minecraft adapter, full inventory/world/container simulation, and new simulation UI.
+
 ## WebUI Rule
 
 Java / Fabric owns mod initialization, runtime, API, permission, storage, validation, audit/debug, and static resource serving.

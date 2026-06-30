@@ -1,6 +1,26 @@
 # PixelLogic Simulation Backend Boundary and Maintainability
 
-This is a docs-only design specification. It does not authorize Java, WebUI, API, GraphRuntime, Minecraft adapter, tag, release, or merge work by itself.
+This was originally a docs-only design specification. By itself it does not authorize Java, WebUI, API, GraphRuntime, Minecraft adapter, git tag, release, or merge work.
+
+## Implementation Checkpoint: Skeleton MVP
+
+`feature/v1-simulation-backend-skeleton` implements the first code-level slice of this boundary:
+
+- `core/simulation` now contains minimal context, event, runner, result, and executor registry classes.
+- `SimulationRunner` prepares one simulated actor/world/event context, calls the real `GraphRuntime`, and returns a bounded `SimulationExecutionResult`.
+- Existing manual/WebUI test-run paths still use the committed graph and are routed through `SimulationRunner`.
+- `condition.player.has_tag` and `action.player.add_tag` are the first simulation-backed non-demo catalog blocks.
+- Player tag behavior lives in `SimulationExecutionRegistry`; `GraphRuntime` remains the traversal core and fails closed if those nodes run without a simulation executor.
+- Timer behavior stays on the existing wall-clock scheduler. Fast-forward remains a boundary only.
+
+Still not implemented:
+
+- draft simulation.
+- named scenarios or persisted simulation state.
+- Minecraft adapter.
+- inventory/world/container simulation.
+- timer fast-forward.
+- public simulation UI panel.
 
 ## Goals
 

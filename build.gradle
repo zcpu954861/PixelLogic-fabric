@@ -64,6 +64,12 @@ tasks.register('blockCatalogSelfCheck', JavaExec) {
 	classpath = sourceSets.main.runtimeClasspath
 }
 
+tasks.register('simulationBackendSelfCheck', JavaExec) {
+	dependsOn classes
+	mainClass = 'com.pixelmc.pixellogic.core.simulation.SimulationBackendSelfCheck'
+	classpath = sourceSets.main.runtimeClasspath
+}
+
 tasks.register('apiWebUiDevServer', JavaExec) {
 	dependsOn classes
 	mainClass = 'com.pixelmc.pixellogic.server.api.ApiWebUiDevServer'
@@ -74,6 +80,7 @@ check.dependsOn tasks.named('manualSimulationSelfCheck')
 check.dependsOn tasks.named('apiWebUiSelfCheck')
 check.dependsOn tasks.named('graphStorageSelfCheck')
 check.dependsOn tasks.named('blockCatalogSelfCheck')
+check.dependsOn tasks.named('simulationBackendSelfCheck')
 
 java {
 	withSourcesJar()

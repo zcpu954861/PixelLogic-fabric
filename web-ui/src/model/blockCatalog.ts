@@ -121,14 +121,16 @@ export const fallbackCatalog: BlockCatalog = {
   categories: [
     category('trigger', '触发事件', '从玩家操作或测试入口开始一条逻辑流。', 10),
     category('condition', '条件判断', '按状态或上下文决定走哪条分支。', 20),
-    category('message', '消息显示', '向玩家或调试视图展示文本反馈。', 30),
-    category('state', '状态数据', '读取或修改流程运行时状态。', 40),
-    category('timer', '时间调度', '等待一段时间后继续流程。', 50),
-    category('debug', '调试诊断', '记录测试和排查信息。', 60),
+    category('player', '玩家操作', '判断或修改当前玩家的模拟属性。', 30),
+    category('message', '消息显示', '向玩家或调试视图展示文本反馈。', 40),
+    category('state', '状态数据', '读取或修改流程运行时状态。', 50),
+    category('timer', '时间调度', '等待一段时间后继续流程。', 60),
+    category('debug', '调试诊断', '记录测试和排查信息。', 70),
   ],
   subcategories: [
     subcategory('trigger.manual', 'trigger', '手动测试', '用于 WebUI 和本地验证的测试入口。', 10),
     subcategory('condition.state', 'condition', '状态条件', '基于玩家、全局或会话状态做判断。', 10),
+    subcategory('player.tag', 'player', '玩家标签', '判断或写入当前模拟玩家的标签。', 10),
     subcategory('message.player', 'message', '玩家消息', '面向玩家的文本反馈。', 10),
     subcategory('state.write', 'state', '写入状态', '设置或累加状态值。', 10),
     subcategory('timer.basic', 'timer', '基础等待', '等待后继续执行。', 10),
@@ -149,6 +151,12 @@ export const fallbackCatalog: BlockCatalog = {
       readonlyField('target', '接收者', 'CURRENT_PLAYER', '当前发送给触发这条流程的玩家或 WebUI 模拟玩家。'),
       field('message', '消息内容', 'rich_text_component', [], 'fullWidth textareaRows:4'),
     ], '向「{target}」发送「{message.plainText}」。', 'action.message.chat', 'APPROXIMATE_SIMULATION', ['PLAYER_MUTATING', 'REQUIRES_PLAYER']),
+    block('condition.player.has_tag', '玩家拥有标签', '当当前模拟玩家拥有指定标签时走通过分支。', 'player', 'player.tag', 'condition', 'PLAYER_HAS_TAG_CONDITION', { tag: 'runner' }, [input('input')], [out('pass'), out('fail')], [
+      field('tag', '标签', 'string'),
+    ], '当当前玩家拥有标签「{tag}」时走通过分支。', 'condition.player.has_tag', 'FULLY_SIMULATABLE', ['READ_ONLY', 'REQUIRES_PLAYER']),
+    block('action.player.add_tag', '添加玩家标签', '给当前模拟玩家添加一个标签。', 'player', 'player.tag', 'action', 'PLAYER_ADD_TAG_ACTION', { tag: 'runner' }, [input('input')], [out('done')], [
+      field('tag', '标签', 'string'),
+    ], '给当前玩家添加标签「{tag}」。', 'action.player.add_tag', 'FULLY_SIMULATABLE', ['PLAYER_MUTATING', 'REQUIRES_PLAYER']),
     block('state.set', '设置状态', '把一个状态写成指定值。', 'state', 'state.write', 'state', 'STATE_SET_ACTION', { scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', value: 'true' }, [input('input')], [out('done')], [
       field('scope', '作用对象', 'scope', [option('PLAYER', '玩家'), option('GLOBAL', '全局'), option('SESSION', '当前会话')]),
       field('key', '状态名', 'string'),

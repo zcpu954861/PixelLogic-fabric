@@ -173,6 +173,13 @@ export type ApiResponse = {
   traceId?: string;
   trace?: ApiTrace | null;
   traces?: ApiTrace[];
+  simulation?: {
+    success: boolean;
+    traceId: string;
+    message: string;
+    timerScheduled: boolean;
+    actorTags: string[];
+  };
   catalog?: BlockCatalog;
   api?: string;
   demoActor?: {

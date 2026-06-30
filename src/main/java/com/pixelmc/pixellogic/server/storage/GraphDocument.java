@@ -105,6 +105,8 @@ public record GraphDocument(
             case COMMAND_TRIGGER -> "命令触发";
             case STATE_COMPARE_CONDITION -> "是否未开始";
             case MESSAGE_ACTION -> "发送欢迎语";
+            case PLAYER_HAS_TAG_CONDITION -> "判断玩家标签";
+            case PLAYER_ADD_TAG_ACTION -> "添加玩家标签";
             case STATE_SET_ACTION -> "记录开始状态";
             case STATE_ADD_ACTION -> "累计开始次数";
             case TIMER_START_ACTION -> "等待倒计时";

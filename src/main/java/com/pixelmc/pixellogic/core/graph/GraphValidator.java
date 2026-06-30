@@ -89,6 +89,8 @@ public final class GraphValidator {
             validateCatalogBlock(node, issues);
             switch (node.type()) {
                 case STATE_COMPARE_CONDITION -> validateCondition(graph, node, issues);
+                case PLAYER_HAS_TAG_CONDITION -> validatePlayerTagCondition(graph, node, issues);
+                case PLAYER_ADD_TAG_ACTION -> validatePlayerTagConfig(node, issues);
                 case STATE_SET_ACTION -> validateStateAction(node, issues, true);
                 case STATE_ADD_ACTION -> validateStateAction(node, issues, false);
                 case TIMER_START_ACTION -> validateTimer(graph, node, issues);
@@ -186,6 +188,26 @@ public final class GraphValidator {
         }
         validateBooleanConfig(node, "expected", issues);
         validateBooleanConfig(node, "missing", issues);
+        validateConditionEdges(graph, node, issues);
+    }
+
+    private void validatePlayerTagCondition(GraphDefinition graph, NodeDefinition node, List<ValidationIssue> issues) {
+        validatePlayerTagConfig(node, issues);
+        validateConditionEdges(graph, node, issues);
+    }
+
+    private void validatePlayerTagConfig(NodeDefinition node, List<ValidationIssue> issues) {
+        String tag = node.config().getOrDefault("tag", "");
+        if (tag.isBlank()) {
+            error(issues, "player_tag_missing", "玩家标签不能为空：" + node.id());
+            return;
+        }
+        if (tag.chars().anyMatch(Character::isWhitespace)) {
+            error(issues, "player_tag_invalid", "玩家标签不能包含空白字符：" + node.id());
+        }
+    }
+
+    private void validateConditionEdges(GraphDefinition graph, NodeDefinition node, List<ValidationIssue> issues) {
         if (!hasIncoming(graph, node.id(), "input")) {
             error(issues, "condition_missing_input", "条件节点缺少输入连接：" + node.id());
         }

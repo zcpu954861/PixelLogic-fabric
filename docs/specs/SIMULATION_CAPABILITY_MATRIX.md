@@ -34,3 +34,12 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 3. Add simulated actor/player tags and permissions before inventory/world features.
 4. Add simple inventory only as item id/count facts.
 5. Defer destructive world mutation, raw command execution, full redstone, full NBT, physics, and chunk behavior.
+
+## Skeleton MVP Status
+
+`feature/v1-simulation-backend-skeleton` implements the first player tag slice:
+
+- `condition.player.has_tag`: fully simulatable against `SimulationActor.tags`.
+- `action.player.add_tag`: fully simulatable by mutating the per-run simulated actor and recording action/state results.
+- `remove tag` remains future work.
+- Real server tag read/write remains future Minecraft adapter work.

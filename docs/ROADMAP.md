@@ -16,11 +16,10 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Next
 
-1. Define and then implement the Simulation Backend skeleton without turning it into a Minecraft clone.
-2. Add a manual simulation event receiver and a small simulated actor/player/world context model.
-3. Move the current demo block behavior toward per-block simulation executors while preserving the current GraphRuntime path.
-4. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
-5. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+1. Audit the Simulation Backend skeleton branch and keep it small before adding more Minecraft-facing blocks.
+2. Move more current demo block behavior toward per-block simulation executors only when it reduces real duplication.
+3. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
+4. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
 
 ## Completed Checkpoints
 
@@ -43,12 +42,13 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - Block Catalog skeleton branch adds the Java built-in catalog registry, `blockId` compatibility, readonly catalog API, catalog-driven WebUI library, and `blockCatalogSelfCheck` for the current seven demo blocks.
 - Catalog form schema + rich text field branch adopts `formSchema` as the editor main path for the current seven demo blocks, adds catalog summaries, upgrades message text to a structured rich text component MVP, and restores modal-local draft + manual save semantics for configuration edits.
 - Simulation Backend boundary docs define the next backend direction: simulated actor/world/inventory/container/event abstractions, a logical receiver runner, per-block simulation executors, capability matrix, and maintenance rules against mega files.
+- Simulation Backend skeleton branch adds minimal `core/simulation` context/event/runner/result/executor code, routes manual/WebUI test-run through `SimulationRunner`, and registers the first simulation-backed player tag condition/action blocks.
 
 ## Follow-Ups
 
 P2 before broader runtime use:
 
-- The current simulation runtime is still a demo GraphRuntime path. Add a Simulation Backend skeleton before expanding many block families.
+- The current simulation runtime now has a small `SimulationRunner` wrapper, but most demo behavior still lives in `GraphRuntime`; move behavior out gradually only when the executor split is useful.
 - Pending timers now have a spike-level max pending count plus reset/commit/stop cleanup. Broader runtime still needs a real capacity/backpressure policy.
 - In-memory state now has a spike-level cap and reset/stop cleanup. Broader runtime still needs durable lifecycle and persistence policy before non-spike use.
 - Draft saves return fingerprints but do not yet enforce `expectedFingerprint`; add optimistic conflict handling before multi-user or multi-tab editing.

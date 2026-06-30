@@ -53,6 +53,19 @@
 - Future implementation should add a small logical receiver runner and per-block simulation executors before adding many new blocks.
 - Maintainability gates forbid new mega files, giant services, endless block-id switches, and new simulation business logic inside `web-ui/src/ui/app.ts`.
 
+## Implementation Checkpoint: Simulation Backend Skeleton MVP
+
+`feature/v1-simulation-backend-skeleton` adds the first minimal simulation backend code slice:
+
+- `SimulationRunner` wraps one committed graph run through the real `GraphRuntime`.
+- `SimulationActor` supports id, display name, online/operator flags, and tags.
+- `SimulationWorld` only records a dimension id.
+- `SimulationExecutionResult` reports trace id, action results, message results, state changes, actor tags, timer scheduling, and errors.
+- `condition.player.has_tag` and `action.player.add_tag` are now registered catalog blocks.
+- These player tag blocks include form schema, summaries, capability flags, safety flags, validation, simulation behavior, trace output, and self-check coverage.
+
+This checkpoint still does not add a real Minecraft adapter, draft simulation, named scenarios, inventory/world/container simulation, or a new WebUI simulation panel.
+
 ## Product Principles
 
 - 分类不是积木。

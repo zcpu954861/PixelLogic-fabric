@@ -25,6 +25,8 @@ public final class BlockCatalogSelfCheck {
                 BuiltInBlockCatalog.TRIGGER_MANUAL_TEST,
                 BuiltInBlockCatalog.CONDITION_STATE_EQUALS,
                 BuiltInBlockCatalog.ACTION_MESSAGE_CHAT,
+                BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG,
+                BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG,
                 BuiltInBlockCatalog.STATE_SET,
                 BuiltInBlockCatalog.STATE_ADD,
                 BuiltInBlockCatalog.TIMER_WAIT,
@@ -33,7 +35,7 @@ public final class BlockCatalogSelfCheck {
         Set<String> actual = new HashSet<>();
         catalog.blocks().forEach(block -> actual.add(block.id()));
 
-        require(actual.equals(expected), "catalog should contain only the current demo concrete block ids");
+        require(actual.equals(expected), "catalog should contain the demo and player tag concrete block ids");
         catalog.blocks().forEach(block -> {
             require(catalog.categories().stream().anyMatch(category -> category.id().equals(block.categoryId())),
                     "block category should exist: " + block.id());
@@ -72,6 +74,16 @@ public final class BlockCatalogSelfCheck {
         require(hasIssue(withFirstNodeBlockId(demo, "unknown.block"), "unknown_block_id"), "unknown blockId should fail validation");
         require(hasIssue(withFirstNodeBlockId(demo, BuiltInBlockCatalog.STATE_SET), "block_type_mismatch"),
                 "blockId/node.type mismatch should fail validation");
+
+        BlockDefinition hasTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG).orElseThrow();
+        BlockDefinition addTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG).orElseThrow();
+        require(hasTag.formSchema().stream().anyMatch(field -> field.key().equals("tag") && field.type().equals("string")),
+                "player tag condition should expose tag field");
+        require(addTag.formSchema().stream().anyMatch(field -> field.key().equals("tag") && field.type().equals("string")),
+                "player tag action should expose tag field");
+        require(hasTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE
+                        && addTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE,
+                "player tag blocks should be fully simulatable");
     }
 
     private static GraphDocument legacyWithoutBlockId(GraphDocument document) {

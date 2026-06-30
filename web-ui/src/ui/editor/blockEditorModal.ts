@@ -43,6 +43,15 @@ export function renderEditorModal(nodeItem: GraphNode, catalog: BlockCatalog, op
             </div>
           </section>
         </div>
+        <div class="unsaved-confirm" data-mode-switch-confirm hidden>
+          <section role="alertdialog" aria-modal="true" aria-labelledby="mode-switch-confirm-title">
+            <b id="mode-switch-confirm-title">切换后，部分分支连接会被断开。确定继续吗？</b>
+            <div>
+              <button type="button" class="ghost-button" data-modal-action="continue-mode-edit">继续编辑</button>
+              <button type="button" class="ghost-button danger" data-modal-action="switch-disconnect">切换并断开</button>
+            </div>
+          </section>
+        </div>
       </section>
     </div>
   `;

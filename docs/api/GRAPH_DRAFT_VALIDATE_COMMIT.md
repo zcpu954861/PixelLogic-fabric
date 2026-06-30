@@ -93,6 +93,14 @@ Known message config compatibility:
 - Old graph documents with a plain string `config.message` remain valid and are treated as `plainText`.
 - The normal WebUI does not expose raw JSON editing for this field.
 
+Known condition config compatibility:
+
+- New condition nodes store `config.outputMode` as one of `PASS_ONLY`, `FAIL_ONLY`, or `BRANCH`.
+- Old graph documents without `outputMode` remain valid and run as `BRANCH`.
+- Unconnected condition outputs are valid and mean that path ends.
+- Unconnected condition inputs are valid during editing; the block is saved but unreachable until connected into a trigger path.
+- The normal WebUI renders this as `条件用途`: `满足时继续`, `不满足时继续`, or `分成两路`.
+
 ## Endpoints
 
 ```text
@@ -135,6 +143,8 @@ Error shape:
 - Commit loads the draft, validates it, writes committed JSON, and swaps the runtime compiled graph only after validation passes.
 - If validation fails, committed graph and current runtime remain unchanged.
 - Test run uses the committed graph, even when a draft exists.
+- Condition runtime follows `outputMode`: `PASS_ONLY` only follows `pass` when true, `FAIL_ONLY` only follows `fail` when false, and `BRANCH` selects `pass` or `fail`.
+- If the selected condition output has no edge, runtime records that no next block is connected and ends successfully.
 
 ## WebUI Semantics
 
@@ -159,6 +169,7 @@ The slot flow drag/insert checkpoint keeps the same API contract. The WebUI may 
 - `nodes` when adding or deleting a block;
 - `edges` when inserting a block into an existing slot connection or disconnecting an input.
 - node `blockId` when creating catalog-backed concrete blocks.
+- condition node `config.outputMode`, and when confirmed by the user, removal of edges on outputs that become inactive.
 
 These edits are still submitted as the same graph draft JSON. `保存` continues to run draft save, validation, and commit. Invalid drag/edit outcomes do not replace the committed runtime graph.
 

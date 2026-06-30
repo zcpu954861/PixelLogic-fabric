@@ -78,6 +78,11 @@ Important user semantics:
 - `action.message.chat` uses a `rich_text_component` field: multiline plain text editing, structured storage, and a simple preview. The normal UI does not expose raw JSON.
 - Rich text typing updates only the modal-local draft and preview; one click on `保存` creates one graph edit/history entry.
 - Short configuration fields use compact two-column layout where space allows; long text fields remain full-width.
+- Condition blocks expose `条件用途` in the same catalog form path:
+  - `满足时继续` renders a normal-height single green output condition card.
+  - `不满足时继续` renders a normal-height single red output condition card.
+  - `分成两路` keeps the current dual-branch condition shape.
+- Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
 
 Safety bounds:
 
@@ -94,7 +99,8 @@ The slot-based canvas now supports a minimal direct-manipulation graph editing l
 - Concrete block entries from the catalog add a new block to the visible canvas and select it.
 - Single click selects the block; pointer movement past the drag threshold starts drag; double click opens the existing editor modal.
 - Dragging a block moves that block and all downstream nodes reachable from outgoing typed edges.
-- Dragging a Condition moves both pass and fail downstream branches.
+- Dragging a dual-branch Condition moves both pass and fail downstream branches; single-output conditions behave like normal chain blocks.
+- Inactive condition outputs are hidden and ignored by visual connection, chain dragging, append, attach, and insert candidate detection.
 - Dragging follows only edges whose puzzle mouths are still visually snapped together; visually separated stale edges are ignored.
 - Magnetic snap has a wider hit area, but connected-state detection uses a tight snapped-position tolerance so near-misses are not treated as one chain.
 - During an active drag, candidate detection uses preview positions so a just-separated old port can be reconnected before pointer release.
@@ -105,6 +111,7 @@ The slot-based canvas now supports a minimal direct-manipulation graph editing l
 - Releasing on blank canvas stores new position metadata and drops edges that are no longer visually snapped.
 - Automatic save and test-run also sync graph edges to the current visual snapped state before persisting.
 - Releasing near a valid join magnetically snaps the dragged chain into place, rewrites the edge as an inserted chain, and keeps validation fail-closed through the existing save flow.
+- A Condition block with no connected input can still be saved like other placed blocks; it is simply unreachable until connected to a trigger path.
 - While hovering near a valid middle join, the two connected components produced by temporarily cutting that join animate apart, leaving a green glow-only insertion gap.
 - Releasing near a chain-end output magnetically appends the dragged chain to that output.
 - Releasing a dragged chain tail near a free input magnetically connects the dragged chain before that block or chain.

@@ -66,7 +66,7 @@ Key checks covered:
 - Free/chain drag updates positions.
 - Inserted message blocks execute in trace.
 - Condition drag moves pass and fail branches.
-- Invalid isolated Condition save fails closed.
+- Isolated Condition blocks can be saved like other placed blocks; they only run after being connected into a trigger path.
 - Delete recovers to valid graph.
 - Disconnect input is undoable and then enters the automatic save/validation queue.
 

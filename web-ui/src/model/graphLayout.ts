@@ -1,5 +1,6 @@
 import { fallbackGraph } from './demoGraph';
 import type { BlockKind, BlockMetrics, Branch, GraphDocument, GraphEdge, GraphNode, GraphPosition, GraphSlot, LaneSpan } from './graphTypes';
+import { activeOutputSlots, conditionOutputMode, isActiveOutputSlot } from './conditionOutputMode';
 import { blockKind } from '../ui/humanize/labels';
 import { connectedOverlap, conditionBlockWidth, conditionBranchGap, normalBlockHeight, normalBlockWidth, visualConnectXTolerance, visualConnectYTolerance } from '../ui/canvas/blockConstants';
 export function blockSize(kind: BlockKind): { width: number; height: number } {
@@ -13,13 +14,14 @@ export function blockMetrics(graph: GraphDocument, nodeItem: GraphNode, cache = 
   }
 
   const kind = blockKind(nodeItem.type);
-  if (kind !== 'condition') {
+  if (kind !== 'condition' || conditionOutputMode(nodeItem) !== 'BRANCH') {
     const hasInput = nodeItem.slots.some((slot) => slot.direction === 'INPUT');
+    const outputs = kind === 'condition' ? activeOutputSlots(nodeItem) : nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT');
     const metrics = {
       width: normalBlockWidth,
       height: normalBlockHeight,
       inputY: hasInput ? normalBlockHeight / 2 : null,
-      outputOffsets: Object.fromEntries(nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT').map((slot) => [slot.id, normalBlockHeight / 2])),
+      outputOffsets: Object.fromEntries(outputs.map((slot) => [slot.id, normalBlockHeight / 2])),
     };
     cache.set(nodeItem.id, metrics);
     return metrics;
@@ -59,7 +61,7 @@ export function branchLaneSpan(
   cache: Map<string, BlockMetrics>,
   visiting: Set<string>,
 ): LaneSpan {
-  const edgeItem = graph.edges.find((graphEdge) => graphEdge.sourceNodeId === sourceNodeId && graphEdge.sourceSlotId === sourceSlotId);
+  const edgeItem = activeGraphEdges(graph).find((graphEdge) => graphEdge.sourceNodeId === sourceNodeId && graphEdge.sourceSlotId === sourceSlotId);
   if (!edgeItem) {
     return { above: normalBlockHeight / 2, below: normalBlockHeight / 2 };
   }
@@ -154,7 +156,7 @@ export function normalizeConditionBranchLayout(graph: GraphDocument): GraphDocum
   const nodeById = new Map(nextGraph.nodes.map((nodeItem) => [nodeItem.id, nodeItem]));
   const outgoing = new Map<string, GraphEdge[]>();
   const incoming = new Set<string>();
-  nextGraph.edges.forEach((graphEdge) => {
+  activeGraphEdges(nextGraph).forEach((graphEdge) => {
     outgoing.set(graphEdge.sourceNodeId, [...(outgoing.get(graphEdge.sourceNodeId) ?? []), graphEdge]);
     incoming.add(graphEdge.targetNodeId);
   });
@@ -202,7 +204,14 @@ export function normalizeConditionBranchLayout(graph: GraphDocument): GraphDocum
 }
 
 export function connectedGraphEdges(graph: GraphDocument): GraphEdge[] {
-  return graph.edges.filter((graphEdge) => isVisuallyConnectedEdge(graph, graphEdge));
+  return activeGraphEdges(graph).filter((graphEdge) => isVisuallyConnectedEdge(graph, graphEdge));
+}
+
+export function activeGraphEdges(graph: GraphDocument): GraphEdge[] {
+  return graph.edges.filter((graphEdge) => {
+    const source = graph.nodes.find((nodeItem) => nodeItem.id === graphEdge.sourceNodeId);
+    return source ? isActiveOutputSlot(source, graphEdge.sourceSlotId) : false;
+  });
 }
 
 export function isVisuallyConnectedEdge(graph: GraphDocument, graphEdge: GraphEdge): boolean {
@@ -238,7 +247,7 @@ export function outputCenterOffset(graph: GraphDocument, sourceNode: GraphNode, 
 }
 
 export function preferredMainOutput(nodeItem: GraphNode): GraphSlot | null {
-  const outputs = nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT');
+  const outputs = activeOutputSlots(nodeItem);
   for (const slotId of ['done', 'timer_completed', 'started']) {
     const slot = outputs.find((item) => item.id === slotId);
     if (slot) {

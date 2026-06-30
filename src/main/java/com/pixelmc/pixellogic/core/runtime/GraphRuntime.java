@@ -2,6 +2,7 @@ package com.pixelmc.pixellogic.core.runtime;
 
 import com.pixelmc.pixellogic.core.graph.CompiledGraph;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
+import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.StateScope;
 import com.pixelmc.pixellogic.core.model.StateValueType;
@@ -118,6 +119,7 @@ public final class GraphRuntime {
                 return new RuntimeResult(false, context.traceId(), message);
             }
             if (next.isEmpty()) {
+                traces.add(context.traceId(), current.id(), "未连接后续积木，流程在此结束。");
                 return new RuntimeResult(true, context.traceId(), "执行完成。");
             }
             current = next.get();
@@ -126,6 +128,18 @@ public final class GraphRuntime {
     }
 
     private String executeNode(NodeDefinition node, ExecutionContext context) {
+        Optional<RuntimeServices.NodeExecution> simulated = services.executeSimulationNode(
+                node,
+                context.playerId(),
+                context.sessionId()
+        );
+        if (simulated.isPresent()) {
+            RuntimeServices.NodeExecution result = simulated.get();
+            if (result.traceMessage() != null && !result.traceMessage().isBlank()) {
+                traces.add(context.traceId(), node.id(), result.traceMessage());
+            }
+            return result.outputSlot();
+        }
         return switch (node.type()) {
             case MANUAL_TRIGGER, COMMAND_TRIGGER -> "started";
             case STATE_COMPARE_CONDITION -> executeCondition(node, context);
@@ -134,6 +148,8 @@ public final class GraphRuntime {
             case STATE_ADD_ACTION -> executeStateAdd(node, context);
             case TIMER_START_ACTION -> executeTimer(node, context);
             case DEBUG_LOG_ACTION -> executeDebug(node, context);
+            case PLAYER_HAS_TAG_CONDITION, PLAYER_ADD_TAG_ACTION ->
+                    throw new IllegalStateException("缺少模拟执行器：" + node.type());
         };
     }
 
@@ -148,13 +164,17 @@ public final class GraphRuntime {
         boolean actual = stored.map(value -> value.asBoolean(missingValue)).orElse(missingValue);
         boolean passed = actual == expected;
         traces.add(context.traceId(), node.id(), "条件" + (passed ? "通过" : "失败") + "：" + displayStateKey(key) + " == " + expected);
-        return passed ? "pass" : "fail";
+        ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
+        traces.add(context.traceId(), node.id(), mode.traceMessage(passed));
+        return mode.outputSlot(passed);
     }
 
     private String executeMessage(NodeDefinition node, ExecutionContext context) {
         String message = RichTextComponentValue.plainText(node.config().getOrDefault("message", ""));
         services.sendPlayerMessage(context.playerId(), message);
         traces.add(context.traceId(), node.id(), "发送消息：" + message);
+        services.recordMessageResult(node.id(), context.playerId(), message);
+        services.recordActionResult(node.id(), "message", "发送消息：" + message);
         return "done";
     }
 
@@ -167,6 +187,8 @@ public final class GraphRuntime {
         }
         stateStore.set(key, value);
         traces.add(context.traceId(), node.id(), "状态写入：" + displayStateKey(key) + " = " + value.displayValue());
+        services.recordStateChange(node.id(), key, value.displayValue());
+        services.recordActionResult(node.id(), "state", "状态写入：" + displayStateKey(key) + " = " + value.displayValue());
         return "done";
     }
 
@@ -175,6 +197,8 @@ public final class GraphRuntime {
         int amount = Integer.parseInt(node.config().getOrDefault("amount", "0"));
         StateValue value = stateStore.addInteger(key, amount);
         traces.add(context.traceId(), node.id(), "状态累加：" + displayStateKey(key) + " = " + value.displayValue());
+        services.recordStateChange(node.id(), key, value.displayValue());
+        services.recordActionResult(node.id(), "state", "状态累加：" + displayStateKey(key) + " = " + value.displayValue());
         return "done";
     }
 
@@ -194,6 +218,8 @@ public final class GraphRuntime {
                 generation
         );
         traces.add(context.traceId(), node.id(), "计时器启动：" + seconds + " 秒");
+        services.recordActionResult(node.id(), "timer", "计时器启动：" + seconds + " 秒");
+        services.recordTimerScheduled(node.id(), Duration.ofSeconds(seconds), continuation);
         services.scheduleTimer(Duration.ofSeconds(seconds), continuation);
         return null;
     }
@@ -202,6 +228,7 @@ public final class GraphRuntime {
         String message = node.config().getOrDefault("message", "");
         services.debug(message);
         traces.add(context.traceId(), node.id(), "调试记录：" + message);
+        services.recordActionResult(node.id(), "debug", "调试记录：" + message);
         return "done";
     }
 

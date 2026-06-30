@@ -3,6 +3,7 @@ package com.pixelmc.pixellogic.core.graph;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.EdgeType;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
+import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.model.SlotDefinition;
@@ -25,6 +26,7 @@ public final class DemoGraphFactory {
                 List.of(
                         node("manual-trigger", NodeType.MANUAL_TRIGGER, out("started"), Map.of()),
                         node("condition-started", NodeType.STATE_COMPARE_CONDITION, in("input"), out("pass"), out("fail"), Map.of(
+                                "outputMode", ConditionOutputMode.BRANCH.name(),
                                 "scope", "PLAYER",
                                 "key", "started",
                                 "valueType", "BOOLEAN",

@@ -107,6 +107,7 @@ public final class PixelLogicApiServer implements AutoCloseable {
                         "message", result.message(),
                         "traceId", result.traceId(),
                         "trace", trace.map(PixelLogicApiServer::traceView).orElse(null),
+                        "simulation", service.lastSimulationResult().orElse(null),
                         "demoActor", demoActor()
                 );
                 if (!result.success()) {

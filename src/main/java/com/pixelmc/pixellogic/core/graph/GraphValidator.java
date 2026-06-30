@@ -6,6 +6,7 @@ import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
+import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.model.SlotDefinition;
@@ -88,7 +89,9 @@ public final class GraphValidator {
         for (NodeDefinition node : graph.nodes()) {
             validateCatalogBlock(node, issues);
             switch (node.type()) {
-                case STATE_COMPARE_CONDITION -> validateCondition(graph, node, issues);
+                case STATE_COMPARE_CONDITION -> validateCondition(node, issues);
+                case PLAYER_HAS_TAG_CONDITION -> validatePlayerTagCondition(node, issues);
+                case PLAYER_ADD_TAG_ACTION -> validatePlayerTagConfig(node, issues);
                 case STATE_SET_ACTION -> validateStateAction(node, issues, true);
                 case STATE_ADD_ACTION -> validateStateAction(node, issues, false);
                 case TIMER_START_ACTION -> validateTimer(graph, node, issues);
@@ -179,21 +182,35 @@ public final class GraphValidator {
         }
     }
 
-    private void validateCondition(GraphDefinition graph, NodeDefinition node, List<ValidationIssue> issues) {
+    private void validateCondition(NodeDefinition node, List<ValidationIssue> issues) {
         validateStateConfig(node, issues);
         if (!"BOOLEAN".equals(node.config().get("valueType"))) {
             error(issues, "condition_state_type_invalid", "State Compare Condition 当前只支持 BOOLEAN：" + node.id());
         }
         validateBooleanConfig(node, "expected", issues);
         validateBooleanConfig(node, "missing", issues);
-        if (!hasIncoming(graph, node.id(), "input")) {
-            error(issues, "condition_missing_input", "条件节点缺少输入连接：" + node.id());
+        validateConditionOutputMode(node, issues);
+    }
+
+    private void validatePlayerTagCondition(NodeDefinition node, List<ValidationIssue> issues) {
+        validatePlayerTagConfig(node, issues);
+        validateConditionOutputMode(node, issues);
+    }
+
+    private void validatePlayerTagConfig(NodeDefinition node, List<ValidationIssue> issues) {
+        String tag = node.config().getOrDefault("tag", "");
+        if (tag.isBlank()) {
+            error(issues, "player_tag_missing", "玩家标签不能为空：" + node.id());
+            return;
         }
-        if (!hasOutgoing(graph, node.id(), "pass")) {
-            error(issues, "condition_missing_pass", "条件节点缺少通过分支：" + node.id());
+        if (tag.chars().anyMatch(Character::isWhitespace)) {
+            error(issues, "player_tag_invalid", "玩家标签不能包含空白字符：" + node.id());
         }
-        if (!hasOutgoing(graph, node.id(), "fail")) {
-            error(issues, "condition_missing_fail", "条件节点缺少失败分支：" + node.id());
+    }
+
+    private void validateConditionOutputMode(NodeDefinition node, List<ValidationIssue> issues) {
+        if (!ConditionOutputMode.isValid(node.config().get(ConditionOutputMode.CONFIG_KEY))) {
+            error(issues, "condition_output_mode_invalid", "条件用途无效：" + node.id());
         }
     }
 
@@ -264,10 +281,6 @@ public final class GraphValidator {
         if (!hasOutgoing(graph, node.id(), "timer_completed")) {
             error(issues, "timer_missing_completed", "计时器缺少完成后的连接：" + node.id());
         }
-    }
-
-    private boolean hasIncoming(GraphDefinition graph, String nodeId, String slotId) {
-        return graph.edges().stream().anyMatch(edge -> edge.targetNodeId().equals(nodeId) && edge.targetSlotId().equals(slotId));
     }
 
     private boolean hasOutgoing(GraphDefinition graph, String nodeId, String slotId) {

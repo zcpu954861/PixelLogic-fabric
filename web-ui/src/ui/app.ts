@@ -26,7 +26,9 @@ import {
   nodePosition,
   outputCenterOffset,
   preferredMainOutput,
-} from '../model/graphLayout';import { escapeAttr, escapeHtml, formatTime, shortFingerprint, shortTraceId } from '../utils/dom';
+} from '../model/graphLayout';
+import { activeConditionOutputSlots, conditionOutputMode, conditionOutputModeKey } from '../model/conditionOutputMode';
+import { escapeAttr, escapeHtml, formatTime, shortFingerprint, shortTraceId } from '../utils/dom';
 import type {
   ApiResponse,
   ApiStatus,
@@ -95,6 +97,7 @@ let autoSaveInFlight = false;
 let autoSaveAgain = false;
 let autoSavePromise: Promise<void> | null = null;
 let saveSequence = 0;
+let confirmedModeSwitchSignature: string | null = null;
 const undoStack: GraphHistoryEntry[] = [];
 const redoStack: GraphHistoryEntry[] = [];
 
@@ -537,6 +540,12 @@ function bindInteractions(): void {
   document.querySelector('[data-modal-action="save"]')?.addEventListener('click', () => void saveEditorDraft());
   document.querySelector('[data-modal-action="continue-edit"]')?.addEventListener('click', hideUnsavedConfirm);
   document.querySelector('[data-modal-action="discard"]')?.addEventListener('click', discardEditorDraft);
+  document.querySelector('[data-modal-action="continue-mode-edit"]')?.addEventListener('click', hideModeSwitchConfirm);
+  document.querySelector('[data-modal-action="switch-disconnect"]')?.addEventListener('click', () => {
+    confirmedModeSwitchSignature = conditionModeRemovalSignature();
+    hideModeSwitchConfirm();
+    void saveEditorDraft();
+  });
   document.querySelectorAll<HTMLButtonElement>('[data-catalog-category]').forEach((buttonEl) => {
     buttonEl.addEventListener('click', () => {
       if (buttonEl.dataset.catalogCategory) {
@@ -986,7 +995,8 @@ function addCatalogBlock(blockId: string): void {
   }
   const graph = cloneGraph(currentGraph());
   const kind = blockKindFromCatalogBlock(blockItem);
-  const nodeItem = createCatalogNode(blockItem, uniqueNodeId(catalogNodeIdPrefix(blockItem), graph), visibleDropPosition(kind));
+  const nodeItem = createCatalogNode(blockItem, uniqueNodeId(catalogNodeIdPrefix(blockItem), graph), { x: 0, y: 0 });
+  nodeItem.position = visibleDropPosition(kind, nodeItem);
   graph.nodes.push(nodeItem);
   applyGraphEdit(graph, `已新增“${blockItem.displayName}”，正在自动保存。`, {
     selectedNodeId: nodeItem.id,
@@ -1004,9 +1014,11 @@ function uniqueNodeId(prefix: string, graph: GraphDocument): string {
   return id;
 }
 
-function visibleDropPosition(kind: BlockKind): GraphPosition {
+function visibleDropPosition(kind: BlockKind, nodeItem?: GraphNode): GraphPosition {
   const viewport = document.querySelector<HTMLElement>('.canvas-viewport');
-  const size = blockSize(kind);
+  const size = nodeItem && kind === 'condition' && conditionOutputMode(nodeItem) !== 'BRANCH'
+    ? { width: normalBlockWidth, height: normalBlockHeight }
+    : blockSize(kind);
   if (!viewport) {
     return { x: 84, y: 88 };
   }
@@ -1072,6 +1084,8 @@ function requestCloseEditor(): void {
 
 function closeEditor(): void {
   hideUnsavedConfirm();
+  hideModeSwitchConfirm();
+  confirmedModeSwitchSignature = null;
   state.editorClosing = true;
   const overlayEl = document.querySelector<HTMLElement>('.editor-overlay');
   if (overlayEl) {
@@ -1095,6 +1109,16 @@ function showUnsavedConfirm(): void {
 
 function hideUnsavedConfirm(): void {
   document.querySelector<HTMLElement>('[data-unsaved-confirm]')?.setAttribute('hidden', '');
+}
+
+function showModeSwitchConfirm(): void {
+  const confirmEl = document.querySelector<HTMLElement>('[data-mode-switch-confirm]');
+  confirmEl?.removeAttribute('hidden');
+  document.querySelector<HTMLElement>('[data-modal-action="continue-mode-edit"]')?.focus();
+}
+
+function hideModeSwitchConfirm(): void {
+  document.querySelector<HTMLElement>('[data-mode-switch-confirm]')?.setAttribute('hidden', '');
 }
 
 function discardEditorDraft(): void {
@@ -1177,6 +1201,10 @@ function updateEditorDraftValue(key: string, value: string, target: 'config' | '
   }
   state.error = '';
   hideUnsavedConfirm();
+  if (key === conditionOutputModeKey) {
+    confirmedModeSwitchSignature = null;
+    hideModeSwitchConfirm();
+  }
   if (key === 'valueType') {
     renderApp();
     return;
@@ -1194,6 +1222,12 @@ async function saveEditorDraft(): Promise<void> {
   }
 
   const graph = currentGraph();
+  const removalSignature = conditionModeRemovalSignature();
+  if (removalSignature && removalSignature !== confirmedModeSwitchSignature) {
+    showModeSwitchConfirm();
+    return;
+  }
+
   const nextGraph = cloneGraph(graph);
   const nextNode = nextGraph.nodes.find((item) => item.id === state.editorOriginalNode?.id);
   if (!nextNode) {
@@ -1204,8 +1238,12 @@ async function saveEditorDraft(): Promise<void> {
 
   nextNode.displayName = state.editorDraftNode.displayName;
   nextNode.config = { ...state.editorDraftNode.config };
+  nextGraph.edges = nextGraph.edges.filter((graphEdge) =>
+    graphEdge.sourceNodeId !== nextNode.id || activeConditionOutputSlots(nextNode).includes(graphEdge.sourceSlotId),
+  );
   state.editorOriginalNode = cloneNode(state.editorDraftNode);
   state.editorSaving = true;
+  confirmedModeSwitchSignature = null;
   applyGraphEdit(nextGraph, '内容已修改，正在保存。', { selectedNodeId: nextNode.id });
   clearPendingAutoSaveTimer();
 
@@ -1576,6 +1614,23 @@ function cloneNode(nodeItem: GraphNode): GraphNode {
 function hasEditorDraftChanges(): boolean {
   return Boolean(state.editorDraftNode && state.editorOriginalNode)
     && JSON.stringify(state.editorDraftNode) !== JSON.stringify(state.editorOriginalNode);
+}
+
+function conditionModeRemovalSignature(): string | null {
+  const draftNode = state.editorDraftNode;
+  const originalNode = state.editorOriginalNode;
+  if (!draftNode || !originalNode || !draftNode.type.includes('CONDITION')) {
+    return null;
+  }
+  if (conditionOutputMode(draftNode) === conditionOutputMode(originalNode)) {
+    return null;
+  }
+  const activeSlots = new Set(activeConditionOutputSlots(draftNode));
+  const removedEdgeIds = currentGraph().edges
+    .filter((graphEdge) => graphEdge.sourceNodeId === originalNode.id && !activeSlots.has(graphEdge.sourceSlotId))
+    .map((graphEdge) => graphEdge.id)
+    .sort();
+  return removedEdgeIds.length > 0 ? `${originalNode.id}:${conditionOutputMode(originalNode)}:${conditionOutputMode(draftNode)}:${removedEdgeIds.join(',')}` : null;
 }
 
 function ensureSelectedNode(): void {

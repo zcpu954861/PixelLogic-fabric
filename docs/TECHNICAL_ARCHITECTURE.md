@@ -111,6 +111,25 @@ Maintainability requirements for that slice:
 - `web-ui/src/ui/app.ts` must not absorb simulation UI business logic.
 - New backend or frontend files over about 500 lines require split review; files over about 800 lines should be split unless clearly justified.
 
+The Simulation Backend skeleton checkpoint adds the first code slice:
+
+- `core/simulation` owns minimal actor/world/event/context/result/runner/executor types.
+- `SimulationRunner` routes manual/WebUI test runs through a simulated context while still calling `GraphRuntime`.
+- `RuntimeServices` provides a small optional simulation-node hook and result collectors; existing services keep no-op defaults.
+- Player tag condition/action are the first simulation-backed catalog expansion.
+- `SimulationExecutionRegistry` owns player tag simulated behavior so `SimulationRunner` does not become a giant service.
+
+Still out of scope: draft simulation, named scenarios, fast-forward timers, real Minecraft adapter, full inventory/world/container simulation, and new simulation UI.
+
+The condition output mode checkpoint keeps the same direct edge runtime and adds only a condition-local config:
+
+- `outputMode` supports `PASS_ONLY` / 满足时继续, `FAIL_ONLY` / 不满足时继续, and `BRANCH` / 分成两路.
+- Missing `outputMode` on old graphs defaults to `BRANCH`.
+- New condition catalog nodes default to `PASS_ONLY`; the seeded demo graph explicitly stays `BRANCH`.
+- Unconnected condition outputs mean that path ends gracefully and are not validation blockers.
+- Unconnected condition inputs are allowed during editing like other loose placed blocks; they are unreachable until connected to a trigger path.
+- `condition.player.has_tag` is categorized as `条件判断 / 玩家条件`; `action.player.add_tag` remains `玩家操作 / 标签`.
+
 ## WebUI Rule
 
 Java / Fabric owns mod initialization, runtime, API, permission, storage, validation, audit/debug, and static resource serving.

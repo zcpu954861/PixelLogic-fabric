@@ -1,9 +1,9 @@
-import type { GraphNode } from '../../model/graphTypes';
+import type { BlockCatalog, GraphNode } from '../../model/graphTypes';
 import { escapeHtml } from '../../utils/dom';
 import { nodeSummary, nodeTypeLabel } from '../humanize/labels';
 import { renderNodeEditor } from './formControls';
 
-export function renderEditorModal(nodeItem: GraphNode, options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string }): string {
+export function renderEditorModal(nodeItem: GraphNode, catalog: BlockCatalog, options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string }): string {
   const title = `${nodeTypeLabel(nodeItem.type)}：${nodeItem.displayName || nodeItem.id}`;
   const modalIssue = options.modalIssue;
 
@@ -20,9 +20,9 @@ export function renderEditorModal(nodeItem: GraphNode, options: { editorClosing:
         <div class="editor-body">
           <section class="editor-summary">
             <b>当前摘要</b>
-            <p data-modal-summary>${escapeHtml(nodeSummary(nodeItem))}</p>
+            <p data-modal-summary>${escapeHtml(nodeSummary(nodeItem, catalog))}</p>
           </section>
-          ${renderNodeEditor(nodeItem)}
+          ${renderNodeEditor(nodeItem, catalog)}
           ${options.error || options.hasValidation ? `
             <section class="editor-issues" role="${options.error ? 'alert' : 'status'}">
               <b>${options.error ? '自动保存提示' : '检查结果'}</b>

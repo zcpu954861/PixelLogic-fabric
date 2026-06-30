@@ -17,7 +17,9 @@ public record BlockDefinition(
         String nodeKind,
         NodeType nodeType,
         Map<String, String> defaultConfig,
-        List<BlockFormFieldDefinition> formFields,
+        List<BlockFormFieldDefinition> formSchema,
+        String summaryTemplate,
+        String summaryFormatter,
         List<SlotDefinition> inputSlots,
         List<SlotDefinition> outputSlots,
         BlockCapabilityLevel simulationCapability,
@@ -30,7 +32,9 @@ public record BlockDefinition(
     public BlockDefinition {
         tags = tags == null ? List.of() : List.copyOf(tags);
         defaultConfig = defaultConfig == null ? Map.of() : Map.copyOf(defaultConfig);
-        formFields = formFields == null ? List.of() : List.copyOf(formFields);
+        formSchema = formSchema == null ? List.of() : List.copyOf(formSchema);
+        summaryTemplate = summaryTemplate == null ? "" : summaryTemplate;
+        summaryFormatter = summaryFormatter == null ? "" : summaryFormatter;
         inputSlots = inputSlots == null ? List.of() : List.copyOf(inputSlots);
         outputSlots = outputSlots == null ? List.of() : List.copyOf(outputSlots);
         safetyFlags = safetyFlags == null ? List.of() : List.copyOf(safetyFlags);

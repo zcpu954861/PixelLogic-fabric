@@ -39,6 +39,8 @@ public final class BlockCatalogSelfCheck {
                     "block category should exist: " + block.id());
             require(!block.displayName().isBlank() && !block.description().isBlank(), "block should have Chinese-facing copy: " + block.id());
             require(!block.nodeKind().isBlank(), "block should expose a UI node kind: " + block.id());
+            require(!block.formSchema().isEmpty(), "block should expose schema-driven form fields: " + block.id());
+            require(!block.summaryTemplate().isBlank(), "block should expose catalog summary metadata: " + block.id());
         });
 
         GraphDefinition demo = DemoGraphFactory.create(Duration.ofSeconds(1));
@@ -52,12 +54,20 @@ public final class BlockCatalogSelfCheck {
         require(!new GraphValidator().hasErrors(new GraphValidator().validate(legacyGraph)), "legacy demo graph should still validate");
 
         BlockDefinition message = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_MESSAGE_CHAT).orElseThrow();
+        require(message.formSchema().stream().anyMatch(field -> field.key().equals("message") && field.type().equals("rich_text_component")),
+                "message block should expose rich_text_component field");
+        require(RichTextComponentValue.isStructured(message.defaultConfig().get("message")),
+                "message block default config should be structured rich text");
         List<SlotDefinition> messageSlots = new ArrayList<>();
         messageSlots.addAll(message.inputSlots());
         messageSlots.addAll(message.outputSlots());
         NodeDefinition created = new NodeDefinition("new-message", message.nodeType(), message.id(), messageSlots, message.defaultConfig());
         require(created.blockId().equals(BuiltInBlockCatalog.ACTION_MESSAGE_CHAT), "new catalog node should keep concrete blockId");
-        require(created.config().get("message").equals("新消息"), "new catalog node should use default config");
+        require(RichTextComponentValue.plainText(created.config().get("message")).equals("新消息"), "new catalog node should use rich text default config");
+        require(!new GraphValidator().hasErrors(new GraphValidator().validate(withMessageConfig(demo, "欢迎旧图"))),
+                "legacy string message should remain valid");
+        require(!new GraphValidator().hasErrors(new GraphValidator().validate(withMessageConfig(demo, RichTextComponentValue.fromPlainText("结构化消息")))),
+                "structured rich text message should validate");
 
         require(hasIssue(withFirstNodeBlockId(demo, "unknown.block"), "unknown_block_id"), "unknown blockId should fail validation");
         require(hasIssue(withFirstNodeBlockId(demo, BuiltInBlockCatalog.STATE_SET), "block_type_mismatch"),
@@ -91,6 +101,17 @@ public final class BlockCatalogSelfCheck {
                 graph.id(),
                 graph.nodes().stream().map(node -> node.id().equals("manual-trigger")
                         ? new NodeDefinition(node.id(), node.type(), blockId, node.slots(), node.config())
+                        : node).toList(),
+                graph.edges(),
+                graph.triggerEntries()
+        );
+    }
+
+    private static GraphDefinition withMessageConfig(GraphDefinition graph, String message) {
+        return new GraphDefinition(
+                graph.id(),
+                graph.nodes().stream().map(node -> node.id().equals("welcome-message")
+                        ? new NodeDefinition(node.id(), node.type(), node.blockId(), node.slots(), java.util.Map.of("message", message, "target", "CURRENT_PLAYER"))
                         : node).toList(),
                 graph.edges(),
                 graph.triggerEntries()

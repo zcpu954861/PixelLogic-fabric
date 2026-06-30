@@ -10,6 +10,7 @@ import {
   fallbackCatalog,
 } from '../model/blockCatalog';
 import { fallbackGraph, graphId } from '../model/demoGraph';
+import { richTextConfig, richTextPlainText } from '../model/richText';
 import { state, world } from '../state/appState';
 import {
   blockMetrics,
@@ -73,7 +74,6 @@ import {
   snapDraggedGroupToCandidate,
 } from './canvas/dragInsert';
 import { renderEditorModal } from './editor/blockEditorModal';
-import { nodeConfigItems, renderNodeEditor } from './editor/formControls';
 import { renderTrace } from './trace/traceView';
 import { draftStatusText, uncommittedNotice, validationErrorText, validationList, validationSummaryText, validationTitle } from './validation/validationView';
 import { renderNodeInfo } from './sidebar/selectionSummary';
@@ -125,7 +125,7 @@ function buildBlocks(graph: GraphDocument): SlotBlock[] {
       branch: branchForNode(graph, nodeItem),
       type: nodeTypeLabel(nodeItem.type),
       title: nodeItem.displayName || nodeItem.id,
-      summary: nodeSummary(nodeItem),
+      summary: nodeSummary(nodeItem, activeCatalog()),
       x: position.x,
       y: position.y,
       width: size.width,
@@ -252,7 +252,7 @@ function renderApp(): void {
           <span>选中积木</span>
           <b>${selectedNode ? escapeHtml(nodeTypeLabel(selectedNode.type)) : '未选中'}</b>
         </div>
-        ${selectedNode ? renderNodeInfo(selectedNode, graph, state.selectedNodeId) : '<section class="info-card">单击积木选中，拖动积木移动，双击积木编辑。</section>'}
+        ${selectedNode ? renderNodeInfo(selectedNode, graph, state.selectedNodeId, activeCatalog()) : '<section class="info-card">单击积木选中，拖动积木移动，双击积木编辑。</section>'}
         <section class="preview-card">
           <b>API 状态</b>
           <p>${escapeHtml(state.statusMessage)}</p>
@@ -280,7 +280,7 @@ function renderApp(): void {
           </ol>
         </section>
       </footer>
-      ${state.editorOpen && selectedNode ? renderEditorModal(selectedNode, { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation), modalIssue: state.error || validationSummaryText(state) }) : ''}
+      ${state.editorOpen && selectedNode ? renderEditorModal(selectedNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation), modalIssue: state.error || validationSummaryText(state) }) : ''}
     </section>
   `;
 
@@ -579,7 +579,7 @@ function bindInteractions(): void {
   };
   window.onbeforeunload = state.dirty || state.hasDraft || autoSaveInFlight ? () => '还有修改正在自动保存，确定要离开吗？' : null;
 
-  document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-node-field], [data-config-key]').forEach((inputEl) => {
+  document.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('[data-node-field], [data-config-key]').forEach((inputEl) => {
     if (inputEl instanceof HTMLSelectElement) {
       inputEl.addEventListener('change', () => updateSelectedNode(inputEl));
       return;
@@ -1059,13 +1059,13 @@ function focusEditor(): void {
     return;
   }
   window.setTimeout(() => {
-    const target = document.querySelector<HTMLElement>('.editor-dialog input, .editor-dialog select, #block-editor-title');
+    const target = document.querySelector<HTMLElement>('.editor-dialog input, .editor-dialog textarea, .editor-dialog select, #block-editor-title');
     target?.focus();
   }, 0);
 }
 
 function trapEditorFocus(event: KeyboardEvent): void {
-  const focusSelector = '.editor-dialog button:not([disabled]), .editor-dialog input:not([disabled]), .editor-dialog select:not([disabled]), #block-editor-title';
+  const focusSelector = '.editor-dialog button:not([disabled]), .editor-dialog input:not([disabled]), .editor-dialog textarea:not([disabled]), .editor-dialog select:not([disabled]), #block-editor-title';
   const focusables = Array.from(
     document.querySelectorAll<HTMLElement>(focusSelector),
   ).filter((item) => item.offsetParent !== null);
@@ -1083,12 +1083,19 @@ function trapEditorFocus(event: KeyboardEvent): void {
   }
 }
 
-function updateSelectedNode(inputEl: HTMLInputElement | HTMLSelectElement): void {
+function updateSelectedNode(inputEl: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): void {
   if (inputEl.dataset.nodeField === 'displayName') {
     updateSelectedNodeValue('displayName', inputEl.value, 'node');
   }
   if (inputEl.dataset.configKey) {
-    updateSelectedNodeValue(inputEl.dataset.configKey, inputEl.value);
+    const value = inputEl.dataset.richText === 'true' ? richTextConfig(inputEl.value) : inputEl.value;
+    updateSelectedNodeValue(inputEl.dataset.configKey, value);
+    if (inputEl.dataset.richText === 'true') {
+      const preview = document.querySelector<HTMLElement>('[data-rich-preview]');
+      if (preview) {
+        preview.textContent = inputEl.value || '未填写';
+      }
+    }
   }
 }
 
@@ -1114,8 +1121,19 @@ function updateSelectedNodeValue(key: string, value: string, target: 'config' | 
       return;
     }
     nextNode.config[key] = value;
+    if (key === 'valueType') {
+      if (value === 'BOOLEAN' && !['true', 'false'].includes(nextNode.config.value ?? '')) {
+        nextNode.config.value = 'true';
+      }
+      if (value === 'INTEGER' && ['true', 'false', ''].includes(nextNode.config.value ?? '')) {
+        nextNode.config.value = '1';
+      }
+      if (value === 'STRING' && ['true', 'false'].includes(nextNode.config.value ?? '')) {
+        nextNode.config.value = '';
+      }
+    }
   }
-  applyGraphEdit(nextGraph, '内容已修改，正在自动保存。', { refreshOnly: true });
+  applyGraphEdit(nextGraph, '内容已修改，正在自动保存。', { refreshOnly: key !== 'valueType' });
 }
 
 function refreshDraftIndicators(): void {
@@ -1127,6 +1145,7 @@ function refreshDraftIndicators(): void {
   const issueList = document.querySelector<HTMLElement>('[data-issue-list]');
   const modalSummary = document.querySelector<HTMLElement>('[data-modal-summary]');
   const modalError = document.querySelector<HTMLElement>('[data-modal-error]');
+  const richPreview = document.querySelector<HTMLElement>('[data-rich-preview]');
   const undoButton = document.querySelector<HTMLButtonElement>('[data-history-action="undo"]');
   const redoButton = document.querySelector<HTMLButtonElement>('[data-history-action="redo"]');
 
@@ -1155,7 +1174,11 @@ function refreshDraftIndicators(): void {
   }
   if (modalSummary) {
     const selected = selectedNodeFrom(currentGraph());
-    modalSummary.textContent = selected ? nodeSummary(selected) : '';
+    modalSummary.textContent = selected ? nodeSummary(selected, activeCatalog()) : '';
+  }
+  if (richPreview) {
+    const selected = selectedNodeFrom(currentGraph());
+    richPreview.textContent = selected ? richTextPlainText(selected.config.message ?? '') || '未填写' : '未填写';
   }
   if (modalError) {
     modalError.textContent = state.error || validationSummaryText(state);

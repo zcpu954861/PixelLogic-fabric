@@ -1,6 +1,7 @@
 package com.pixelmc.pixellogic.core.runtime;
 
 import com.pixelmc.pixellogic.core.graph.CompiledGraph;
+import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.StateScope;
 import com.pixelmc.pixellogic.core.model.StateValueType;
@@ -151,7 +152,7 @@ public final class GraphRuntime {
     }
 
     private String executeMessage(NodeDefinition node, ExecutionContext context) {
-        String message = node.config().getOrDefault("message", "");
+        String message = RichTextComponentValue.plainText(node.config().getOrDefault("message", ""));
         services.sendPlayerMessage(context.playerId(), message);
         traces.add(context.traceId(), node.id(), "发送消息：" + message);
         return "done";

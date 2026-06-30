@@ -72,6 +72,8 @@ Important user semantics:
 - Closing the editor modal is just closing the form; field changes are already part of the graph history and automatic save queue.
 - Modal open/close uses short CSS animation and respects reduced motion.
 - The editor modal uses humanized Chinese form labels and controls. Internal graph values such as `PLAYER`, `BOOLEAN`, and `true` remain storage/runtime values, but normal UI renders them as labels such as `玩家`, `是或否`, and `是`.
+- The editor modal now prefers Block Catalog `formSchema` for known `blockId` values. Legacy `NodeType` form builders remain only as fallback for old or unknown nodes.
+- `action.message.chat` uses a `rich_text_component` field: multiline plain text editing, structured storage, and a simple preview. The normal UI does not expose raw JSON.
 - Short configuration fields use compact two-column layout where space allows; long text fields remain full-width.
 
 Safety bounds:
@@ -116,6 +118,7 @@ Current responsibility boundaries:
 - `api/`: localhost PixelLogic API client and connection/content-type errors.
 - `model/`: graph/API types, seeded demo graph, pure graph layout, connection, and cloning helpers.
 - `model/blockCatalog.ts`: frontend fallback catalog and catalog-block-to-graph-node conversion.
+- `model/richText.ts`: rich text component MVP helpers for structured storage and plain text display.
 - `state/`: mutable app state and canvas world dimensions.
 - `ui/app.ts`: orchestration, app shell assembly, event binding, autosave, undo/redo, and API actions.
 - `ui/canvas/`: puzzle block view, block constants, and drag/insert graph rules.

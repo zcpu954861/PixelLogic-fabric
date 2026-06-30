@@ -1,4 +1,5 @@
 import type { BlockCatalog, BlockKind, CatalogBlock, CatalogCategory, CatalogSubcategory, FieldOption, GraphNode, GraphPosition, GraphSlot } from './graphTypes';
+import { richTextConfig } from './richText';
 
 const category = (id: string, displayName: string, description: string, order: number): CatalogCategory => ({
   id,
@@ -23,11 +24,57 @@ const out = (id: string): GraphSlot => ({ id, direction: 'OUTPUT', edgeType: 'CO
 const field = (
   key: string,
   label: string,
-  control: 'text' | 'number' | 'select' | 'boolean',
+  type: CatalogBlock['formSchema'][number]['type'],
   options: FieldOption[] = [],
-  full = false,
+  ui = '',
   suffix = '',
-) => ({ key, label, control, options, required: true, full, suffix });
+) => ({
+  key,
+  type,
+  label,
+  description: '',
+  defaultValue: '',
+  placeholder: '',
+  options,
+  required: true,
+  min: '',
+  max: '',
+  step: '',
+  ui,
+  suffix,
+});
+
+const readonlyField = (key: string, label: string, defaultValue: string, description = ''): CatalogBlock['formSchema'][number] => ({
+  key,
+  type: 'readonly',
+  label,
+  description,
+  defaultValue,
+  placeholder: '',
+  options: [],
+  required: false,
+  min: '',
+  max: '',
+  step: '',
+  ui: 'readonlyBadge',
+  suffix: '',
+});
+
+const hiddenField = (key: string, defaultValue: string): CatalogBlock['formSchema'][number] => ({
+  key,
+  type: 'hidden',
+  label: key,
+  description: '',
+  defaultValue,
+  placeholder: '',
+  options: [],
+  required: false,
+  min: '',
+  max: '',
+  step: '',
+  ui: '',
+  suffix: '',
+});
 
 const block = (
   id: string,
@@ -40,7 +87,9 @@ const block = (
   defaultConfig: Record<string, string>,
   inputSlots: GraphSlot[],
   outputSlots: GraphSlot[],
-  formFields = [] as CatalogBlock['formFields'],
+  formSchema = [] as CatalogBlock['formSchema'],
+  summaryTemplate = '',
+  summaryFormatter = '',
   simulationCapability = 'FULLY_SIMULATABLE',
   safetyFlags = ['READ_ONLY'],
   aliases = [] as string[],
@@ -55,7 +104,9 @@ const block = (
   nodeKind,
   nodeType,
   defaultConfig,
-  formFields,
+  formSchema,
+  summaryTemplate,
+  summaryFormatter,
   inputSlots,
   outputSlots,
   simulationCapability,
@@ -84,33 +135,38 @@ export const fallbackCatalog: BlockCatalog = {
     subcategory('debug.basic', 'debug', '调试输出', '记录模拟执行信息。', 10),
   ],
   blocks: [
-    block('trigger.manual_test', 'WebUI 测试运行', '点击测试运行时进入这条流程。', 'trigger', 'trigger.manual', 'trigger', 'MANUAL_TRIGGER', {}, [], [out('started')], [], 'FULLY_SIMULATABLE', ['READ_ONLY'], ['manual.test.start']),
+    block('trigger.manual_test', 'WebUI 测试运行', '点击测试运行时进入这条流程。', 'trigger', 'trigger.manual', 'trigger', 'MANUAL_TRIGGER', {}, [], [out('started')], [
+      readonlyField('triggerType', '积木类型', '手动测试触发', '测试运行从这里进入流程。'),
+    ], '手动测试触发入口。', '', 'FULLY_SIMULATABLE', ['READ_ONLY'], ['manual.test.start']),
     block('condition.state.equals', '判断状态是否等于', '比较一个状态值，按通过或失败继续。', 'condition', 'condition.state', 'condition', 'STATE_COMPARE_CONDITION', { scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', expected: 'false', missing: 'false' }, [input('input')], [out('pass'), out('fail')], [
-      field('scope', '作用对象', 'select', [option('PLAYER', '玩家'), option('GLOBAL', '全局'), option('SESSION', '当前会话')]),
-      field('key', '状态名', 'text'),
-      field('expected', '目标值', 'boolean', [option('true', '是'), option('false', '否')]),
-      field('missing', '缺失时视为', 'boolean', [option('true', '是'), option('false', '否')]),
-    ]),
-    block('action.message.chat', '发送聊天消息', '向当前玩家或模拟玩家发送一条消息。', 'message', 'message.player', 'action', 'MESSAGE_ACTION', { message: '新消息' }, [input('input')], [out('done')], [
-      field('message', '消息', 'text', [], true),
-    ], 'APPROXIMATE_SIMULATION', ['PLAYER_MUTATING', 'REQUIRES_PLAYER']),
+      field('scope', '作用对象', 'scope', [option('PLAYER', '玩家'), option('GLOBAL', '全局'), option('SESSION', '当前会话')]),
+      field('key', '状态名', 'string', [], 'fullWidth'),
+      hiddenField('valueType', 'BOOLEAN'),
+      field('expected', '目标值', 'boolean', [option('true', '是'), option('false', '否')], 'segmented'),
+      field('missing', '缺失时视为', 'boolean', [option('true', '是'), option('false', '否')], 'segmented'),
+    ], '当「{scope}」的 {key} 等于「{expected}」时走通过分支。', 'condition.state.equals'),
+    block('action.message.chat', '发送聊天消息', '向当前玩家或模拟玩家发送一条 vanilla text component 语义消息。', 'message', 'message.player', 'action', 'MESSAGE_ACTION', { target: 'CURRENT_PLAYER', message: richTextConfig('新消息') }, [input('input')], [out('done')], [
+      readonlyField('target', '接收者', 'CURRENT_PLAYER', '当前发送给触发这条流程的玩家或 WebUI 模拟玩家。'),
+      field('message', '消息内容', 'rich_text_component', [], 'fullWidth textareaRows:4'),
+    ], '向「{target}」发送「{message.plainText}」。', 'action.message.chat', 'APPROXIMATE_SIMULATION', ['PLAYER_MUTATING', 'REQUIRES_PLAYER']),
     block('state.set', '设置状态', '把一个状态写成指定值。', 'state', 'state.write', 'state', 'STATE_SET_ACTION', { scope: 'PLAYER', key: 'started', valueType: 'BOOLEAN', value: 'true' }, [input('input')], [out('done')], [
-      field('scope', '作用对象', 'select', [option('PLAYER', '玩家'), option('GLOBAL', '全局'), option('SESSION', '当前会话')]),
-      field('key', '状态名', 'text'),
+      field('scope', '作用对象', 'scope', [option('PLAYER', '玩家'), option('GLOBAL', '全局'), option('SESSION', '当前会话')]),
+      field('key', '状态名', 'string'),
       field('valueType', '数据类型', 'select', [option('BOOLEAN', '是或否'), option('INTEGER', '数字'), option('STRING', '文本')]),
-      field('value', '设置为', 'text'),
-    ], 'FULLY_SIMULATABLE', ['STATE_MUTATING']),
+      field('value', '设置为', 'segmented', [option('true', '是'), option('false', '否')], 'segmented'),
+    ], '把「{scope}」的 {key} 设置为「{value}」。', 'state.set', 'FULLY_SIMULATABLE', ['STATE_MUTATING']),
     block('state.add', '累加状态', '把数字状态增加指定数值。', 'state', 'state.write', 'state', 'STATE_ADD_ACTION', { scope: 'PLAYER', key: 'start_count', valueType: 'INTEGER', amount: '1' }, [input('input')], [out('done')], [
-      field('scope', '作用对象', 'select', [option('PLAYER', '玩家'), option('GLOBAL', '全局'), option('SESSION', '当前会话')]),
-      field('key', '状态名', 'text'),
-      field('amount', '增加数值', 'number', [], false, ''),
-    ], 'FULLY_SIMULATABLE', ['STATE_MUTATING']),
+      field('scope', '作用对象', 'scope', [option('PLAYER', '玩家'), option('GLOBAL', '全局'), option('SESSION', '当前会话')]),
+      field('key', '状态名', 'string'),
+      hiddenField('valueType', 'INTEGER'),
+      { ...field('amount', '增加数值', 'integer'), min: '-999999', max: '999999', step: '1' },
+    ], '把「{scope}」的 {key} 增加 {amount}。', 'state.add', 'FULLY_SIMULATABLE', ['STATE_MUTATING']),
     block('timer.wait', '等待一段时间', '等待指定秒数后继续执行。', 'timer', 'timer.basic', 'timer', 'TIMER_START_ACTION', { durationSeconds: '30' }, [input('input')], [out('timer_completed')], [
-      field('durationSeconds', '等待时间', 'number', [], false, '秒'),
-    ]),
+      { ...field('durationSeconds', '等待时间', 'integer', [], '', '秒'), min: '1', max: '86400', step: '1' },
+    ], '等待 {durationSeconds} 秒后继续。', 'timer.wait'),
     block('debug.log', '调试记录', '在模拟执行记录里写入一条调试信息。', 'debug', 'debug.basic', 'debug', 'DEBUG_LOG_ACTION', { message: '调试记录' }, [input('input')], [out('done')], [
-      field('message', '内容', 'text', [], true),
-    ]),
+      field('message', '记录内容', 'textarea', [], 'fullWidth textareaRows:3'),
+    ], '记录：{message}', 'debug.log'),
   ],
 };
 

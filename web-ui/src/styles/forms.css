@@ -8,7 +8,8 @@
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 38px;
   border: 1px solid #b8c8bc;
@@ -17,6 +18,13 @@ select {
   color: var(--ink);
   padding: 0 10px;
   font-weight: 700;
+}
+
+textarea {
+  min-height: 86px;
+  padding: 9px 10px;
+  resize: vertical;
+  line-height: 1.42;
 }
 
 input[type="number"] {
@@ -218,4 +226,46 @@ select {
   color: #991b1b;
   font-weight: 800;
   line-height: 1.45;
+}
+
+.readonly-field small,
+.field-row small,
+.rich-text-field small {
+  color: #667568;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.readonly-field.is-full {
+  grid-column: 1 / -1;
+}
+
+.rich-text-field {
+  display: grid;
+  gap: 8px;
+}
+
+.rich-text-preview {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid #c9d6cc;
+  border-radius: 8px;
+  background: #f7fbf5;
+}
+
+.rich-text-preview span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.rich-text-preview p {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 800;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

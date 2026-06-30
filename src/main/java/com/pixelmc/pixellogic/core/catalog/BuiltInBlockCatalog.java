@@ -99,7 +99,9 @@ public final class BuiltInBlockCatalog {
                         "trigger",
                         NodeType.MANUAL_TRIGGER,
                         Map.of(),
-                        List.of(),
+                        List.of(readonly("triggerType", "积木类型", "手动测试触发", "测试运行从这里进入流程。")),
+                        "手动测试触发入口。",
+                        "",
                         List.of(),
                         List.of(out("started")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
@@ -117,11 +119,14 @@ public final class BuiltInBlockCatalog {
                         NodeType.STATE_COMPARE_CONDITION,
                         Map.of("scope", "PLAYER", "key", "started", "valueType", "BOOLEAN", "expected", "false", "missing", "false"),
                         List.of(
-                                select("scope", "作用对象", List.of(option("PLAYER", "玩家"), option("GLOBAL", "全局"), option("SESSION", "当前会话"))),
-                                text("key", "状态名", true),
+                                scope("scope", "作用对象"),
+                                text("key", "状态名", true, "例如 started"),
+                                hidden("valueType", "BOOLEAN"),
                                 bool("expected", "目标值"),
                                 bool("missing", "缺失时视为")
                         ),
+                        "当「{scope}」的 {key} 等于「{expected}」时走通过分支。",
+                        "condition.state.equals",
                         List.of(in("input")),
                         List.of(out("pass"), out("fail")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
@@ -137,8 +142,16 @@ public final class BuiltInBlockCatalog {
                         "message.player",
                         "action",
                         NodeType.MESSAGE_ACTION,
-                        Map.of("message", "新消息"),
-                        List.of(text("message", "消息", true)),
+                        Map.of(
+                                "target", "CURRENT_PLAYER",
+                                "message", RichTextComponentValue.fromPlainText("新消息")
+                        ),
+                        List.of(
+                                readonly("target", "接收者", "CURRENT_PLAYER", "当前发送给触发这条流程的玩家或 WebUI 模拟玩家。"),
+                                richText("message", "消息内容", "输入要发送给玩家的文本。")
+                        ),
+                        "向「{target}」发送「{message.plainText}」。",
+                        "action.message.chat",
                         List.of(in("input")),
                         List.of(out("done")),
                         BlockCapabilityLevel.APPROXIMATE_SIMULATION,
@@ -156,11 +169,13 @@ public final class BuiltInBlockCatalog {
                         NodeType.STATE_SET_ACTION,
                         Map.of("scope", "PLAYER", "key", "started", "valueType", "BOOLEAN", "value", "true"),
                         List.of(
-                                select("scope", "作用对象", List.of(option("PLAYER", "玩家"), option("GLOBAL", "全局"), option("SESSION", "当前会话"))),
-                                text("key", "状态名", false),
+                                scope("scope", "作用对象"),
+                                text("key", "状态名", false, "例如 started"),
                                 select("valueType", "数据类型", List.of(option("BOOLEAN", "是或否"), option("INTEGER", "数字"), option("STRING", "文本"))),
-                                text("value", "设置为", false)
+                                segmented("value", "设置为", List.of(option("true", "是"), option("false", "否")))
                         ),
+                        "把「{scope}」的 {key} 设置为「{value}」。",
+                        "state.set",
                         List.of(in("input")),
                         List.of(out("done")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
@@ -178,10 +193,13 @@ public final class BuiltInBlockCatalog {
                         NodeType.STATE_ADD_ACTION,
                         Map.of("scope", "PLAYER", "key", "start_count", "valueType", "INTEGER", "amount", "1"),
                         List.of(
-                                select("scope", "作用对象", List.of(option("PLAYER", "玩家"), option("GLOBAL", "全局"), option("SESSION", "当前会话"))),
-                                text("key", "状态名", false),
-                                number("amount", "增加数值", "")
+                                scope("scope", "作用对象"),
+                                text("key", "状态名", false, "例如 start_count"),
+                                hidden("valueType", "INTEGER"),
+                                integer("amount", "增加数值", "", "-999999", "999999", "1")
                         ),
+                        "把「{scope}」的 {key} 增加 {amount}。",
+                        "state.add",
                         List.of(in("input")),
                         List.of(out("done")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
@@ -198,7 +216,9 @@ public final class BuiltInBlockCatalog {
                         "timer",
                         NodeType.TIMER_START_ACTION,
                         Map.of("durationSeconds", "30"),
-                        List.of(number("durationSeconds", "等待时间", "秒")),
+                        List.of(integer("durationSeconds", "等待时间", "秒", "1", "86400", "1")),
+                        "等待 {durationSeconds} 秒后继续。",
+                        "timer.wait",
                         List.of(in("input")),
                         List.of(out("timer_completed")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
@@ -215,7 +235,9 @@ public final class BuiltInBlockCatalog {
                         "debug",
                         NodeType.DEBUG_LOG_ACTION,
                         Map.of("message", "调试记录"),
-                        List.of(text("message", "内容", true)),
+                        List.of(textarea("message", "记录内容", true, "只写入模拟 trace，不发送给玩家。")),
+                        "记录：{message}",
+                        "debug.log",
                         List.of(in("input")),
                         List.of(out("done")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
@@ -243,7 +265,9 @@ public final class BuiltInBlockCatalog {
             String nodeKind,
             NodeType nodeType,
             Map<String, String> defaultConfig,
-            List<BlockFormFieldDefinition> formFields,
+            List<BlockFormFieldDefinition> formSchema,
+            String summaryTemplate,
+            String summaryFormatter,
             List<SlotDefinition> inputSlots,
             List<SlotDefinition> outputSlots,
             BlockCapabilityLevel simulationCapability,
@@ -262,7 +286,9 @@ public final class BuiltInBlockCatalog {
                 nodeKind,
                 nodeType,
                 defaultConfig,
-                formFields,
+                formSchema,
+                summaryTemplate,
+                summaryFormatter,
                 inputSlots,
                 outputSlots,
                 simulationCapability,
@@ -282,20 +308,62 @@ public final class BuiltInBlockCatalog {
         return new SlotDefinition(id, SlotDirection.OUTPUT, EdgeType.CONTROL);
     }
 
-    private static BlockFormFieldDefinition text(String key, String label, boolean full) {
-        return new BlockFormFieldDefinition(key, label, "text", List.of(), true, full, "");
+    private static BlockFormFieldDefinition text(String key, String label, boolean full, String placeholder) {
+        return field(key, "string", label, "", true, "", placeholder, List.of(), "", "", "", full ? "fullWidth" : "", "");
     }
 
-    private static BlockFormFieldDefinition number(String key, String label, String suffix) {
-        return new BlockFormFieldDefinition(key, label, "number", List.of(), true, false, suffix);
+    private static BlockFormFieldDefinition textarea(String key, String label, boolean full, String description) {
+        return field(key, "textarea", label, description, true, "", "", List.of(), "", "", "", full ? "fullWidth textareaRows:3" : "textareaRows:3", "");
     }
 
     private static BlockFormFieldDefinition bool(String key, String label) {
-        return new BlockFormFieldDefinition(key, label, "boolean", List.of(option("true", "是"), option("false", "否")), true, false, "");
+        return field(key, "boolean", label, "", true, "", "", List.of(option("true", "是"), option("false", "否")), "", "", "", "segmented", "");
     }
 
     private static BlockFormFieldDefinition select(String key, String label, List<BlockFormFieldDefinition.FieldOption> options) {
-        return new BlockFormFieldDefinition(key, label, "select", options, true, false, "");
+        return field(key, "select", label, "", true, "", "", options, "", "", "", "", "");
+    }
+
+    private static BlockFormFieldDefinition segmented(String key, String label, List<BlockFormFieldDefinition.FieldOption> options) {
+        return field(key, "segmented", label, "", true, "", "", options, "", "", "", "segmented", "");
+    }
+
+    private static BlockFormFieldDefinition scope(String key, String label) {
+        return field(key, "scope", label, "", true, "PLAYER", "", List.of(option("PLAYER", "玩家"), option("GLOBAL", "全局"), option("SESSION", "当前会话")), "", "", "", "", "");
+    }
+
+    private static BlockFormFieldDefinition integer(String key, String label, String suffix, String min, String max, String step) {
+        return field(key, "integer", label, "", true, "", "", List.of(), min, max, step, "", suffix);
+    }
+
+    private static BlockFormFieldDefinition readonly(String key, String label, String defaultValue, String description) {
+        return field(key, "readonly", label, description, false, defaultValue, "", List.of(), "", "", "", "readonlyBadge", "");
+    }
+
+    private static BlockFormFieldDefinition hidden(String key, String defaultValue) {
+        return field(key, "hidden", key, "", false, defaultValue, "", List.of(), "", "", "", "", "");
+    }
+
+    private static BlockFormFieldDefinition richText(String key, String label, String description) {
+        return field(key, "rich_text_component", label, description, true, RichTextComponentValue.fromPlainText(""), "欢迎开始游戏\n任务开始！", List.of(), "", "", "", "fullWidth textareaRows:4", "");
+    }
+
+    private static BlockFormFieldDefinition field(
+            String key,
+            String type,
+            String label,
+            String description,
+            boolean required,
+            String defaultValue,
+            String placeholder,
+            List<BlockFormFieldDefinition.FieldOption> options,
+            String min,
+            String max,
+            String step,
+            String ui,
+            String suffix
+    ) {
+        return new BlockFormFieldDefinition(key, type, label, description, required, defaultValue, placeholder, options, min, max, step, ui, suffix);
     }
 
     private static BlockFormFieldDefinition.FieldOption option(String value, String label) {

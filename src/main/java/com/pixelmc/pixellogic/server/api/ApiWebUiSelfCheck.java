@@ -41,6 +41,9 @@ public final class ApiWebUiSelfCheck {
                     "catalog endpoint should return categories and blocks");
             require(catalog.body().contains("trigger.manual_test") && catalog.body().contains("condition.state.equals"),
                     "catalog should include demo block ids");
+            require(catalog.body().contains("\"formSchema\"") && catalog.body().contains("rich_text_component")
+                            && catalog.body().contains("\"summaryTemplate\""),
+                    "catalog should expose form schema, rich text field type, and summary metadata");
 
             CheckedResponse graphResponse = send(client, "GET", base + "/api/pixellogic/graphs/demo-start-flow");
             requireJson(graphResponse, "graph should be JSON");

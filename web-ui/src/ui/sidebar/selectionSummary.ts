@@ -1,15 +1,15 @@
-import type { GraphDocument, GraphEdge, GraphNode } from '../../model/graphTypes';
+import type { BlockCatalog, GraphDocument, GraphEdge, GraphNode } from '../../model/graphTypes';
 import { connectedGraphEdges } from '../../model/graphLayout';
 import { escapeHtml } from '../../utils/dom';
 import { nodeConfigItems } from '../editor/formControls';
 import { nodeSummary, slotLabel } from '../humanize/labels';
 
-export function renderNodeInfo(nodeItem: GraphNode, graph: GraphDocument, selectedNodeId: string): string {
-  const configItems = nodeConfigItems(nodeItem);
+export function renderNodeInfo(nodeItem: GraphNode, graph: GraphDocument, selectedNodeId: string, catalog: BlockCatalog): string {
+  const configItems = nodeConfigItems(nodeItem, catalog);
   return `
     <section class="info-card">
       <b>${escapeHtml(nodeItem.displayName || nodeItem.id)}</b>
-      <p>${escapeHtml(nodeSummary(nodeItem))}</p>
+      <p>${escapeHtml(nodeSummary(nodeItem, catalog))}</p>
     </section>
     <section class="info-card">
       <b>配置摘要</b>

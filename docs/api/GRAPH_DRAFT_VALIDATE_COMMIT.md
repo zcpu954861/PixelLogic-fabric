@@ -87,6 +87,12 @@ The WebUI now also uses a local graph version and save sequence before applying 
 
 `blockId` is the concrete Block Catalog identity for new and normalized nodes. `type` remains in the schema as the v1 compatibility/runtime dispatch field. Old graph documents without `blockId` are still accepted and infer the catalog block from legacy `type` during normalization.
 
+Known message config compatibility:
+
+- New `action.message.chat` nodes store `config.message` as a rich text component payload string containing `version`, `plainText`, and `segments`.
+- Old graph documents with a plain string `config.message` remain valid and are treated as `plainText`.
+- The normal WebUI does not expose raw JSON editing for this field.
+
 ## Endpoints
 
 ```text

@@ -35,10 +35,19 @@ public final class ApiWebUiSelfCheck {
             requireJson(graphs, "graphs should be JSON");
             require(graphs.body().contains("\"graphs\"") && graphs.body().contains("demo-start-flow"), "graphs should list seeded graph");
 
+            CheckedResponse catalog = send(client, "GET", base + "/api/pixellogic/catalog");
+            requireJson(catalog, "catalog should be JSON");
+            require(catalog.body().contains("\"categories\"") && catalog.body().contains("\"blocks\""),
+                    "catalog endpoint should return categories and blocks");
+            require(catalog.body().contains("trigger.manual_test") && catalog.body().contains("condition.state.equals"),
+                    "catalog should include demo block ids");
+
             CheckedResponse graphResponse = send(client, "GET", base + "/api/pixellogic/graphs/demo-start-flow");
             requireJson(graphResponse, "graph should be JSON");
             require(graphResponse.body().contains("\"fingerprint\"") && graphResponse.body().contains("\"validation\""),
                     "graph endpoint should return graph, fingerprint, and validation");
+            require(graphResponse.body().contains("\"blockId\"") && graphResponse.body().contains("trigger.manual_test"),
+                    "graph endpoint should return blockId for catalog migration");
 
             JsonObject graph = JsonParser.parseString(graphResponse.body()).getAsJsonObject().getAsJsonObject("graph");
             setNodeConfig(graph, "welcome-message", "message", "API self-check welcome");

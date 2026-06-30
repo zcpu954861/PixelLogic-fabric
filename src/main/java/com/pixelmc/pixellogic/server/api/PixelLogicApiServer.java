@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
+import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
 import com.pixelmc.pixellogic.core.trace.ExecutionTrace;
 import com.pixelmc.pixellogic.core.trace.TraceStep;
@@ -127,6 +128,9 @@ public final class PixelLogicApiServer implements AutoCloseable {
         }
         if ("GET".equals(method) && "/api/pixellogic/graphs".equals(path)) {
             return onServerThread(() -> ok(Map.of("graphs", service.graphs())));
+        }
+        if ("GET".equals(method) && "/api/pixellogic/catalog".equals(path)) {
+            return ok(Map.of("catalog", BuiltInBlockCatalog.catalog()));
         }
 
         Matcher graphMatcher = GRAPH_PATH.matcher(path);

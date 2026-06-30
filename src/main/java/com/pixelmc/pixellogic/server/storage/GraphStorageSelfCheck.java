@@ -105,6 +105,7 @@ public final class GraphStorageSelfCheck {
                     return new GraphDocument.NodeDocument(
                             node.id(),
                             node.type(),
+                            node.blockId(),
                             node.displayName(),
                             config,
                             node.position(),

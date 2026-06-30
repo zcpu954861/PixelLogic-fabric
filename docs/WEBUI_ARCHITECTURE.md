@@ -11,6 +11,26 @@ The WebUI is an independent Vite + TypeScript project.
 - Graph API-backed draft save, draft validation, and commit for `demo-start-flow`.
 - App shell communicates the product direction: cards, slots, direct execution trace, and readable user actions.
 
+## Future Block Catalog
+
+The left library is now driven by the Block Catalog skeleton. The current top-level entries (`触发事件 / 条件判断 / 消息显示 / 状态数据 / 时间调度 / 调试诊断`) are catalog data for the demo set, not permanent product categories.
+
+Current behavior:
+
+- categories come from `BlockCatalog.categories`;
+- clicking a category opens concrete blocks for that category;
+- clicking a concrete block creates a graph node with `blockId`, `nodeType`, default config, and slots from catalog data;
+- API catalog failures keep the local fallback catalog visible while showing the normal Chinese API disconnected error;
+- technical block ids are not primary user-facing copy.
+
+Still future:
+
+- search, tags, recent blocks, and common recommendations;
+- richer per-block summary templates shared with backend trace formatting;
+- drag-from-library placement.
+
+Users should drag concrete blocks such as `发送聊天消息`, `状态等于`, or `等待一段时间`, not a generic `动作` or `条件` block that hides many unrelated modes in one form.
+
 ## API Test Run
 
 The current WebUI calls:
@@ -66,7 +86,7 @@ Safety bounds:
 
 The slot-based canvas now supports a minimal direct-manipulation graph editing loop:
 
-- Block library buttons add a new block to the visible canvas and select it.
+- Concrete block entries from the catalog add a new block to the visible canvas and select it.
 - Single click selects the block; pointer movement past the drag threshold starts drag; double click opens the existing editor modal.
 - Dragging a block moves that block and all downstream nodes reachable from outgoing typed edges.
 - Dragging a Condition moves both pass and fail downstream branches.
@@ -95,6 +115,7 @@ Current responsibility boundaries:
 
 - `api/`: localhost PixelLogic API client and connection/content-type errors.
 - `model/`: graph/API types, seeded demo graph, pure graph layout, connection, and cloning helpers.
+- `model/blockCatalog.ts`: frontend fallback catalog and catalog-block-to-graph-node conversion.
 - `state/`: mutable app state and canvas world dimensions.
 - `ui/app.ts`: orchestration, app shell assembly, event binding, autosave, undo/redo, and API actions.
 - `ui/canvas/`: puzzle block view, block constants, and drag/insert graph rules.
@@ -110,3 +131,5 @@ Current responsibility boundaries:
 Java may serve built static assets later, but Java must not generate WebUI source strings.
 
 The normal user flow must expose visual graph relationships instead of channel names.
+
+The normal block library must expose concrete, human-readable blocks from the catalog. Category names are navigation, not executable nodes.

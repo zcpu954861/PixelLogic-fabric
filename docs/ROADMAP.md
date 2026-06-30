@@ -12,14 +12,14 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Active Baseline
 
-`mc-1.21.11` now contains the v1 editor baseline: graph draft/save/load, modal editing, humanized forms, auto save/validate/apply, undo/redo, slot-flow drag/insert, WebUI structure split, and Apache-2.0 metadata.
+`mc-1.21.11` now contains the v1 editor baseline: graph draft/save/load, modal editing, humanized forms, auto save/validate/apply, undo/redo, slot-flow drag/insert, WebUI structure split, lifecycle/capacity safety cleanup, and Apache-2.0 metadata.
 
 ## Next
 
-1. User review `feature/v1-lifecycle-capacity-safety-cleanup`.
-2. Repair any lifecycle/capacity findings reported from review or hand test.
-3. If accepted, run merge-readiness audit before merging back to `mc-1.21.11`.
-4. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+1. Review the first Block Catalog skeleton implementation.
+2. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
+3. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+4. Next catalog work should add shared summary/validation/form-schema reuse only when the current seven-block skeleton is accepted.
 
 ## Completed Checkpoints
 
@@ -37,7 +37,9 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - WebUI structure split moves the large frontend entry and stylesheet into responsibility-based TypeScript and CSS modules without changing behavior.
 - Apache-2.0 license metadata and full `LICENSE` text are included on `mc-1.21.11`.
 - v1 editor baseline health audit completed with no P0/P1.
-- Lifecycle/capacity safety cleanup is in progress on `feature/v1-lifecycle-capacity-safety-cleanup`.
+- Lifecycle/capacity safety cleanup is merged into `mc-1.21.11` with state/timer/trace/undo/autosave/API lifecycle bounds.
+- Block Catalog / Simulation Model docs define the next direction: concrete catalog blocks, registry-driven categories, and simulation executors separated from future Minecraft executors.
+- Block Catalog skeleton branch adds the Java built-in catalog registry, `blockId` compatibility, readonly catalog API, catalog-driven WebUI library, and `blockCatalogSelfCheck` for the current seven demo blocks.
 
 ## Follow-Ups
 

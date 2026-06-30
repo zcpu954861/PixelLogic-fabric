@@ -56,6 +56,7 @@ Graph JSON is versioned and readable. It is not a Java object dump.
     {
       "id": "manual-trigger",
       "type": "MANUAL_TRIGGER",
+      "blockId": "trigger.manual_test",
       "displayName": "WebUI 测试运行",
       "config": {},
       "position": { "x": 48, "y": 205 },
@@ -84,6 +85,8 @@ Graph JSON is versioned and readable. It is not a Java object dump.
 
 The WebUI now also uses a local graph version and save sequence before applying save, validate, or commit responses. This prevents stale local responses from overwriting newer edits, but it is not a replacement for future server-side optimistic conflict checks.
 
+`blockId` is the concrete Block Catalog identity for new and normalized nodes. `type` remains in the schema as the v1 compatibility/runtime dispatch field. Old graph documents without `blockId` are still accepted and infer the catalog block from legacy `type` during normalization.
+
 ## Endpoints
 
 ```text
@@ -93,6 +96,7 @@ GET  /api/pixellogic/graphs/demo-start-flow/draft
 PUT  /api/pixellogic/graphs/demo-start-flow/draft
 POST /api/pixellogic/graphs/demo-start-flow/validate
 POST /api/pixellogic/graphs/demo-start-flow/commit
+GET  /api/pixellogic/catalog
 ```
 
 Success shape:
@@ -148,6 +152,7 @@ The slot flow drag/insert checkpoint keeps the same API contract. The WebUI may 
 - node `position` metadata after free drag or chain drag;
 - `nodes` when adding or deleting a block;
 - `edges` when inserting a block into an existing slot connection or disconnecting an input.
+- node `blockId` when creating catalog-backed concrete blocks.
 
 These edits are still submitted as the same graph draft JSON. `保存` continues to run draft save, validation, and commit. Invalid drag/edit outcomes do not replace the committed runtime graph.
 

@@ -1,5 +1,7 @@
 package com.pixelmc.pixellogic.core.graph;
 
+import com.pixelmc.pixellogic.core.catalog.BlockDefinition;
+import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
@@ -82,6 +84,7 @@ public final class GraphValidator {
 
     private void validateNodes(GraphDefinition graph, Map<String, NodeDefinition> nodes, List<ValidationIssue> issues) {
         for (NodeDefinition node : graph.nodes()) {
+            validateCatalogBlock(node, issues);
             switch (node.type()) {
                 case STATE_COMPARE_CONDITION -> validateCondition(graph, node, issues);
                 case STATE_SET_ACTION -> validateStateAction(node, issues, true);
@@ -90,6 +93,17 @@ public final class GraphValidator {
                 case MANUAL_TRIGGER, COMMAND_TRIGGER, MESSAGE_ACTION, DEBUG_LOG_ACTION -> {
                 }
             }
+        }
+    }
+
+    private void validateCatalogBlock(NodeDefinition node, List<ValidationIssue> issues) {
+        BlockDefinition block = BuiltInBlockCatalog.block(node.blockId()).orElse(null);
+        if (block == null) {
+            error(issues, "unknown_block_id", "未知积木 blockId：" + node.blockId() + "（" + node.id() + "）");
+            return;
+        }
+        if (block.nodeType() != node.type()) {
+            error(issues, "block_type_mismatch", "积木 blockId 与节点类型不匹配：" + node.id());
         }
     }
 

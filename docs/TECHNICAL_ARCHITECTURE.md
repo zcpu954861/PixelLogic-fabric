@@ -34,6 +34,14 @@ The v1 graph draft checkpoint adds the first persistent graph loop:
 
 It still does not implement arbitrary graph create/delete editing, Region, old TZZ adapters, multi-loader storage, or Java-generated WebUI.
 
+The v1 block catalog skeleton separates Block Catalog definitions from the current demo node families:
+
+- `core/catalog` owns the built-in registry records for categories, subcategories, concrete blocks, form fields, simulation capability, Minecraft capability, and safety flags.
+- Only the current demo concrete block ids are registered: `trigger.manual_test`, `condition.state.equals`, `action.message.chat`, `state.set`, `state.add`, `timer.wait`, and `debug.log`.
+- Graph JSON keeps legacy `node.type` and adds `blockId`; old graph documents without `blockId` infer it from `node.type`.
+- GraphRuntime still dispatches on `NodeType` in this checkpoint. The catalog is a registry and compatibility layer, not a runtime rewrite.
+- `GET /api/pixellogic/catalog` exposes the readonly catalog to the independent WebUI.
+
 ## Lifecycle / Capacity Safety
 
 The v1 editor baseline now has spike-level safety bounds:
@@ -56,6 +64,8 @@ These bounds are intentionally small and local to the spike. Before broader runt
 - `core/condition`
 - `core/state`
 - `core/timer`
+- `core/catalog`
+- `core/simulation`
 - `core/region`
 - `server/api`
 - `server/storage`
@@ -63,6 +73,21 @@ These bounds are intentionally small and local to the spike. Before broader runt
 - `loader/fabric`
 - `loader/forge` or `loader/neoforge` later
 - `web-ui`
+
+## Simulation Adapter Boundary
+
+Simulation is an adapter-facing capability model, not a full Minecraft clone.
+
+Core logic simulation may model actors, state, timers, trace, inventory summaries, simple world facts, regions, containers, event sources, permissions, and trace output only to the extent PixelLogic blocks need them. It must not promise full redstone, entity AI, physics, chunk loading, or complete item NBT behavior.
+
+The intended split for future concrete blocks is:
+
+- shared Block Definition for id, slots, form schema, validation, summary, trace format, and safety flags;
+- Simulation Executor for WebUI-first testing and trace;
+- Minecraft Executor for real Fabric/Minecraft side effects;
+- loader adapter conversion from real events into PixelLogic triggers.
+
+GraphRuntime and WebUI must not directly bind to Minecraft classes.
 
 ## WebUI Rule
 

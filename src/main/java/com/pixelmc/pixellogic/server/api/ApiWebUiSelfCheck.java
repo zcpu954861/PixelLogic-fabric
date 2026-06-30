@@ -14,11 +14,15 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.require;
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.run;
+
 public final class ApiWebUiSelfCheck {
     private ApiWebUiSelfCheck() {
     }
 
     public static void main(String[] args) throws Exception {
+        run("apiWebUiSelfCheck", () -> {
         Path storageRoot = Files.createTempDirectory("pixel-logic-api-self-check-");
         try (PixelLogicSpikeService service = new PixelLogicSpikeService((playerId, message) -> {
         }, Runnable::run, ignored -> {
@@ -107,6 +111,7 @@ public final class ApiWebUiSelfCheck {
             require(apiRoot.body().contains("\"ok\":false") && apiRoot.body().contains("\"error\"") && apiRoot.body().contains("NOT_FOUND"),
                     "api root should return JSON error shape");
         }
+        });
     }
 
     private static void setNodeConfig(JsonObject graph, String nodeId, String key, String value) {
@@ -158,12 +163,6 @@ public final class ApiWebUiSelfCheck {
 
     private static void requireJson(CheckedResponse response, String message) {
         require(response.contentType().toLowerCase().contains("application/json"), message);
-    }
-
-    private static void require(boolean condition, String message) {
-        if (!condition) {
-            throw new IllegalStateException(message);
-        }
     }
 
     private record CheckedResponse(String contentType, String body) {

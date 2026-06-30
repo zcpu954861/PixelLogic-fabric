@@ -22,11 +22,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.require;
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.run;
+
 public final class ConditionOutputModeSelfCheck {
     private ConditionOutputModeSelfCheck() {
     }
 
     public static void main(String[] args) {
+        run("conditionOutputModeSelfCheck", () -> {
         BlockDefinition stateCondition = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_STATE_EQUALS).orElseThrow();
         BlockDefinition hasTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG).orElseThrow();
         BlockDefinition addTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG).orElseThrow();
@@ -58,20 +62,21 @@ public final class ConditionOutputModeSelfCheck {
         require(validator.hasErrors(validator.validate(conditionGraph(Map.of("outputMode", "BOGUS"), List.of()))),
                 "unknown outputMode should fail validation");
 
-        RunResult passOnlyFalse = run(conditionGraph(Map.of("outputMode", "PASS_ONLY", "expected", "true"), List.of()));
+        RunResult passOnlyFalse = runGraph(conditionGraph(Map.of("outputMode", "PASS_ONLY", "expected", "true"), List.of()));
         require(passOnlyFalse.success(), "PASS_ONLY false should end gracefully");
         require(passOnlyFalse.trace().containsMessage("条件不满足，流程在此结束。"), "PASS_ONLY false should trace graceful end");
 
-        RunResult failOnlyTrue = run(conditionGraph(Map.of("outputMode", "FAIL_ONLY"), List.of()));
+        RunResult failOnlyTrue = runGraph(conditionGraph(Map.of("outputMode", "FAIL_ONLY"), List.of()));
         require(failOnlyTrue.success(), "FAIL_ONLY true should end gracefully");
         require(failOnlyTrue.trace().containsMessage("条件满足，流程在此结束。"), "FAIL_ONLY true should trace graceful end");
 
-        RunResult branchMissingEdge = run(conditionGraph(Map.of("outputMode", "BRANCH"), List.of(edge("e2", "condition", "fail", "debug-fail", "input"))));
+        RunResult branchMissingEdge = runGraph(conditionGraph(Map.of("outputMode", "BRANCH"), List.of(edge("e2", "condition", "fail", "debug-fail", "input"))));
         require(branchMissingEdge.success(), "BRANCH selected unconnected output should end gracefully");
         require(branchMissingEdge.trace().containsMessage("未连接后续积木，流程在此结束。"), "missing selected output should trace end");
+        });
     }
 
-    private static RunResult run(GraphDefinition graph) {
+    private static RunResult runGraph(GraphDefinition graph) {
         CompiledGraph compiled = new GraphCompiler().compile(graph);
         BoundedTraceBuffer traces = new BoundedTraceBuffer(2, 20);
         GraphRuntime runtime = new GraphRuntime(compiled, new InMemoryStateStore(), traces, new RuntimeServices() {
@@ -156,12 +161,6 @@ public final class ConditionOutputModeSelfCheck {
 
     private static EdgeDefinition edge(String id, String sourceNode, String sourceSlot, String targetNode, String targetSlot) {
         return new EdgeDefinition(id, sourceNode, sourceSlot, targetNode, targetSlot, EdgeType.CONTROL);
-    }
-
-    private static void require(boolean condition, String message) {
-        if (!condition) {
-            throw new IllegalStateException(message);
-        }
     }
 
     private record RunResult(boolean success, com.pixelmc.pixellogic.core.trace.ExecutionTrace trace) {

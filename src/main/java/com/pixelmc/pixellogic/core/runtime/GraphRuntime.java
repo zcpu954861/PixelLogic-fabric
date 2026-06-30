@@ -129,13 +129,13 @@ public final class GraphRuntime {
     }
 
     private String executeNode(NodeDefinition node, ExecutionContext context) {
-        Optional<RuntimeServices.NodeExecution> simulated = services.executeSimulationNode(
+        Optional<RuntimeNodeExecutionResult> simulated = services.executeSimulationNode(
                 node,
                 context.playerId(),
                 context.sessionId()
         );
         if (simulated.isPresent()) {
-            RuntimeServices.NodeExecution result = simulated.get();
+            RuntimeNodeExecutionResult result = simulated.get();
             if (result.traceMessage() != null && !result.traceMessage().isBlank()) {
                 traces.add(context.traceId(), node.id(), result.traceMessage());
             }

@@ -110,11 +110,16 @@ function renderFieldControl(field: EditableField, describedBy: string): string {
 }
 
 export function editorSection(nodeItem: GraphNode, catalog: BlockCatalog): EditorSection {
-  const blockItem = catalogBlock(catalog, nodeItem.blockId ?? '');
+  const blockItem = catalogBlock(catalog, nodeItem.blockId ?? '') ?? uniqueCatalogBlockForNodeType(catalog, nodeItem.type);
   if (blockItem) {
     return { title: blockItem.displayName, fields: schemaDrivenFields(nodeItem, blockItem.formSchema) };
   }
   return legacyNodeTypeEditorSection(nodeItem);
+}
+
+function uniqueCatalogBlockForNodeType(catalog: BlockCatalog, nodeType: string) {
+  const matches = catalog.blocks.filter((blockItem) => blockItem.nodeType === nodeType);
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[]): EditableField[] {

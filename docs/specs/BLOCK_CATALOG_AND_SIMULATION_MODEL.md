@@ -103,6 +103,16 @@ This checkpoint still does not add a real Minecraft adapter, draft simulation, n
 - The new message blocks reuse `rich_text_component`; color and formatting toolbar remain future work.
 - The title/subtitle/actionbar blocks are separate; there is no combined title+subtitle block.
 
+## Implementation Checkpoint: Maintainability Cleanup v1
+
+`feature/v1-maintainability-cleanup` keeps the catalog model but removes frontend duplication:
+
+- Java `BuiltInBlockCatalog` and `/api/pixellogic/catalog` remain the full catalog authority.
+- WebUI `fallbackCatalog` is only an API-offline placeholder and no longer copies every built-in block definition.
+- WebUI form controls still use catalog `formSchema` first; legacy `NodeType` fields are kept only for old or unknown nodes.
+- Nodes missing `blockId` infer catalog schema only when their legacy `node.type` maps to exactly one catalog block, avoiding ambiguous message-action guesses.
+- No catalog generation system, new blocks, capability metadata deletion, or graph schema rewrite is included.
+
 ## Product Principles
 
 - 分类不是积木。
@@ -342,7 +352,7 @@ debug.trace_marker
 - 危险字段需要二次确认或高级标记。
 - 表单只展示该具体积木需要的字段，不展示万能动作的全部可能配置。
 
-Current MVP supports `string`, `textarea`, `number`, `integer`, `boolean`, `select`, `segmented`, `readonly`, `hidden`, `scope`, and `rich_text_component`. The frontend uses catalog schema as the main path and reserves legacy `NodeType` builders for unknown old nodes only.
+Current MVP supports `string`, `textarea`, `number`, `integer`, `boolean`, `select`, `segmented`, `readonly`, `hidden`, `scope`, and `rich_text_component`. The frontend uses catalog schema as the main path and reserves legacy `NodeType` builders for unknown old nodes only. The frontend fallback catalog is not a full registry and must not be treated as authoritative.
 
 ## Summary Direction
 

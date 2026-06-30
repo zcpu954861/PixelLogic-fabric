@@ -16,11 +16,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.require;
+import static com.pixelmc.pixellogic.selfcheck.SelfCheckSupport.run;
+
 public final class BlockCatalogSelfCheck {
     private BlockCatalogSelfCheck() {
     }
 
     public static void main(String[] args) {
+        run("blockCatalogSelfCheck", () -> {
         BlockCatalog catalog = BuiltInBlockCatalog.catalog();
         Set<String> expected = Set.of(
                 BuiltInBlockCatalog.TRIGGER_MANUAL_TEST,
@@ -113,6 +117,7 @@ public final class BlockCatalogSelfCheck {
         require(messageBlock(BuiltInBlockCatalog.ACTION_MESSAGE_ACTIONBAR).formSchema().stream()
                         .anyMatch(field -> field.key().equals("message") && field.type().equals("rich_text_component")),
                 "actionbar message block should use rich_text_component");
+        });
     }
 
     private static GraphDocument legacyWithoutBlockId(GraphDocument document) {
@@ -169,9 +174,4 @@ public final class BlockCatalogSelfCheck {
         return BuiltInBlockCatalog.block(blockId).orElseThrow();
     }
 
-    private static void require(boolean condition, String message) {
-        if (!condition) {
-            throw new IllegalStateException(message);
-        }
-    }
 }

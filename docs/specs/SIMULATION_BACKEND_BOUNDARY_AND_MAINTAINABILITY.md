@@ -11,7 +11,8 @@ This was originally a docs-only design specification. By itself it does not auth
 - Existing manual/WebUI test-run paths still use the committed graph and are routed through `SimulationRunner`.
 - `condition.player.has_tag` and `action.player.add_tag` are the first simulation-backed non-demo catalog blocks.
 - Player tag behavior lives in `SimulationExecutionRegistry`; `GraphRuntime` remains the traversal core and fails closed if those nodes run without a simulation executor.
-- Timer behavior stays on the existing wall-clock scheduler. Fast-forward remains a boundary only.
+- Timer behavior stays on the existing wall-clock scheduler. `SimulationRunOptions` currently only preserves real-time timer scheduling; fast-forward remains a future boundary and no longer has a runtime switch.
+- Simulated node execution returns `RuntimeNodeExecutionResult` through `RuntimeServices`, keeping the optional simulation hook small without nesting result records inside the service interface.
 
 Still not implemented:
 

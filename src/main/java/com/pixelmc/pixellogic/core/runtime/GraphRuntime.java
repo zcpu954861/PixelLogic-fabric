@@ -4,8 +4,8 @@ import com.pixelmc.pixellogic.core.graph.CompiledGraph;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.StateScope;
 import com.pixelmc.pixellogic.core.model.StateValueType;
+import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.state.StateKey;
-import com.pixelmc.pixellogic.core.state.StateStore;
 import com.pixelmc.pixellogic.core.state.StateValue;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
 import com.pixelmc.pixellogic.core.trace.BoundedTraceBuffer;
@@ -16,7 +16,7 @@ import java.util.UUID;
 
 public final class GraphRuntime {
     private final CompiledGraph graph;
-    private final StateStore stateStore;
+    private final InMemoryStateStore stateStore;
     private final BoundedTraceBuffer traces;
     private final RuntimeServices services;
     private final RuntimeLimits limits;
@@ -24,7 +24,7 @@ public final class GraphRuntime {
 
     public GraphRuntime(
             CompiledGraph graph,
-            StateStore stateStore,
+            InMemoryStateStore stateStore,
             BoundedTraceBuffer traces,
             RuntimeServices services,
             RuntimeLimits limits
@@ -34,7 +34,7 @@ public final class GraphRuntime {
 
     public GraphRuntime(
             CompiledGraph graph,
-            StateStore stateStore,
+            InMemoryStateStore stateStore,
             BoundedTraceBuffer traces,
             RuntimeServices services,
             RuntimeLimits limits,

@@ -6,6 +6,7 @@ import com.pixelmc.pixellogic.core.graph.GraphCompiler;
 import com.pixelmc.pixellogic.core.graph.GraphValidator;
 import com.pixelmc.pixellogic.core.graph.ValidationIssue;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
+import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.StateScope;
 import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.state.StateKey;
@@ -17,7 +18,9 @@ import com.pixelmc.pixellogic.core.trace.ExecutionTrace;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -103,14 +106,14 @@ public final class ManualSimulationSelfCheck {
         latestCheck.add(oldTrace.id(), "timer", "计时器完成：继续执行");
         require(latestCheck.latest().map(ExecutionTrace::id).orElse("").equals("old"), "timer-updated trace should become latest");
 
-        GraphDefinition invalidCondition = DemoGraphFactory.create(Duration.ofSeconds(1)).withNodeConfig("condition-started", "expected", "maybe");
+        GraphDefinition invalidCondition = withNodeConfig(DemoGraphFactory.create(Duration.ofSeconds(1)), "condition-started", "expected", "maybe");
         require(new GraphValidator().hasErrors(new GraphValidator().validate(invalidCondition)), "invalid boolean condition config should fail validation");
 
         state.set(StateKey.of(StateScope.PLAYER, playerId.toString(), "started"), StateValue.string("bad"));
         RuntimeResult badState = runtime.start(new TriggerEvent(DemoGraphFactory.TRIGGER_TYPE, "/pixellogic test start", playerId, "self-check"));
         require(!badState.success(), "state type mismatch should fail closed");
 
-        GraphDefinition conflictingSetGraph = DemoGraphFactory.create(Duration.ofSeconds(1)).withNodeConfig("set-started", "valueType", "STRING");
+        GraphDefinition conflictingSetGraph = withNodeConfig(DemoGraphFactory.create(Duration.ofSeconds(1)), "set-started", "valueType", "STRING");
         InMemoryStateStore conflictingState = new InMemoryStateStore();
         GraphRuntime conflictingRuntime = new GraphRuntime(
                 new GraphCompiler().compile(conflictingSetGraph),
@@ -159,5 +162,19 @@ public final class ManualSimulationSelfCheck {
         if (!condition) {
             throw new IllegalStateException(message);
         }
+    }
+
+    private static GraphDefinition withNodeConfig(GraphDefinition graph, String nodeId, String key, String value) {
+        List<NodeDefinition> updatedNodes = graph.nodes().stream()
+                .map(node -> {
+                    if (!node.id().equals(nodeId)) {
+                        return node;
+                    }
+                    Map<String, String> config = new HashMap<>(node.config());
+                    config.put(key, value);
+                    return new NodeDefinition(node.id(), node.type(), node.slots(), Map.copyOf(config));
+                })
+                .toList();
+        return new GraphDefinition(graph.id(), updatedNodes, graph.edges(), graph.triggerEntries());
     }
 }

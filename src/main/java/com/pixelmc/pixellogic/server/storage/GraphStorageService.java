@@ -129,10 +129,6 @@ public final class GraphStorageService {
         return Files.exists(draftPath(graphId));
     }
 
-    public Path root() {
-        return root;
-    }
-
     public static void validateGraphId(String graphId) {
         if (!isSafeGraphId(graphId)) {
             throw new IllegalArgumentException("graph id 只能包含字母、数字、下划线和短横线。");

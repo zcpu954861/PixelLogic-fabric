@@ -66,7 +66,7 @@ public record GraphDocument(
                 updatedAt,
                 "",
                 nodes.stream().map(NodeDocument::normalized).toList(),
-                edges.stream().map(EdgeDocument::normalized).toList(),
+                edges,
                 sortedMap(triggerEntries)
         );
     }
@@ -171,7 +171,7 @@ public record GraphDocument(
                     blankToDefault(displayName, id),
                     sortedMap(config),
                     position == null ? new Position(48, 78) : position,
-                    slots.stream().map(SlotDocument::normalized).toList()
+                    slots
             );
         }
     }
@@ -182,9 +182,6 @@ public record GraphDocument(
             return new SlotDefinition(id, SlotDirection.valueOf(direction), EdgeType.valueOf(edgeType));
         }
 
-        SlotDocument normalized() {
-            return new SlotDocument(id, direction, edgeType);
-        }
     }
 
     public record EdgeDocument(
@@ -211,9 +208,6 @@ public record GraphDocument(
             );
         }
 
-        EdgeDocument normalized() {
-            return new EdgeDocument(id, sourceNodeId, sourceSlotId, targetNodeId, targetSlotId, type);
-        }
     }
 
     public record Position(int x, int y) {

@@ -103,7 +103,7 @@ Current responsibility boundaries:
 - `ui/trace/`: trace rendering.
 - `ui/humanize/`: labels and trace message humanization.
 - `ui/validation/`: validation/draft status copy.
-- `styles/`: split CSS modules imported by `styles/index.css`; `styles.css` is a tiny compatibility import.
+- `styles/`: split CSS modules imported by `styles/index.css`.
 
 ## Boundary
 

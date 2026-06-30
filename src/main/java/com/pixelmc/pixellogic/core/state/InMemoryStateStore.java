@@ -7,7 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
-public final class InMemoryStateStore implements StateStore {
+public final class InMemoryStateStore {
     public static final int DEFAULT_MAX_ENTRIES = 1024;
 
     private final int maxEntries;
@@ -24,18 +24,15 @@ public final class InMemoryStateStore implements StateStore {
         this.maxEntries = maxEntries;
     }
 
-    @Override
     public synchronized Optional<StateValue> get(StateKey key) {
         return Optional.ofNullable(values.get(key));
     }
 
-    @Override
     public synchronized void set(StateKey key, StateValue value) {
         requireCapacityFor(key);
         values.put(key, value);
     }
 
-    @Override
     public synchronized StateValue addInteger(StateKey key, int amount) {
         requireCapacityFor(key);
         StateValue current = values.get(key);
@@ -46,11 +43,6 @@ public final class InMemoryStateStore implements StateStore {
         StateValue next = StateValue.integer(base + amount);
         values.put(key, next);
         return next;
-    }
-
-    @Override
-    public synchronized void remove(StateKey key) {
-        values.remove(key);
     }
 
     public synchronized void removeOwner(StateScope scope, String ownerId) {

@@ -98,6 +98,7 @@ Known condition config compatibility:
 - New condition nodes store `config.outputMode` as one of `PASS_ONLY`, `FAIL_ONLY`, or `BRANCH`.
 - Old graph documents without `outputMode` remain valid and run as `BRANCH`.
 - Unconnected condition outputs are valid and mean that path ends.
+- Unconnected condition inputs are valid during editing; the block is saved but unreachable until connected into a trigger path.
 - The normal WebUI renders this as `条件用途`: `满足时继续`, `不满足时继续`, or `分成两路`.
 
 ## Endpoints

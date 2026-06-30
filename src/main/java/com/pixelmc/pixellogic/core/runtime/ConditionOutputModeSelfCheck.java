@@ -21,7 +21,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.time.Duration;
 
 public final class ConditionOutputModeSelfCheck {
     private ConditionOutputModeSelfCheck() {
@@ -52,6 +51,8 @@ public final class ConditionOutputModeSelfCheck {
                 "old condition graph without outputMode should validate as BRANCH");
         require(!validator.hasErrors(validator.validate(conditionGraph(Map.of("outputMode", "PASS_ONLY"), List.of()))),
                 "PASS_ONLY with no connected output should validate");
+        require(!validator.hasErrors(validator.validate(disconnectedConditionGraph(Map.of("outputMode", "PASS_ONLY"), List.of()))),
+                "condition with no connected input should validate like other placed blocks");
         require(!validator.hasErrors(validator.validate(conditionGraph(Map.of("outputMode", "BRANCH"), List.of(edge("e2", "condition", "pass", "debug-pass", "input"))))),
                 "BRANCH with one unconnected side should validate");
         require(validator.hasErrors(validator.validate(conditionGraph(Map.of("outputMode", "BOGUS"), List.of()))),
@@ -91,6 +92,14 @@ public final class ConditionOutputModeSelfCheck {
     }
 
     private static GraphDefinition conditionGraph(Map<String, String> configPatch, List<EdgeDefinition> conditionEdges) {
+        return conditionGraph(configPatch, conditionEdges, true);
+    }
+
+    private static GraphDefinition disconnectedConditionGraph(Map<String, String> configPatch, List<EdgeDefinition> conditionEdges) {
+        return conditionGraph(configPatch, conditionEdges, false);
+    }
+
+    private static GraphDefinition conditionGraph(Map<String, String> configPatch, List<EdgeDefinition> conditionEdges, boolean connectConditionInput) {
         Map<String, String> config = new java.util.HashMap<>(Map.of(
                 "scope", "PLAYER",
                 "key", "started",
@@ -107,7 +116,7 @@ public final class ConditionOutputModeSelfCheck {
                         node("debug-pass", NodeType.DEBUG_LOG_ACTION, in("input"), out("done"), Map.of("message", "pass")),
                         node("debug-fail", NodeType.DEBUG_LOG_ACTION, in("input"), out("done"), Map.of("message", "fail"))
                 ),
-                join(List.of(edge("e1", "manual-trigger", "started", "condition", "input")), conditionEdges),
+                join(connectConditionInput ? List.of(edge("e1", "manual-trigger", "started", "condition", "input")) : List.of(), conditionEdges),
                 Map.of(DemoGraphFactory.TRIGGER_TYPE, "manual-trigger")
         );
     }

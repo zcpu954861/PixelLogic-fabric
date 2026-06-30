@@ -76,6 +76,7 @@ This checkpoint still does not add a real Minecraft adapter, draft simulation, n
 - Old graphs without `outputMode` default to `BRANCH` for compatibility.
 - New condition catalog entries default to `PASS_ONLY`, while the seeded demo graph explicitly stores `BRANCH`.
 - Condition outputs are optional in validation; an unconnected selected output ends the path and writes a trace step.
+- Condition inputs are also optional while editing, matching other placed blocks; an unconnected condition is saved but unreachable until attached to a trigger path.
 - `condition.player.has_tag` now belongs to `条件判断 / 玩家条件`; `action.player.add_tag` remains `玩家操作 / 标签`.
 
 ## Product Principles

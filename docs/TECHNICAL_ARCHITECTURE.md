@@ -127,6 +127,7 @@ The condition output mode checkpoint keeps the same direct edge runtime and adds
 - Missing `outputMode` on old graphs defaults to `BRANCH`.
 - New condition catalog nodes default to `PASS_ONLY`; the seeded demo graph explicitly stays `BRANCH`.
 - Unconnected condition outputs mean that path ends gracefully and are not validation blockers.
+- Unconnected condition inputs are allowed during editing like other loose placed blocks; they are unreachable until connected to a trigger path.
 - `condition.player.has_tag` is categorized as `条件判断 / 玩家条件`; `action.player.add_tag` remains `玩家操作 / 标签`.
 
 ## WebUI Rule

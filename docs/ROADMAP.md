@@ -44,7 +44,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - Catalog form schema + rich text field branch adopts `formSchema` as the editor main path for the current seven demo blocks, adds catalog summaries, upgrades message text to a structured rich text component MVP, and restores modal-local draft + manual save semantics for configuration edits.
 - Simulation Backend boundary docs define the next backend direction: simulated actor/world/inventory/container/event abstractions, a logical receiver runner, per-block simulation executors, capability matrix, and maintenance rules against mega files.
 - Simulation Backend skeleton branch adds minimal `core/simulation` context/event/runner/result/executor code, routes manual/WebUI test-run through `SimulationRunner`, and registers the first simulation-backed player tag condition/action blocks.
-- Condition output mode branch adds `满足时继续` / `不满足时继续` / `分成两路`, makes unconnected condition outputs end gracefully, moves `condition.player.has_tag` to 条件判断 / 玩家条件, and keeps the demo graph as explicit dual-branch.
+- Condition output mode branch adds `满足时继续` / `不满足时继续` / `分成两路`, makes unconnected condition outputs end gracefully, allows unconnected condition inputs during editing, moves `condition.player.has_tag` to 条件判断 / 玩家条件, and keeps the demo graph as explicit dual-branch.
 
 ## Follow-Ups
 

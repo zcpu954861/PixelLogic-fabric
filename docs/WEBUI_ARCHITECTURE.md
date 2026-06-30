@@ -111,6 +111,7 @@ The slot-based canvas now supports a minimal direct-manipulation graph editing l
 - Releasing on blank canvas stores new position metadata and drops edges that are no longer visually snapped.
 - Automatic save and test-run also sync graph edges to the current visual snapped state before persisting.
 - Releasing near a valid join magnetically snaps the dragged chain into place, rewrites the edge as an inserted chain, and keeps validation fail-closed through the existing save flow.
+- A Condition block with no connected input can still be saved like other placed blocks; it is simply unreachable until connected to a trigger path.
 - While hovering near a valid middle join, the two connected components produced by temporarily cutting that join animate apart, leaving a green glow-only insertion gap.
 - Releasing near a chain-end output magnetically appends the dragged chain to that output.
 - Releasing a dragged chain tail near a free input magnetically connects the dragged chain before that block or chain.

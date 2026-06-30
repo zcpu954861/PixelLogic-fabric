@@ -16,6 +16,7 @@
 - New catalog condition nodes default to `PASS_ONLY`.
 - The demo graph explicitly keeps `BRANCH`.
 - Unconnected selected condition output means graceful end and trace records the end.
+- Unconnected condition input is valid during editing, matching other placed blocks; the condition only runs after it is connected into a trigger path.
 - Switching to a mode that makes an existing branch inactive asks for confirmation before removing the affected edge.
 
 ## Catalog Changes

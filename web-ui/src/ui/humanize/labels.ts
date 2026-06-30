@@ -1,4 +1,4 @@
-import { catalogBlock } from '../../model/blockCatalog';
+import { catalogBlock, catalogCategory } from '../../model/blockCatalog';
 import { conditionOutputMode, conditionOutputModeLabel } from '../../model/conditionOutputMode';
 import type { BlockCatalog, BlockKind, CatalogBlock, FieldOption, GraphNode } from '../../model/graphTypes';
 import { richTextPlainText, shortRichText } from '../../model/richText';
@@ -67,9 +67,8 @@ export function nodeTypeLabel(type: string): string {
     case 'MESSAGE_ACTION':
       return '发送消息';
     case 'PLAYER_HAS_TAG_CONDITION':
-      return '玩家是否拥有标签';
     case 'PLAYER_IS_ADMIN_CONDITION':
-      return '玩家是否为管理员';
+      return '条件判断';
     case 'PLAYER_ADD_TAG_ACTION':
       return '添加玩家标签';
     case 'PLAYER_REMOVE_TAG_ACTION':
@@ -85,6 +84,23 @@ export function nodeTypeLabel(type: string): string {
     default:
       return '积木';
   }
+}
+
+export function nodeCategoryLabel(nodeItem: GraphNode, catalog?: BlockCatalog): string {
+  if (!catalog) {
+    return nodeTypeLabel(nodeItem.type);
+  }
+  const blockItem = catalogBlock(catalog, nodeItem.blockId ?? '') ?? catalog.blocks.find((item) => item.nodeType === nodeItem.type) ?? null;
+  const categoryItem = blockItem ? catalogCategory(catalog, blockItem.categoryId) : null;
+  return categoryItem?.displayName ?? nodeTypeLabel(nodeItem.type);
+}
+
+export function nodeOfficialLabel(nodeItem: GraphNode, catalog?: BlockCatalog): string {
+  return catalog ? catalogBlock(catalog, nodeItem.blockId ?? '')?.displayName ?? nodeTypeLabel(nodeItem.type) : nodeTypeLabel(nodeItem.type);
+}
+
+export function nodeTypeMetaLabel(nodeItem: GraphNode, catalog?: BlockCatalog): string {
+  return `${nodeCategoryLabel(nodeItem, catalog)}：${nodeOfficialLabel(nodeItem, catalog)}`;
 }
 
 export function nodeSummary(nodeItem: GraphNode, catalog?: BlockCatalog): string {

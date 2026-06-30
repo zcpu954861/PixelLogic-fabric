@@ -10,16 +10,15 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 - License: `Apache-2.0`
 
-## Active Checkpoint Branch
+## Active Baseline
 
-`refactor/webui-structure-split`
+`mc-1.21.11` now contains the v1 editor baseline: graph draft/save/load, modal editing, humanized forms, auto save/validate/apply, undo/redo, slot-flow drag/insert, WebUI structure split, and Apache-2.0 metadata.
 
 ## Next
 
-1. User review the WebUI structure split on `refactor/webui-structure-split`.
-2. Run audit/merge readiness before merging the drag/insert and structure split work to `mc-1.21.11`.
-3. Decide whether the next implementation target is graph editor polish, trace polish, or P2 state/timer capacity cleanup.
-4. Keep Region, old TZZ migration, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+1. User review the current v1 editor baseline on `mc-1.21.11`.
+2. Decide whether the next implementation target is state/timer lifecycle and capacity cleanup or a first release-candidate audit.
+3. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
 
 ## Completed Checkpoints
 
@@ -35,6 +34,8 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - Block editor humanized form UX hides internal enum strings from normal UI, uses Chinese labels and compact controls, and keeps graph JSON/runtime semantics unchanged.
 - Slot flow drag/insert UX adds block-library creation, free drag, downstream chain drag, Condition branch drag, insert-into-connection, minimal disconnect/delete actions, position metadata persistence, and trace display polish.
 - WebUI structure split moves the large frontend entry and stylesheet into responsibility-based TypeScript and CSS modules without changing behavior.
+- Apache-2.0 license metadata and full `LICENSE` text are included on `mc-1.21.11`.
+- v1 editor baseline health audit completed with no P0/P1.
 
 ## Follow-Ups
 

@@ -1,7 +1,10 @@
 .gradle/
 build/
 out/
+
+# Local Minecraft test worlds / runtime output
 run/
+world/
 logs/
 reports/
 

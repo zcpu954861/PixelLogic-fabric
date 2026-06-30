@@ -12,13 +12,13 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Active Baseline
 
-`mc-1.21.11` now contains the v1 editor baseline: graph draft/save/load, modal editing, humanized forms, auto save/validate/apply, undo/redo, slot-flow drag/insert, WebUI structure split, and Apache-2.0 metadata.
+`mc-1.21.11` now contains the v1 editor baseline: graph draft/save/load, modal editing, humanized forms, auto save/validate/apply, undo/redo, slot-flow drag/insert, WebUI structure split, lifecycle/capacity safety cleanup, and Apache-2.0 metadata.
 
 ## Next
 
-1. User review `feature/v1-lifecycle-capacity-safety-cleanup`.
-2. Repair any lifecycle/capacity findings reported from review or hand test.
-3. If accepted, run merge-readiness audit before merging back to `mc-1.21.11`.
+1. Design Block Catalog and Simulation Model as docs-only groundwork for the next implementation checkpoint.
+2. If accepted, implement the smallest BlockDefinition registry skeleton and migrate only the current demo blocks into it.
+3. Keep WebUI category navigation data-driven; the current six buttons are not permanent product categories.
 4. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
 
 ## Completed Checkpoints
@@ -37,7 +37,8 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - WebUI structure split moves the large frontend entry and stylesheet into responsibility-based TypeScript and CSS modules without changing behavior.
 - Apache-2.0 license metadata and full `LICENSE` text are included on `mc-1.21.11`.
 - v1 editor baseline health audit completed with no P0/P1.
-- Lifecycle/capacity safety cleanup is in progress on `feature/v1-lifecycle-capacity-safety-cleanup`.
+- Lifecycle/capacity safety cleanup is merged into `mc-1.21.11` with state/timer/trace/undo/autosave/API lifecycle bounds.
+- Block Catalog / Simulation Model docs define the next direction: concrete catalog blocks, registry-driven categories, and simulation executors separated from future Minecraft executors.
 
 ## Follow-Ups
 

@@ -11,6 +11,20 @@ The WebUI is an independent Vite + TypeScript project.
 - Graph API-backed draft save, draft validation, and commit for `demo-start-flow`.
 - App shell communicates the product direction: cards, slots, direct execution trace, and readable user actions.
 
+## Future Block Catalog
+
+The current left library buttons (`触发器 / 条件 / 动作 / 状态 / 计时器 / 调试`) are demo entries, not permanent product categories.
+
+Future WebUI library behavior should be driven by Block Catalog definitions:
+
+- category and subcategory registry, not hardcoded six buckets;
+- concrete block list inside each category;
+- search, tags, recent blocks, and common recommendations;
+- per-block short description, summary template, simulation capability, and safety flags;
+- no technical block id as primary user-facing copy.
+
+Users should drag concrete blocks such as `发送聊天消息`, `状态等于`, or `等待一段时间`, not a generic `动作` or `条件` block that hides many unrelated modes in one form.
+
 ## API Test Run
 
 The current WebUI calls:
@@ -110,3 +124,5 @@ Current responsibility boundaries:
 Java may serve built static assets later, but Java must not generate WebUI source strings.
 
 The normal user flow must expose visual graph relationships instead of channel names.
+
+The normal block library must expose concrete, human-readable blocks from the catalog. Category names are navigation, not executable nodes.

@@ -34,6 +34,8 @@ The v1 graph draft checkpoint adds the first persistent graph loop:
 
 It still does not implement arbitrary graph create/delete editing, Region, old TZZ adapters, multi-loader storage, or Java-generated WebUI.
 
+The next catalog design step separates Block Catalog definitions from the current demo node families. The six current WebUI entries are temporary catalog examples, not a stable architecture boundary. A future registry should describe concrete blocks, their slots, form schema, summary, validation, simulation capability, Minecraft capability, and safety flags.
+
 ## Lifecycle / Capacity Safety
 
 The v1 editor baseline now has spike-level safety bounds:
@@ -56,6 +58,8 @@ These bounds are intentionally small and local to the spike. Before broader runt
 - `core/condition`
 - `core/state`
 - `core/timer`
+- `core/catalog`
+- `core/simulation`
 - `core/region`
 - `server/api`
 - `server/storage`
@@ -63,6 +67,21 @@ These bounds are intentionally small and local to the spike. Before broader runt
 - `loader/fabric`
 - `loader/forge` or `loader/neoforge` later
 - `web-ui`
+
+## Simulation Adapter Boundary
+
+Simulation is an adapter-facing capability model, not a full Minecraft clone.
+
+Core logic simulation may model actors, state, timers, trace, inventory summaries, simple world facts, regions, containers, event sources, permissions, and trace output only to the extent PixelLogic blocks need them. It must not promise full redstone, entity AI, physics, chunk loading, or complete item NBT behavior.
+
+The intended split for future concrete blocks is:
+
+- shared Block Definition for id, slots, form schema, validation, summary, trace format, and safety flags;
+- Simulation Executor for WebUI-first testing and trace;
+- Minecraft Executor for real Fabric/Minecraft side effects;
+- loader adapter conversion from real events into PixelLogic triggers.
+
+GraphRuntime and WebUI must not directly bind to Minecraft classes.
 
 ## WebUI Rule
 

@@ -88,12 +88,14 @@ WebUI owns the independent frontend:
 
 - slot-based horizontal flow canvas
 - graph editing
-- block library
+- block library driven by Block Catalog definitions
 - selected block properties
 - validation display
 - execution trace display
 
 Java must not generate WebUI HTML, CSS, or JavaScript.
+
+The current six WebUI library buttons are temporary demo entries. The next architecture step should move to category registry plus concrete block definitions rather than a hardcoded category enum.
 
 ## No Channel Core Model
 
@@ -148,6 +150,8 @@ User term: card, block, puzzle piece, 积木.
 
 Internal term: Node is acceptable in core code.
 
+Future catalog term: Block Definition describes the concrete user-placeable block. Category is only library navigation and must not be treated as an executable node.
+
 v1 node families:
 
 - Trigger
@@ -166,6 +170,10 @@ Each node has:
 - output slots
 - position metadata for WebUI
 - Chinese summary data or summary template
+
+The current families are demo/runtime families, not permanent catalog categories. A future Block Catalog should map concrete block ids such as `trigger.manual_test`, `condition.state.equals`, `action.message.chat`, `state.set`, `timer.wait`, and `debug.log` onto the underlying runtime node behavior.
+
+Catalog definitions should own form schema, default config, summary template, validation rules, capability levels, safety flags, and migration/deprecation metadata. Runtime execution should continue to use compiled graph indexes and typed edges.
 
 ### Slot / Port
 
@@ -325,6 +333,19 @@ Each trace step should include:
 - error if any
 
 Trace powers WebUI bottom execution record and runtime diagnosis.
+
+### Simulation Model
+
+Simulation is the WebUI-first execution model for testing graph logic before every block has a real Minecraft adapter.
+
+It may model PixelLogic-visible abstractions such as actor/player, state, timers, trace, simple inventory facts, simple world facts, region events, container slots, event source, and permissions. It must not simulate complete Minecraft mechanics such as redstone, entity AI, physics, chunk loading, or full item NBT behavior.
+
+The intended executor split is:
+
+- shared validation, slots, form schema, summary, and trace format in Block Definition;
+- simulation executor for `FULLY_SIMULATABLE` or `APPROXIMATE_SIMULATION` blocks;
+- Minecraft executor for real server side effects;
+- capability and safety flags to warn, restrict, or require real runtime.
 
 ### ValidationIssue
 

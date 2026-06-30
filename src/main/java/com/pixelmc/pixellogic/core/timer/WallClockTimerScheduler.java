@@ -46,16 +46,12 @@ public final class WallClockTimerScheduler implements AutoCloseable {
             }
             int timerId = ++nextTimerId;
             int scheduledGeneration = generation;
-            try {
-                ScheduledFuture<?> future = executor.schedule(
-                        () -> runDue(timerId, scheduledGeneration, continuation, onDue),
-                        Math.max(1L, delay.toMillis()),
-                        TimeUnit.MILLISECONDS
-                );
-                pendingTimers.put(timerId, future);
-            } catch (RuntimeException exception) {
-                throw exception;
-            }
+            ScheduledFuture<?> future = executor.schedule(
+                    () -> runDue(timerId, scheduledGeneration, continuation, onDue),
+                    Math.max(1L, delay.toMillis()),
+                    TimeUnit.MILLISECONDS
+            );
+            pendingTimers.put(timerId, future);
         }
     }
 
@@ -65,11 +61,7 @@ public final class WallClockTimerScheduler implements AutoCloseable {
         }
     }
 
-    public int maxPendingTimers() {
-        return maxPendingTimers;
-    }
-
-    public void clearPendingTimers(String reason) {
+    public void clearPendingTimers() {
         Map<Integer, ScheduledFuture<?>> pending;
         synchronized (lock) {
             generation += 1;
@@ -84,7 +76,7 @@ public final class WallClockTimerScheduler implements AutoCloseable {
         synchronized (lock) {
             closed = true;
         }
-        clearPendingTimers("scheduler closed");
+        clearPendingTimers();
         executor.shutdownNow();
     }
 

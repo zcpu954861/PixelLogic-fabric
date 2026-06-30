@@ -65,10 +65,6 @@ public final class InMemoryStateStore implements StateStore {
         return values.size();
     }
 
-    public int maxEntries() {
-        return maxEntries;
-    }
-
     private void requireCapacityFor(StateKey key) {
         // ponytail: spike memory store fails closed at a fixed cap; replace with durable state lifecycle before broad runtime use.
         if (!values.containsKey(key) && values.size() >= maxEntries) {

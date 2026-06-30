@@ -127,7 +127,7 @@ public final class ManualSimulationSelfCheck {
         try (WallClockTimerScheduler fullScheduler = new WallClockTimerScheduler(0)) {
             boolean rejected = false;
             try {
-                fullScheduler.schedule(Duration.ofSeconds(1), new TimerContinuation("g", "n", "t", playerId, "s", 1), ignored -> {
+                fullScheduler.schedule(Duration.ofSeconds(1), new TimerContinuation("g", "n", "t", playerId, "s", 1, 0L), ignored -> {
                 });
             } catch (RejectedExecutionException exception) {
                 rejected = true;
@@ -137,9 +137,9 @@ public final class ManualSimulationSelfCheck {
 
         try (WallClockTimerScheduler scheduler = new WallClockTimerScheduler(4)) {
             AtomicBoolean fired = new AtomicBoolean();
-            scheduler.schedule(Duration.ofMillis(100), new TimerContinuation("g", "n", "t", playerId, "s", 1), ignored -> fired.set(true));
+            scheduler.schedule(Duration.ofMillis(100), new TimerContinuation("g", "n", "t", playerId, "s", 1, 0L), ignored -> fired.set(true));
             require(scheduler.pendingTimers() == 1, "timer scheduler should track pending timers");
-            scheduler.clearPendingTimers("self-check");
+            scheduler.clearPendingTimers();
             Thread.sleep(150L);
             require(!fired.get() && scheduler.pendingTimers() == 0, "timer clear should cancel pending callbacks");
         } catch (InterruptedException exception) {

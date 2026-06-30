@@ -13,7 +13,6 @@ import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
 import com.pixelmc.pixellogic.core.runtime.TriggerEvent;
 import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
-import com.pixelmc.pixellogic.core.state.StateKey;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
 import com.pixelmc.pixellogic.core.timer.WallClockTimerScheduler;
 import com.pixelmc.pixellogic.core.trace.BoundedTraceBuffer;
@@ -35,11 +34,10 @@ import java.util.function.Consumer;
 public final class PixelLogicSpikeService implements AutoCloseable {
     private static final int MAX_TRACES = 50;
     private static final int MAX_STEPS_PER_TRACE = 100;
-    private static final int MAX_STATE_ENTRIES = InMemoryStateStore.DEFAULT_MAX_ENTRIES;
     private static final String MANUAL_SESSION_ID = "manual-session";
 
     private final GraphValidator validator = new GraphValidator();
-    private final InMemoryStateStore stateStore = new InMemoryStateStore(MAX_STATE_ENTRIES);
+    private final InMemoryStateStore stateStore = new InMemoryStateStore();
     private final BoundedTraceBuffer traces = new BoundedTraceBuffer(MAX_TRACES, MAX_STEPS_PER_TRACE);
     private final WallClockTimerScheduler timerScheduler = new WallClockTimerScheduler();
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -139,7 +137,7 @@ public final class PixelLogicSpikeService implements AutoCloseable {
 
     public void resetPlayer(UUID playerId) {
         runtimeGeneration.incrementAndGet();
-        timerScheduler.clearPendingTimers("test reset");
+        timerScheduler.clearPendingTimers();
         stateStore.removeOwner(StateScope.PLAYER, playerId.toString());
         stateStore.removeOwner(StateScope.SESSION, MANUAL_SESSION_ID);
         GraphDocument graph = committedGraph;
@@ -215,18 +213,6 @@ public final class PixelLogicSpikeService implements AutoCloseable {
         return timerScheduler.pendingTimers();
     }
 
-    public int maxPendingTimers() {
-        return timerScheduler.maxPendingTimers();
-    }
-
-    public int stateEntries() {
-        return stateStore.size();
-    }
-
-    public int maxStateEntries() {
-        return stateStore.maxEntries();
-    }
-
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
@@ -238,7 +224,7 @@ public final class PixelLogicSpikeService implements AutoCloseable {
 
     private void installCommittedGraph(GraphDocument document) {
         long generation = runtimeGeneration.incrementAndGet();
-        timerScheduler.clearPendingTimers("committed graph installed");
+        timerScheduler.clearPendingTimers();
         GraphDefinition graph = document.toGraphDefinition();
         List<ValidationIssue> issues = List.copyOf(validator.validate(graph));
         if (validator.hasErrors(issues)) {

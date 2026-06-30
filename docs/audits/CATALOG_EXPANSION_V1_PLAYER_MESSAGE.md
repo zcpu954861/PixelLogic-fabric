@@ -39,3 +39,10 @@
 
 - `catalogExpansionV1SelfCheck`: added.
 - `.\gradlew.bat catalogExpansionV1SelfCheck`: pass during implementation.
+
+## User-Accepted UI Display Addendum
+
+- Card gray type labels display the top-level catalog category, not the concrete block name.
+- The right-panel selected-block badge follows the same category-label rule.
+- The block editor title displays `未命名(官方积木名)` when the node has not been renamed away from the official catalog name, otherwise `自定义名称(官方积木名)`.
+- The base-info `积木类型` field is static metadata and displays `积木类别：官方积木名`; it is not an editable or readonly-input-style control.

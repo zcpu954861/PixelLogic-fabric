@@ -52,6 +52,26 @@ public final class CompiledGraph {
         return node(edges.getFirst().targetNodeId());
     }
 
+    public Optional<NodeDefinition> bodyEntry(String containerNodeId, String parentSlot) {
+        return nodesById.values().stream()
+                .filter(node -> node.parentContainerId().equals(containerNodeId))
+                .filter(node -> node.parentSlot().equals(parentSlot))
+                .filter(node -> incomingWithinParent(node.id(), containerNodeId, parentSlot).isEmpty())
+                .findFirst();
+    }
+
+    public boolean isInBody(NodeDefinition node, String containerNodeId, String parentSlot) {
+        return node.parentContainerId().equals(containerNodeId) && node.parentSlot().equals(parentSlot);
+    }
+
+    private List<EdgeDefinition> incomingWithinParent(String nodeId, String containerNodeId, String parentSlot) {
+        return outgoingByNodeAndSlot.values().stream()
+                .flatMap(List::stream)
+                .filter(edge -> edge.targetNodeId().equals(nodeId))
+                .filter(edge -> node(edge.sourceNodeId()).map(source -> isInBody(source, containerNodeId, parentSlot)).orElse(false))
+                .toList();
+    }
+
     record EdgeKey(String nodeId, String slotId) {
     }
 }

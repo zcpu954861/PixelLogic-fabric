@@ -1,5 +1,5 @@
 import type { SlotBlock, SlotJoin } from '../../model/graphTypes';
-import { normalBlockHeight, puzzleMouthHalfHeight } from './blockConstants';
+import { containerBodyInset, containerFooterHeight, containerHeaderHeight, normalBlockHeight, puzzleMouthHalfHeight } from './blockConstants';
 import { escapeAttr, escapeHtml } from '../../utils/dom';
 
 export function puzzlePath(block: SlotBlock): string {
@@ -30,6 +30,17 @@ export function puzzlePath(block: SlotBlock): string {
     const branchInset = width - 106;
 
     return `M${branchInset} ${capTop} H${width - tab} V${passTop} H${width} V${passBottom} H${width - tab} V${failTop} H${width} V${failBottom} H${width - tab} V${capBottom} H${branchInset} V${headBottom} H0 V${inputBottom} H${tab} V${inputTop} H0 V${headTop} H${branchInset} Z`;
+  }
+
+  if (kind === 'control') {
+    const inputY = block.inputY ?? normalBlockHeight / 2;
+    const inputTop = inputY - puzzleMouthHalfHeight;
+    const inputBottom = inputY + puzzleMouthHalfHeight;
+    const outputY = block.outputOffsets.done;
+    const outputPath = outputY === undefined
+      ? `V${height}`
+      : `V${outputY - puzzleMouthHalfHeight} H${width} V${outputY + puzzleMouthHalfHeight} H${width - tab} V${height}`;
+    return `M0 0 H${width - tab} V${containerHeaderHeight} H${containerBodyInset} V${height - containerFooterHeight} H${width - tab} ${outputPath} H0 V${inputBottom} H${tab} V${inputTop} H0 Z`;
   }
 
   return `M0 0 H${width - tab} V${notchTop} H${width} V${notchBottom} H${width - tab} V${height} H0 V${notchBottom} H${tab} V${notchTop} H0 Z`;
@@ -78,15 +89,20 @@ export function renderSlotJoin(join: SlotJoin): string {
 export function renderBlock(block: SlotBlock, recentNodeId: string | null): string {
   const branchTabs = block.kind === 'condition' ? conditionBranchTabs(block) : '';
   const conditionClass = block.kind === 'condition' && !('pass' in block.outputOffsets && 'fail' in block.outputOffsets) ? ' condition-single' : '';
+  const zIndex = Math.max(10, (block.kind === 'control' ? 900 : 3000) - block.x) + (block.selected ? 1000 : 0);
+  const bodyZone = block.kind === 'control'
+    ? '<div class="container-body-zone"><span>拖入积木到这里</span></div>'
+    : '';
 
   return `
     <article
       class="logic-block ${block.kind} ${block.branch}${conditionClass}${block.selected ? ' selected' : ''}${recentNodeId === block.id ? ' newly-added' : ''}"
       data-block="${escapeAttr(block.id)}"
       data-branch="${block.branch}"
-      style="left:${block.x}px; top:${block.y}px; width:${block.width}px; height:${block.height}px; --condition-content-top:${Math.max(18, (block.inputY ?? 202) - 57)}px; z-index:${3000 - block.x + (block.selected ? 1000 : 0)}"
+      style="left:${block.x}px; top:${block.y}px; width:${block.width}px; height:${block.height}px; --condition-content-top:${Math.max(18, (block.inputY ?? 202) - 57)}px; z-index:${zIndex}"
     >
       ${renderShape(puzzlePath(block), block.width, block.height, branchTabs)}
+      ${bodyZone}
       <div class="block-topline">
         <span>${escapeHtml(block.type)}</span>
       </div>

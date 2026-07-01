@@ -23,6 +23,8 @@ import {
   cloneGraph,
   connectedComponentNodeIds,
   connectedGraphEdges,
+  containerBodyRect,
+  containerDescendantNodeIds,
   downstreamNodeIds,
   fallbackPosition,
   normalizeConditionBranchLayout,
@@ -55,6 +57,7 @@ import {
   insertDraggedGroup,
   makeInsertionGap,
   snapDraggedGroupToCandidate,
+  syncDraggedContainerMembership,
 } from './canvas/dragInsert';
 import { renderCatalogLibrary } from './catalog/catalogLibrary';
 import { updateBlockOverflowMotion } from './canvas/cardOverflow';
@@ -489,9 +492,9 @@ function bindInteractions(): void {
     renderApp();
   });
   document.querySelectorAll<HTMLButtonElement>('[data-catalog-block]').forEach((buttonEl) => {
-    buttonEl.addEventListener('click', () => {
+    buttonEl.addEventListener('pointerdown', (event) => {
       if (buttonEl.dataset.catalogBlock) {
-        addCatalogBlock(buttonEl.dataset.catalogBlock);
+        beginCatalogPointer(event, buttonEl.dataset.catalogBlock, buttonEl);
       }
     });
   });
@@ -698,8 +701,11 @@ function endBlockDrag(event: PointerEvent, viewport: HTMLElement): void {
   if (inserted) {
     makeInsertionGap(nextGraph, drag);
   }
+  const movedOutOfContainer = inserted ? false : syncDraggedContainerMembership(nextGraph, drag);
   const actionText = inserted
     ? connectedActionText(drag.candidate)
+    : movedOutOfContainer
+      ? '已移出容器内部，正在自动保存。'
     : '位置已更新，正在自动保存。';
   applyGraphEdit(nextGraph, actionText, { selectedNodeId: drag.rootId, recentNodeId: null });
 }
@@ -904,6 +910,9 @@ function renderInsertPreview(drag: BlockDrag): void {
       markInsertSplitGroups(graphWithPreviewPositions(currentGraph(), drag), candidate);
     }
   }
+  if (candidate.kind === 'container') {
+    document.querySelector<HTMLElement>(`[data-block="${candidate.containerNodeId}"]`)?.classList.add('container-target');
+  }
   document.querySelector<HTMLElement>(`[data-block="${candidate.join.from}"]`)?.classList.add('is-related');
   document.querySelector<HTMLElement>(`[data-block="${candidate.join.to}"]`)?.classList.add('is-related');
   setDragHint(candidate.message, candidate.valid ? 'valid' : 'invalid');
@@ -933,6 +942,9 @@ function clearInsertPreview(): void {
   document.querySelectorAll('.logic-block.is-insert-split-left, .logic-block.is-insert-split-right').forEach((item) => {
     item.classList.remove('is-insert-split-left', 'is-insert-split-right');
   });
+  document.querySelectorAll('.logic-block.container-target').forEach((item) => {
+    item.classList.remove('container-target');
+  });
   clearFocus();
 }
 
@@ -950,6 +962,40 @@ function setDragHint(message: string, tone: string): void {
 
 
 function addCatalogBlock(blockId: string): void {
+  addCatalogBlockAt(blockId, null);
+}
+
+function beginCatalogPointer(event: PointerEvent, blockId: string, buttonEl: HTMLElement): void {
+  if (event.button !== 0) {
+    return;
+  }
+  const start = { x: event.clientX, y: event.clientY };
+  let moved = false;
+  buttonEl.setPointerCapture(event.pointerId);
+  const cleanup = () => {
+    buttonEl.removeEventListener('pointermove', onMove);
+    buttonEl.removeEventListener('pointerup', onUp);
+    buttonEl.removeEventListener('pointercancel', onCancel);
+    if (buttonEl.hasPointerCapture(event.pointerId)) {
+      buttonEl.releasePointerCapture(event.pointerId);
+    }
+  };
+  const onMove = (moveEvent: PointerEvent) => {
+    if (Math.hypot(moveEvent.clientX - start.x, moveEvent.clientY - start.y) >= dragThreshold) {
+      moved = true;
+    }
+  };
+  const onUp = (upEvent: PointerEvent) => {
+    cleanup();
+    addCatalogBlockAt(blockId, moved ? upEvent : null);
+  };
+  const onCancel = () => cleanup();
+  buttonEl.addEventListener('pointermove', onMove);
+  buttonEl.addEventListener('pointerup', onUp);
+  buttonEl.addEventListener('pointercancel', onCancel);
+}
+
+function addCatalogBlockAt(blockId: string, event: PointerEvent | null): void {
   const blockItem = catalogBlock(activeCatalog(), blockId);
   if (!blockItem) {
     state.error = '没有找到这个积木，请重新打开积木库。';
@@ -959,12 +1005,43 @@ function addCatalogBlock(blockId: string): void {
   const graph = cloneGraph(currentGraph());
   const kind = blockKindFromCatalogBlock(blockItem);
   const nodeItem = createCatalogNode(blockItem, uniqueNodeId(catalogNodeIdPrefix(blockItem), graph), { x: 0, y: 0 });
-  nodeItem.position = visibleDropPosition(kind, nodeItem);
+  const dropPoint = event ? pointerToWorld(event) : null;
+  const selectedContainer = dropPoint
+    ? containerAtPoint(graph, dropPoint)
+    : graph.nodes.find((item) => item.id === state.selectedNodeId && item.blockId?.startsWith('control.loop.'));
+  if (selectedContainer && nodeItem.id !== selectedContainer.id) {
+    const rect = containerBodyRect(graph, selectedContainer);
+    const childIndex = graph.nodes.filter((item) => item.parentContainerId === selectedContainer.id).length;
+    nodeItem.parentContainerId = selectedContainer.id;
+    nodeItem.parentSlot = 'body';
+    const size = blockSize(kind);
+    const x = dropPoint ? dropPoint.x - size.width / 2 : rect.x + 18;
+    const y = dropPoint ? dropPoint.y - normalBlockHeight / 2 : rect.y + 18 + childIndex * 34;
+    nodeItem.position = { x: Math.round(Math.max(rect.x + 12, x)), y: Math.round(Math.max(rect.y + 12, y)) };
+  } else {
+    nodeItem.position = dropPoint
+      ? { x: Math.max(28, Math.round(dropPoint.x - blockSize(kind).width / 2)), y: Math.max(28, Math.round(dropPoint.y - normalBlockHeight / 2)) }
+      : visibleDropPosition(kind, nodeItem);
+  }
   graph.nodes.push(nodeItem);
   applyGraphEdit(graph, `已新增“${blockItem.displayName}”，正在自动保存。`, {
     selectedNodeId: nodeItem.id,
     recentNodeId: nodeItem.id,
   });
+}
+
+function containerAtPoint(graph: GraphDocument, point: GraphPosition): GraphNode | null {
+  return graph.nodes
+    .filter((nodeItem) => nodeItem.blockId?.startsWith('control.loop.'))
+    .filter((nodeItem) => {
+      const rect = containerBodyRect(graph, nodeItem);
+      return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
+    })
+    .sort((left, right) => {
+      const leftRect = containerBodyRect(graph, left);
+      const rightRect = containerBodyRect(graph, right);
+      return leftRect.width * leftRect.height - rightRect.width * rightRect.height;
+    })[0] ?? null;
 }
 
 function uniqueNodeId(prefix: string, graph: GraphDocument): string {
@@ -1012,11 +1089,15 @@ function deleteSelectedNode(): void {
     return;
   }
   const before = graph.nodes.length;
-  graph.nodes = graph.nodes.filter((nodeItem) => nodeItem.id !== state.selectedNodeId);
+  const deletedIds = new Set([state.selectedNodeId, ...containerDescendantNodeIds(graph, state.selectedNodeId)]);
+  if (deletedIds.size > 1 && !window.confirm('此循环块内还有积木，删除后内部积木也会删除。')) {
+    return;
+  }
+  graph.nodes = graph.nodes.filter((nodeItem) => !deletedIds.has(nodeItem.id));
   if (graph.nodes.length === before) {
     return;
   }
-  graph.edges = graph.edges.filter((graphEdge) => graphEdge.sourceNodeId !== state.selectedNodeId && graphEdge.targetNodeId !== state.selectedNodeId);
+  graph.edges = graph.edges.filter((graphEdge) => !deletedIds.has(graphEdge.sourceNodeId) && !deletedIds.has(graphEdge.targetNodeId));
   applyGraphEdit(graph, '已删除积木和相关连接，正在自动保存。', {
     selectedNodeId: graph.nodes[0]?.id ?? '',
     recentNodeId: null,

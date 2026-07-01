@@ -1,11 +1,14 @@
 import type { BlockDrag, GraphDocument, GraphEdge, GraphNode, GraphPosition, GraphSlot, InsertCandidate, SlotJoin } from '../../model/graphTypes';
 import { activeOutputSlots } from '../../model/conditionOutputMode';
 import { edge } from '../../model/demoGraph';
-import { blockMetrics, branchForNode, connectedGraphEdges, downstreamNodeIds, fallbackPosition, inputCenterOffset, nodePosition, outputCenterOffset } from '../../model/graphLayout';
+import { blockMetrics, branchForNode, connectedGraphEdges, containerBodyRect, downstreamNodeIds, fallbackPosition, inputCenterOffset, nodePosition, outputCenterOffset } from '../../model/graphLayout';
 import { preferredMainOutput } from './activeOutput';
 import { connectedOverlap, insertSnapX, insertSnapY, normalBlockHeight, reconnectSnapX, reconnectSnapY } from './blockConstants';
 
 export function connectedActionText(candidate: InsertCandidate | null): string {
+  if (candidate?.kind === 'container') {
+    return '已放入容器内部，正在自动保存。';
+  }
   if (candidate?.kind === 'append') {
     return '已连接到链尾，正在自动保存。';
   }
@@ -71,6 +74,11 @@ export function findInsertCandidate(baseGraph: GraphDocument, drag: BlockDrag): 
     }
   }
 
+  const containerCandidate = findContainerCandidate(graph, drag, rootPosition);
+  if (containerCandidate && !best) {
+    return containerCandidate;
+  }
+
   return best?.candidate ?? null;
 }
 
@@ -105,6 +113,9 @@ export function snapScoreWithin(anchor: GraphPosition, join: SlotJoin, snapX: nu
 }
 
 export function isReconnectCandidate(graph: GraphDocument, drag: BlockDrag, candidate: InsertCandidate): boolean {
+  if (candidate.kind === 'container') {
+    return false;
+  }
   if (candidate.kind === 'append') {
     const root = graph.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
     const rootInput = root?.slots.find((slot) => slot.direction === 'INPUT');
@@ -223,6 +234,9 @@ export function attachCandidates(graph: GraphDocument, drag: BlockDrag): InsertC
 
 export function snapDraggedGroupToCandidate(graph: GraphDocument, drag: BlockDrag): void {
   const candidate = drag.candidate;
+  if (candidate?.kind === 'container') {
+    return;
+  }
   if (candidate?.kind === 'attach') {
     snapDraggedGroupTailToTarget(graph, drag, candidate);
     return;
@@ -333,6 +347,10 @@ export function insertDraggedGroup(graph: GraphDocument, drag: BlockDrag): boole
   }
 
   const group = new Set(drag.groupIds);
+  if (candidate.kind === 'container') {
+    assignContainerMembership(graph, group, candidate.containerNodeId, candidate.slotId);
+    return true;
+  }
   if (candidate.kind === 'attach') {
     const tail = draggedTailOutput(graph, group);
     const target = graph.nodes.find((nodeItem) => nodeItem.id === candidate.targetNodeId);
@@ -373,6 +391,86 @@ export function insertDraggedGroup(graph: GraphDocument, drag: BlockDrag): boole
   graph.edges.push(edge(nextEdgeId(graph), candidate.edge.sourceNodeId, candidate.edge.sourceSlotId, drag.rootId, rootInput.id));
   graph.edges.push(edge(nextEdgeId(graph), tail.nodeId, tail.slot.id, candidate.edge.targetNodeId, candidate.edge.targetSlotId));
   return true;
+}
+
+export function syncDraggedContainerMembership(graph: GraphDocument, drag: BlockDrag): boolean {
+  const group = new Set(drag.groupIds);
+  let changed = false;
+  graph.nodes = graph.nodes.map((nodeItem) => {
+    if (!group.has(nodeItem.id) || (nodeItem.parentContainerId && group.has(nodeItem.parentContainerId))) {
+      return nodeItem;
+    }
+    if (!nodeItem.parentContainerId) {
+      return nodeItem;
+    }
+    const parent = graph.nodes.find((item) => item.id === nodeItem.parentContainerId);
+    if (!parent || pointInsideRect(nodePosition(graph, nodeItem.id), containerBodyRect(graph, parent))) {
+      return nodeItem;
+    }
+    changed = true;
+    return { ...nodeItem, parentContainerId: '', parentSlot: '' };
+  });
+  return changed;
+}
+
+function findContainerCandidate(graph: GraphDocument, drag: BlockDrag, rootPosition: GraphPosition): InsertCandidate | null {
+  const group = new Set(drag.groupIds);
+  const root = graph.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
+  if (!root) {
+    return null;
+  }
+  const rootSize = blockMetrics(graph, root);
+  const anchor = { x: rootPosition.x + rootSize.width / 2, y: rootPosition.y + Math.min(rootSize.height / 2, 120) };
+  const container = smallestContainerAtPoint(graph, anchor, (nodeItem) =>
+    !group.has(nodeItem.id) && Boolean(nodeItem.blockId?.startsWith('control.loop.')),
+  );
+  if (!container) {
+    return null;
+  }
+  const rect = containerBodyRect(graph, container);
+  return {
+    kind: 'container',
+    containerNodeId: container.id,
+    slotId: 'body',
+    join: {
+      id: `container:${container.id}:body`,
+      from: container.id,
+      to: drag.rootId,
+      branch: 'main',
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      tone: 'normal',
+    },
+    valid: true,
+    message: '松手即可放入循环内部。',
+  };
+}
+
+function assignContainerMembership(graph: GraphDocument, group: Set<string>, containerNodeId: string, slotId: string): void {
+  graph.edges = graph.edges.filter((graphEdge) =>
+    !group.has(graphEdge.targetNodeId) || group.has(graphEdge.sourceNodeId),
+  );
+  graph.nodes = graph.nodes.map((nodeItem) => {
+    if (!group.has(nodeItem.id) || (nodeItem.parentContainerId && group.has(nodeItem.parentContainerId))) {
+      return nodeItem;
+    }
+    return { ...nodeItem, parentContainerId: containerNodeId, parentSlot: slotId };
+  });
+}
+
+function pointInsideRect(point: GraphPosition, rect: { x: number; y: number; width: number; height: number }): boolean {
+  return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
+}
+
+function smallestContainerAtPoint(graph: GraphDocument, point: GraphPosition, include: (nodeItem: GraphNode) => boolean): GraphNode | null {
+  return graph.nodes
+    .filter((nodeItem) => include(nodeItem) && pointInsideRect(point, containerBodyRect(graph, nodeItem)))
+    .sort((left, right) => rectArea(containerBodyRect(graph, left)) - rectArea(containerBodyRect(graph, right)))[0] ?? null;
+}
+
+function rectArea(rect: { width: number; height: number }): number {
+  return rect.width * rect.height;
 }
 
 export function makeInsertionGap(graph: GraphDocument, drag: BlockDrag): void {

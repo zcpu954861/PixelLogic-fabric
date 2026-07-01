@@ -77,6 +77,8 @@ public record GraphDocument(
                 node.id(),
                 node.type().name(),
                 node.blockId(),
+                node.parentContainerId(),
+                node.parentSlot(),
                 defaultDisplayName(node),
                 sortedMap(node.config()),
                 defaultPosition(node.id()),
@@ -114,6 +116,8 @@ public record GraphDocument(
             case TARGET_BLOCK_IN_REGION_CONDITION -> "判断目标方块区域";
             case TARGET_BLOCK_Y_COMPARE_CONDITION -> "判断目标方块高度";
             case PLAYER_NEAR_TARGET_BLOCK_CONDITION -> "判断玩家靠近目标方块";
+            case CONTROL_LOOP_COUNT -> "循环次数";
+            case CONTROL_LOOP_FOREVER -> "无限循环";
             case PLAYER_ADD_TAG_ACTION -> "添加玩家标签";
             case PLAYER_REMOVE_TAG_ACTION -> "移除玩家标签";
             case STATE_SET_ACTION -> "记录开始状态";
@@ -161,6 +165,8 @@ public record GraphDocument(
             String id,
             String type,
             String blockId,
+            String parentContainerId,
+            String parentSlot,
             String displayName,
             Map<String, String> config,
             Position position,
@@ -175,6 +181,8 @@ public record GraphDocument(
                     id,
                     nodeType,
                     BuiltInBlockCatalog.resolveBlockId(blockId, nodeType),
+                    blankToDefault(parentContainerId, ""),
+                    blankToDefault(parentSlot, ""),
                     slots.stream().map(SlotDocument::toDefinition).toList(),
                     sortedMap(config)
             );
@@ -186,6 +194,8 @@ public record GraphDocument(
                     id,
                     type,
                     BuiltInBlockCatalog.resolveBlockId(blockId, nodeType),
+                    blankToDefault(parentContainerId, ""),
+                    blankToDefault(parentSlot, ""),
                     blankToDefault(displayName, id),
                     sortedMap(config),
                     position == null ? new Position(48, 78) : position,

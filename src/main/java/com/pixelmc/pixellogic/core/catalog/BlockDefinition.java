@@ -20,6 +20,7 @@ public record BlockDefinition(
         List<BlockFormFieldDefinition> formSchema,
         String summaryTemplate,
         String summaryFormatter,
+        List<String> containerSlots,
         List<SlotDefinition> inputSlots,
         List<SlotDefinition> outputSlots,
         BlockCapabilityLevel simulationCapability,
@@ -35,6 +36,7 @@ public record BlockDefinition(
         formSchema = formSchema == null ? List.of() : List.copyOf(formSchema);
         summaryTemplate = summaryTemplate == null ? "" : summaryTemplate;
         summaryFormatter = summaryFormatter == null ? "" : summaryFormatter;
+        containerSlots = containerSlots == null ? List.of() : List.copyOf(containerSlots);
         inputSlots = inputSlots == null ? List.of() : List.copyOf(inputSlots);
         outputSlots = outputSlots == null ? List.of() : List.copyOf(outputSlots);
         safetyFlags = safetyFlags == null ? List.of() : List.copyOf(safetyFlags);

@@ -2,9 +2,26 @@ import { fallbackGraph } from './demoGraph';
 import type { BlockKind, BlockMetrics, Branch, GraphDocument, GraphEdge, GraphNode, GraphPosition, LaneSpan } from './graphTypes';
 import { activeOutputSlots, conditionOutputMode, isActiveOutputSlot } from './conditionOutputMode';
 import { blockKind } from '../ui/humanize/labels';
-import { connectedOverlap, conditionBlockWidth, conditionBranchGap, normalBlockHeight, normalBlockWidth, visualConnectXTolerance, visualConnectYTolerance } from '../ui/canvas/blockConstants';
+import {
+  connectedOverlap,
+  conditionBlockWidth,
+  conditionBranchGap,
+  containerBlockWidth,
+  containerBodyInset,
+  containerBodyMinHeight,
+  containerBodyPadding,
+  containerFooterHeight,
+  containerHeaderHeight,
+  normalBlockHeight,
+  normalBlockWidth,
+  visualConnectXTolerance,
+  visualConnectYTolerance,
+} from '../ui/canvas/blockConstants';
 import { preferredMainOutput } from '../ui/canvas/activeOutput';
 export function blockSize(kind: BlockKind): { width: number; height: number } {
+  if (kind === 'control') {
+    return { width: containerBlockWidth, height: containerHeaderHeight + containerBodyMinHeight + containerFooterHeight };
+  }
   return kind === 'condition' ? { width: conditionBlockWidth, height: normalBlockHeight * 2 + conditionBranchGap } : { width: normalBlockWidth, height: normalBlockHeight };
 }
 
@@ -15,6 +32,35 @@ export function blockMetrics(graph: GraphDocument, nodeItem: GraphNode, cache = 
   }
 
   const kind = blockKind(nodeItem.type);
+  if (kind === 'control') {
+    if (visiting.has(nodeItem.id)) {
+      return {
+        width: containerBlockWidth,
+        height: containerHeaderHeight + containerBodyMinHeight + containerFooterHeight,
+        inputY: normalBlockHeight / 2,
+        outputOffsets: Object.fromEntries(nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT').map((slot) => [slot.id, containerHeaderHeight + containerBodyMinHeight + containerFooterHeight - containerFooterHeight / 2])),
+      };
+    }
+    visiting.add(nodeItem.id);
+    const position = nodePosition(graph, nodeItem.id);
+    const children = containerChildren(graph, nodeItem.id, 'body');
+    const childBottom = children.reduce((bottom, child) => {
+      const childPosition = nodePosition(graph, child.id);
+      const childMetrics = blockMetrics(graph, child, cache, visiting);
+      return Math.max(bottom, childPosition.y + childMetrics.height - position.y + containerBodyPadding);
+    }, containerHeaderHeight + containerBodyMinHeight + containerFooterHeight);
+    visiting.delete(nodeItem.id);
+    const height = Math.max(containerHeaderHeight + containerBodyMinHeight + containerFooterHeight, childBottom);
+    const outputY = height - containerFooterHeight / 2;
+    const metrics = {
+      width: containerBlockWidth,
+      height,
+      inputY: normalBlockHeight / 2,
+      outputOffsets: Object.fromEntries(nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT').map((slot) => [slot.id, outputY])),
+    };
+    cache.set(nodeItem.id, metrics);
+    return metrics;
+  }
   if (kind !== 'condition' || conditionOutputMode(nodeItem) !== 'BRANCH') {
     const hasInput = nodeItem.slots.some((slot) => slot.direction === 'INPUT');
     const outputs = kind === 'condition' ? activeOutputSlots(nodeItem) : nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT');
@@ -116,6 +162,11 @@ export function downstreamNodeIds(graph: GraphDocument, rootId: string): string[
     }
     visited.add(nextId);
     ordered.push(nextId);
+    containerDescendantNodeIds(graph, nextId).forEach((childId) => {
+      if (!visited.has(childId)) {
+        stack.push(childId);
+      }
+    });
     for (const graphEdge of outgoing.get(nextId) ?? []) {
       if (!visited.has(graphEdge.targetNodeId)) {
         stack.push(graphEdge.targetNodeId);
@@ -123,6 +174,38 @@ export function downstreamNodeIds(graph: GraphDocument, rootId: string): string[
     }
   }
   return ordered;
+}
+
+export function containerChildren(graph: GraphDocument, containerNodeId: string, parentSlot = 'body'): GraphNode[] {
+  return graph.nodes.filter((nodeItem) => nodeItem.parentContainerId === containerNodeId && (nodeItem.parentSlot || 'body') === parentSlot);
+}
+
+export function containerDescendantNodeIds(graph: GraphDocument, containerNodeId: string): string[] {
+  const result: string[] = [];
+  const visited = new Set<string>();
+  const visit = (parentId: string) => {
+    containerChildren(graph, parentId).forEach((child) => {
+      if (visited.has(child.id)) {
+        return;
+      }
+      visited.add(child.id);
+      result.push(child.id);
+      visit(child.id);
+    });
+  };
+  visit(containerNodeId);
+  return result;
+}
+
+export function containerBodyRect(graph: GraphDocument, containerNode: GraphNode): { x: number; y: number; width: number; height: number } {
+  const position = nodePosition(graph, containerNode.id);
+  const metrics = blockMetrics(graph, containerNode);
+  return {
+    x: position.x + containerBodyInset,
+    y: position.y + containerHeaderHeight,
+    width: Math.max(140, metrics.width - containerBodyInset - containerBodyPadding),
+    height: Math.max(containerBodyMinHeight, metrics.height - containerHeaderHeight - containerFooterHeight),
+  };
 }
 
 export function connectedComponentNodeIds(graph: GraphDocument, rootId: string, omittedEdgeId: string): string[] {
@@ -258,6 +341,8 @@ export function cloneGraph(graph: GraphDocument): GraphDocument {
       ...nodeItem,
       config: { ...nodeItem.config },
       position: nodeItem.position ? { ...nodeItem.position } : undefined,
+      parentContainerId: nodeItem.parentContainerId ?? '',
+      parentSlot: nodeItem.parentSlot ?? '',
       slots: nodeItem.slots.map((slot) => ({ ...slot })),
     })),
     edges: graph.edges.map((graphEdge) => ({ ...graphEdge })),
@@ -273,7 +358,7 @@ export function branchForNode(graph: GraphDocument, nodeItem: GraphNode): Branch
   if (incoming?.sourceSlotId === 'pass') {
     return 'pass';
   }
-  if (nodeItem.type.includes('TRIGGER') || nodeItem.type.includes('CONDITION')) {
+  if (nodeItem.type.includes('TRIGGER') || nodeItem.type.includes('CONDITION') || nodeItem.type.startsWith('CONTROL_LOOP_')) {
     return 'main';
   }
   return 'pass';

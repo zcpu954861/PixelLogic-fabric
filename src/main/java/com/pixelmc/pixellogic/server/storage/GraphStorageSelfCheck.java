@@ -111,6 +111,8 @@ public final class GraphStorageSelfCheck {
                             node.id(),
                             node.type(),
                             node.blockId(),
+                            node.parentContainerId(),
+                            node.parentSlot(),
                             node.displayName(),
                             config,
                             node.position(),

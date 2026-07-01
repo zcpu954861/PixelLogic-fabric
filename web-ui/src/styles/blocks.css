@@ -58,6 +58,13 @@
   --block-outline: #7c3aed;
 }
 
+.logic-block.control {
+  --accent: #0f766e;
+  --block-outline: #0f766e;
+  --fill: #f8fffc;
+  padding-right: 44px;
+}
+
 .puzzle-shape {
   position: absolute;
   inset: 0;
@@ -221,6 +228,40 @@
 
 .logic-block.condition-single h3 {
   font-size: 1.28rem;
+}
+
+.logic-block.control h3 {
+  max-width: 24ch;
+}
+
+.logic-block.control p {
+  max-width: 25ch;
+}
+
+.container-body-zone {
+  position: absolute;
+  left: 82px;
+  right: 24px;
+  top: 126px;
+  bottom: 58px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-height: 132px;
+  border: 2px dashed rgba(15, 118, 110, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(15, 118, 110, 0.08), rgba(45, 111, 159, 0.05));
+  color: rgba(15, 118, 110, 0.58);
+  font-size: 0.86rem;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.logic-block.control.container-target .container-body-zone {
+  border-color: rgba(22, 163, 74, 0.82);
+  box-shadow: 0 0 24px rgba(22, 163, 74, 0.24);
+  background: rgba(220, 252, 231, 0.48);
 }
 
 @keyframes block-title-marquee {

@@ -1,7 +1,8 @@
 import type { BlockDrag, GraphDocument, GraphEdge, GraphNode, GraphPosition, GraphSlot, InsertCandidate, SlotJoin } from '../../model/graphTypes';
 import { activeOutputSlots } from '../../model/conditionOutputMode';
 import { edge } from '../../model/demoGraph';
-import { blockMetrics, branchForNode, connectedGraphEdges, downstreamNodeIds, fallbackPosition, inputCenterOffset, nodePosition, outputCenterOffset, preferredMainOutput } from '../../model/graphLayout';
+import { blockMetrics, branchForNode, connectedGraphEdges, downstreamNodeIds, fallbackPosition, inputCenterOffset, nodePosition, outputCenterOffset } from '../../model/graphLayout';
+import { preferredMainOutput } from './activeOutput';
 import { connectedOverlap, insertSnapX, insertSnapY, normalBlockHeight, reconnectSnapX, reconnectSnapY } from './blockConstants';
 
 export function connectedActionText(candidate: InsertCandidate | null): string {

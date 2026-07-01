@@ -16,23 +16,7 @@ import {
   type RichTextStyle,
   type RichTextStyleKey,
 } from '../model/richText';
-import {
-  addSimulationTag,
-  cloneSimulationTestContext,
-  defaultSimulationTestContext,
-  addSimulationRegion,
-  removeSimulationTag,
-  removeSimulationRegion,
-  simulationTestPayload,
-  type SimulationTestContext,
-  updateSimulationDisplayName,
-  updateSimulationOperator,
-  updateSimulationPlayerPosition,
-  updateSimulationRegion,
-  updateSimulationTargetBlock,
-  updateSimulationTargetEnabled,
-  validateSimulationTestContext,
-} from '../model/simulationTestContext';
+import { simulationTestPayload, validateSimulationTestContext } from '../model/simulationTestContext';
 import { state, world } from '../state/appState';
 import {
   blockSize,
@@ -73,7 +57,9 @@ import {
   snapDraggedGroupToCandidate,
 } from './canvas/dragInsert';
 import { renderCatalogLibrary } from './catalog/catalogLibrary';
+import { updateBlockOverflowMotion } from './canvas/cardOverflow';
 import { renderEditorModal } from './editor/blockEditorModal';
+import { bindCustomSelectControls } from './editor/customDropdown';
 import {
   insertTextAtRichTextSelection,
   renderRichTextContent,
@@ -82,6 +68,15 @@ import {
   setRichTextSelectionOffsets,
 } from './editor/richText/richTextEditor';
 import { renderSimulationTestContextModal, renderSimulationTestResultSummary, renderTestRunControl } from './simulation/simulationTestContextPanel';
+import {
+  bindSimulationDraftFields,
+  discardSimulationEditorDraft,
+  hasSimulationDraftChanges,
+  hideSimulationUnsavedConfirm,
+  openSimulationEditor,
+  requestCloseSimulationEditor,
+  saveSimulationEditorDraft,
+} from './simulation/simulationContextHandlers';
 import { renderTrace } from './trace/traceView';
 import { draftStatusText, uncommittedNotice, validationErrorText, validationList, validationSummaryText, validationTitle } from './validation/validationView';
 import { renderNodeInfo } from './sidebar/selectionSummary';
@@ -272,48 +267,12 @@ function renderApp(): void {
   updateBlockOverflowMotion();
   restoreModalScrollSnapshot(modalScroll);
   focusEditor(editorWasOpen, simulationEditorWasOpen);
-  window.requestAnimationFrame(updateBlockOverflowMotion);
+  window.requestAnimationFrame(() => updateBlockOverflowMotion());
 }
 
 function activeCatalog(): BlockCatalog {
   return state.catalog ?? fallbackCatalog;
 }
-
-function updateBlockOverflowMotion(): void {
-  document.querySelectorAll<HTMLElement>('.logic-block h3').forEach((titleEl) => {
-    const textEl = titleEl.querySelector<HTMLElement>('.block-title-text');
-    const distance = textEl ? Math.ceil(textEl.scrollWidth - titleEl.clientWidth) : 0;
-    titleEl.classList.toggle('is-overflowing', distance > 2);
-    if (distance > 2) {
-      titleEl.style.setProperty('--marquee-x', `${-distance}px`);
-      titleEl.style.setProperty('--marquee-duration', `${Math.min(18, Math.max(8, distance / 7))}s`);
-    }
-  });
-
-  document.querySelectorAll<HTMLElement>('.logic-block p').forEach((summaryEl) => {
-    const textEl = summaryEl.querySelector<HTMLElement>('.block-summary-text');
-    const distance = textEl ? Math.ceil(textEl.scrollHeight - summaryEl.clientHeight) : 0;
-    summaryEl.classList.toggle('is-overflowing', distance > 4);
-    if (distance > 4) {
-      summaryEl.style.setProperty('--marquee-y', `${-distance}px`);
-      summaryEl.style.setProperty('--marquee-duration', `${Math.min(18, Math.max(9, distance / 3))}s`);
-    }
-  });
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 function setTransform(): void {
@@ -489,7 +448,7 @@ function bindInteractions(): void {
     state.simulationMenuOpen = !state.simulationMenuOpen;
     renderApp();
   });
-  document.querySelector('[data-sim-action="open-editor"]')?.addEventListener('click', openSimulationEditor);
+  document.querySelector('[data-sim-action="open-editor"]')?.addEventListener('click', () => openSimulationEditor(renderApp));
   document.querySelector('.workspace')?.addEventListener('pointerdown', (event) => {
     if (state.simulationMenuOpen && !(event.target as HTMLElement).closest('.test-run-control')) {
       state.simulationMenuOpen = false;
@@ -511,12 +470,12 @@ function bindInteractions(): void {
     hideModeSwitchConfirm();
     void saveEditorDraft();
   });
-  document.querySelector('[data-sim-modal-action="close"]')?.addEventListener('click', requestCloseSimulationEditor);
-  document.querySelector('[data-sim-modal-action="cancel"]')?.addEventListener('click', requestCloseSimulationEditor);
-  document.querySelector('[data-sim-modal-action="save"]')?.addEventListener('click', saveSimulationEditorDraft);
+  document.querySelector('[data-sim-modal-action="close"]')?.addEventListener('click', () => requestCloseSimulationEditor(renderApp));
+  document.querySelector('[data-sim-modal-action="cancel"]')?.addEventListener('click', () => requestCloseSimulationEditor(renderApp));
+  document.querySelector('[data-sim-modal-action="save"]')?.addEventListener('click', () => saveSimulationEditorDraft(renderApp));
   document.querySelector('[data-sim-modal-action="continue-edit"]')?.addEventListener('click', hideSimulationUnsavedConfirm);
-  document.querySelector('[data-sim-modal-action="discard"]')?.addEventListener('click', discardSimulationEditorDraft);
-  bindSimulationDraftFields();
+  document.querySelector('[data-sim-modal-action="discard"]')?.addEventListener('click', () => discardSimulationEditorDraft(renderApp));
+  bindSimulationDraftFields(renderApp);
   document.querySelectorAll<HTMLButtonElement>('[data-catalog-category]').forEach((buttonEl) => {
     buttonEl.addEventListener('click', () => {
       if (buttonEl.dataset.catalogCategory) {
@@ -547,7 +506,7 @@ function bindInteractions(): void {
   });
   document.querySelector('[data-sim-modal-overlay]')?.addEventListener('pointerdown', (event) => {
     if ((event.target as HTMLElement).hasAttribute('data-sim-modal-overlay')) {
-      requestCloseSimulationEditor();
+      requestCloseSimulationEditor(renderApp);
     }
   });
 
@@ -573,7 +532,7 @@ function bindInteractions(): void {
     }
     if (event.key === 'Escape' && state.simulationEditorOpen) {
       event.preventDefault();
-      requestCloseSimulationEditor();
+      requestCloseSimulationEditor(renderApp);
     }
     if (event.key === 'Tab' && (state.editorOpen || state.simulationEditorOpen)) {
       trapEditorFocus(event);
@@ -1126,192 +1085,6 @@ function discardEditorDraft(): void {
   closeEditor();
 }
 
-function openSimulationEditor(): void {
-  state.simulationMenuOpen = false;
-  state.simulationDraftContext = cloneSimulationTestContext(state.simulationTestContext);
-  state.simulationOriginalContext = cloneSimulationTestContext(state.simulationTestContext);
-  state.simulationEditorOpen = true;
-  state.simulationEditorClosing = false;
-  state.simulationTestContextError = '';
-  renderApp();
-}
-
-function requestCloseSimulationEditor(): void {
-  if (hasSimulationDraftChanges()) {
-    showSimulationUnsavedConfirm();
-    return;
-  }
-  closeSimulationEditor();
-}
-
-function closeSimulationEditor(): void {
-  hideSimulationUnsavedConfirm();
-  state.simulationEditorClosing = true;
-  const overlayEl = document.querySelector<HTMLElement>('[data-sim-modal-overlay]');
-  if (overlayEl) {
-    overlayEl.classList.add('is-closing');
-  }
-  window.setTimeout(() => {
-    state.simulationEditorOpen = false;
-    state.simulationEditorClosing = false;
-    state.simulationDraftContext = null;
-    state.simulationOriginalContext = null;
-    state.simulationTestContextError = '';
-    renderApp();
-  }, 160);
-}
-
-function showSimulationUnsavedConfirm(): void {
-  const confirmEl = document.querySelector<HTMLElement>('[data-sim-unsaved-confirm]');
-  confirmEl?.removeAttribute('hidden');
-  document.querySelector<HTMLElement>('[data-sim-modal-action="continue-edit"]')?.focus();
-}
-
-function hideSimulationUnsavedConfirm(): void {
-  document.querySelector<HTMLElement>('[data-sim-unsaved-confirm]')?.setAttribute('hidden', '');
-}
-
-function discardSimulationEditorDraft(): void {
-  state.simulationDraftContext = state.simulationOriginalContext
-    ? cloneSimulationTestContext(state.simulationOriginalContext)
-    : null;
-  closeSimulationEditor();
-}
-
-function bindSimulationDraftFields(): void {
-  const nameInput = document.querySelector<HTMLInputElement>('[data-sim-draft-name]');
-  nameInput?.addEventListener('input', () => {
-    updateSimulationDraft(updateSimulationDisplayName(simulationDraft(), nameInput.value), false);
-  });
-
-  const tagInput = document.querySelector<HTMLInputElement>('[data-sim-draft-tag-input]');
-  const addTag = () => {
-    if (!tagInput) {
-      return;
-    }
-    const result = addSimulationTag(simulationDraft(), tagInput.value);
-    if (result.error) {
-      state.simulationTestContextError = result.error;
-      renderApp();
-      return;
-    }
-    tagInput.value = '';
-    updateSimulationDraft(result.context);
-  };
-  document.querySelector('[data-sim-draft-action="add-tag"]')?.addEventListener('click', addTag);
-  tagInput?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      addTag();
-    }
-  });
-
-  document.querySelectorAll<HTMLButtonElement>('[data-sim-draft-admin-value]').forEach((buttonEl) => {
-    buttonEl.addEventListener('click', () => {
-      updateSimulationDraft(updateSimulationOperator(simulationDraft(), buttonEl.dataset.simDraftAdminValue === 'true'));
-    });
-  });
-
-  document.querySelectorAll<HTMLInputElement>('[data-sim-player-position-field]').forEach((inputEl) => {
-    inputEl.addEventListener('input', () => {
-      updateSimulationDraft(
-        updateSimulationPlayerPosition(simulationDraft(), inputEl.dataset.simPlayerPositionField as 'dimensionId' | 'x' | 'y' | 'z', inputEl.value),
-        false,
-      );
-    });
-  });
-
-  document.querySelectorAll<HTMLButtonElement>('[data-sim-target-enabled]').forEach((buttonEl) => {
-    buttonEl.addEventListener('click', () => {
-      updateSimulationDraft(updateSimulationTargetEnabled(simulationDraft(), buttonEl.dataset.simTargetEnabled === 'true'));
-    });
-  });
-
-  document.querySelectorAll<HTMLInputElement>('[data-sim-target-field]').forEach((inputEl) => {
-    inputEl.addEventListener('input', () => {
-      updateSimulationDraft(
-        updateSimulationTargetBlock(
-          simulationDraft(),
-          inputEl.dataset.simTargetField as 'dimensionId' | 'x' | 'y' | 'z' | 'blockId' | 'enabled',
-          inputEl.value,
-        ),
-        false,
-      );
-    });
-  });
-
-  document.querySelector('[data-sim-region-action="add"]')?.addEventListener('click', () => {
-    const result = addSimulationRegion(simulationDraft());
-    if (result.error) {
-      state.simulationTestContextError = result.error;
-      renderApp();
-      return;
-    }
-    updateSimulationDraft(result.context);
-  });
-  document.querySelectorAll<HTMLButtonElement>('[data-sim-region-action="remove"]').forEach((buttonEl) => {
-    buttonEl.addEventListener('click', () => {
-      updateSimulationDraft(removeSimulationRegion(simulationDraft(), Number(buttonEl.dataset.simRegionIndex)));
-    });
-  });
-  document.querySelectorAll<HTMLInputElement>('[data-sim-region-field]').forEach((inputEl) => {
-    inputEl.addEventListener('input', () => {
-      updateSimulationDraft(
-        updateSimulationRegion(
-          simulationDraft(),
-          Number(inputEl.dataset.simRegionIndex),
-          inputEl.dataset.simRegionField as 'name' | 'dimensionId' | 'minX' | 'minY' | 'minZ' | 'maxX' | 'maxY' | 'maxZ',
-          inputEl.value,
-        ),
-        false,
-      );
-    });
-  });
-  document.querySelector('[data-sim-draft-action="reset"]')?.addEventListener('click', () => {
-    updateSimulationDraft(defaultSimulationTestContext());
-  });
-  document.querySelectorAll<HTMLButtonElement>('[data-sim-draft-remove-tag]').forEach((buttonEl) => {
-    buttonEl.addEventListener('click', () => {
-      updateSimulationDraft(removeSimulationTag(simulationDraft(), buttonEl.dataset.simDraftRemoveTag ?? ''));
-    });
-  });
-}
-
-function simulationDraft(): SimulationTestContext {
-  return state.simulationDraftContext ?? state.simulationTestContext;
-}
-
-function updateSimulationDraft(context: SimulationTestContext, render = true): void {
-  state.simulationDraftContext = context;
-  state.simulationTestContextError = '';
-  hideSimulationUnsavedConfirm();
-  if (render) {
-    renderApp();
-  }
-}
-
-function saveSimulationEditorDraft(): void {
-  const draft = state.simulationDraftContext;
-  if (!draft) {
-    return;
-  }
-  const error = validateSimulationTestContext(draft);
-  if (error) {
-    state.simulationTestContextError = error;
-    renderApp();
-    return;
-  }
-  if (!hasSimulationDraftChanges()) {
-    closeSimulationEditor();
-    return;
-  }
-  state.simulationTestContext = cloneSimulationTestContext(simulationTestPayload(draft).testContext);
-  state.simulationOriginalContext = cloneSimulationTestContext(state.simulationTestContext);
-  state.simulationDraftContext = cloneSimulationTestContext(state.simulationTestContext);
-  state.lastAction = '测试上下文已更新';
-  closeSimulationEditor();
-}
-
 function focusEditor(editorWasOpen = false, simulationEditorWasOpen = false): void {
   if (!state.editorOpen && !state.simulationEditorOpen) {
     return;
@@ -1354,58 +1127,6 @@ function updateEditorDraft(inputEl: HTMLInputElement | HTMLSelectElement | HTMLT
   if (inputEl.dataset.configKey) {
     updateEditorDraftValue(inputEl.dataset.configKey, inputEl.value);
   }
-}
-
-function bindCustomSelectControls(): void {
-  document.querySelectorAll<HTMLButtonElement>('[data-custom-select-toggle]').forEach((buttonEl) => {
-    buttonEl.addEventListener('click', (event) => {
-      event.preventDefault();
-      const selectEl = buttonEl.closest<HTMLElement>('[data-custom-select]');
-      if (!selectEl) {
-        return;
-      }
-      const willOpen = !selectEl.classList.contains('is-open');
-      closeCustomSelects(selectEl);
-      selectEl.classList.toggle('is-open', willOpen);
-      buttonEl.setAttribute('aria-expanded', String(willOpen));
-      selectEl.querySelector<HTMLElement>('.custom-select-list')?.toggleAttribute('hidden', !willOpen);
-    });
-  });
-
-  document.querySelectorAll<HTMLButtonElement>('[data-custom-select-option]').forEach((buttonEl) => {
-    buttonEl.addEventListener('click', () => {
-      const selectEl = buttonEl.closest<HTMLElement>('[data-custom-select]');
-      const triggerText = selectEl?.querySelector<HTMLElement>('.custom-select-trigger span');
-      if (triggerText) {
-        triggerText.textContent = buttonEl.textContent?.trim() ?? '';
-      }
-      selectEl?.querySelectorAll<HTMLButtonElement>('[data-custom-select-option]').forEach((item) => {
-        const selected = item === buttonEl;
-        item.setAttribute('aria-selected', String(selected));
-        item.setAttribute('aria-pressed', String(selected));
-      });
-      closeCustomSelects();
-    });
-  });
-
-  document.querySelectorAll<HTMLElement>('.editor-dialog').forEach((dialogEl) => {
-    dialogEl.addEventListener('pointerdown', (event) => {
-      if (!(event.target as HTMLElement).closest('[data-custom-select]')) {
-        closeCustomSelects();
-      }
-    });
-  });
-}
-
-function closeCustomSelects(except?: HTMLElement): void {
-  document.querySelectorAll<HTMLElement>('[data-custom-select].is-open').forEach((selectEl) => {
-    if (except && selectEl === except) {
-      return;
-    }
-    selectEl.classList.remove('is-open');
-    selectEl.querySelector<HTMLButtonElement>('[data-custom-select-toggle]')?.setAttribute('aria-expanded', 'false');
-    selectEl.querySelector<HTMLElement>('.custom-select-list')?.setAttribute('hidden', '');
-  });
 }
 
 function bindRichTextToolbar(): void {
@@ -2276,11 +1997,6 @@ function cloneNode(nodeItem: GraphNode): GraphNode {
 function hasEditorDraftChanges(): boolean {
   return Boolean(state.editorDraftNode && state.editorOriginalNode)
     && JSON.stringify(state.editorDraftNode) !== JSON.stringify(state.editorOriginalNode);
-}
-
-function hasSimulationDraftChanges(): boolean {
-  return Boolean(state.simulationDraftContext && state.simulationOriginalContext)
-    && JSON.stringify(state.simulationDraftContext) !== JSON.stringify(state.simulationOriginalContext);
 }
 
 function conditionModeRemovalSignature(): string | null {

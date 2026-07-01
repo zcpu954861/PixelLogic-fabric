@@ -1,6 +1,44 @@
 export const simulationTagLimit = 32;
 export const simulationTagLengthLimit = 64;
 export const simulationNameLengthLimit = 64;
+export const simulationRegionLimit = 8;
+export const simulationRegionNameLengthLimit = 64;
+export const simulationCoordinateLimit = 30_000_000;
+export const simulationMinY = -2048;
+export const simulationMaxY = 4096;
+
+const defaultDimensionId = 'minecraft:overworld';
+const defaultBlockId = 'minecraft:stone';
+const namespacedIdPattern = /^[a-z0-9_.-]+:[a-z0-9_./-]+$/;
+
+export type SimulationPosition = {
+  dimensionId: string;
+  x: number;
+  y: number;
+  z: number;
+};
+
+export type SimulationTargetBlock = SimulationPosition & {
+  enabled: boolean;
+  blockId: string;
+};
+
+export type SimulationRegionFact = {
+  name: string;
+  dimensionId: string;
+  minX: number;
+  minY: number;
+  minZ: number;
+  maxX: number;
+  maxY: number;
+  maxZ: number;
+};
+
+export type SimulationTestWorld = {
+  playerPosition: SimulationPosition;
+  targetBlock: SimulationTargetBlock;
+  regions: SimulationRegionFact[];
+};
 
 export type SimulationTestActor = {
   id: string;
@@ -11,6 +49,7 @@ export type SimulationTestActor = {
 
 export type SimulationTestContext = {
   actor: SimulationTestActor;
+  world: SimulationTestWorld;
 };
 
 export type SimulationTestResult = {
@@ -19,6 +58,9 @@ export type SimulationTestResult = {
   message: string;
   actorDisplayName: string;
   actorOperator: boolean;
+  playerPosition?: SimulationPosition;
+  targetBlock?: SimulationTargetBlock;
+  regions?: SimulationRegionFact[];
   initialActorTags: string[];
   actorTags: string[];
   timerScheduled: boolean;
@@ -32,20 +74,28 @@ export function defaultSimulationTestContext(): SimulationTestContext {
       tags: [],
       operator: false,
     },
+    world: defaultSimulationWorld(),
   };
 }
 
 export function cloneSimulationTestContext(context: SimulationTestContext): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
   return {
     actor: {
-      ...context.actor,
-      tags: [...context.actor.tags],
+      ...normalized.actor,
+      tags: [...normalized.actor.tags],
+    },
+    world: {
+      playerPosition: { ...normalized.world.playerPosition },
+      targetBlock: { ...normalized.world.targetBlock },
+      regions: normalized.world.regions.map((region) => ({ ...region })),
     },
   };
 }
 
 export function updateSimulationDisplayName(context: SimulationTestContext, displayName: string): SimulationTestContext {
   return {
+    ...withWorldDefaults(context),
     actor: {
       ...context.actor,
       displayName,
@@ -55,9 +105,123 @@ export function updateSimulationDisplayName(context: SimulationTestContext, disp
 
 export function updateSimulationOperator(context: SimulationTestContext, operator: boolean): SimulationTestContext {
   return {
+    ...withWorldDefaults(context),
     actor: {
       ...context.actor,
       operator,
+    },
+  };
+}
+
+export function updateSimulationPlayerPosition(
+  context: SimulationTestContext,
+  field: keyof SimulationPosition,
+  value: string,
+): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  return {
+    ...normalized,
+    world: {
+      ...normalized.world,
+      playerPosition: updatePosition(normalized.world.playerPosition, field, value),
+    },
+  };
+}
+
+export function updateSimulationTargetEnabled(context: SimulationTestContext, enabled: boolean): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  return {
+    ...normalized,
+    world: {
+      ...normalized.world,
+      targetBlock: {
+        ...normalized.world.targetBlock,
+        enabled,
+      },
+    },
+  };
+}
+
+export function updateSimulationTargetBlock(
+  context: SimulationTestContext,
+  field: keyof SimulationTargetBlock,
+  value: string,
+): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  const targetBlock = normalized.world.targetBlock;
+  return {
+    ...normalized,
+    world: {
+      ...normalized.world,
+      targetBlock: {
+        ...targetBlock,
+        [field]: field === 'dimensionId' || field === 'blockId' ? value : toNumberInput(value),
+      },
+    },
+  };
+}
+
+export function addSimulationRegion(context: SimulationTestContext): { context: SimulationTestContext; error: string } {
+  const normalized = withWorldDefaults(context);
+  if (normalized.world.regions.length >= simulationRegionLimit) {
+    return { context, error: '测试区域数量不能超过 8 个。' };
+  }
+  const nextIndex = normalized.world.regions.length + 1;
+  return {
+    context: {
+      ...normalized,
+      world: {
+        ...normalized.world,
+        regions: [
+          ...normalized.world.regions,
+          {
+            name: `测试区域 ${nextIndex}`,
+            dimensionId: defaultDimensionId,
+            minX: 0,
+            minY: 64,
+            minZ: 0,
+            maxX: 0,
+            maxY: 70,
+            maxZ: 0,
+          },
+        ],
+      },
+    },
+    error: '',
+  };
+}
+
+export function removeSimulationRegion(context: SimulationTestContext, index: number): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  return {
+    ...normalized,
+    world: {
+      ...normalized.world,
+      regions: normalized.world.regions.filter((_, itemIndex) => itemIndex !== index),
+    },
+  };
+}
+
+export function updateSimulationRegion(
+  context: SimulationTestContext,
+  index: number,
+  field: keyof SimulationRegionFact,
+  value: string,
+): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  return {
+    ...normalized,
+    world: {
+      ...normalized.world,
+      regions: normalized.world.regions.map((region, itemIndex) => {
+        if (itemIndex !== index) {
+          return region;
+        }
+        return {
+          ...region,
+          [field]: field === 'name' || field === 'dimensionId' ? value : toNumberInput(value),
+        };
+      }),
     },
   };
 }
@@ -73,10 +237,11 @@ export function addSimulationTag(context: SimulationTestContext, rawTag: string)
     return { context, error };
   }
   if (currentTags.includes(tag)) {
-    return { context: { actor: { ...context.actor, tags: currentTags } }, error: '' };
+    return { context: { ...withWorldDefaults(context), actor: { ...context.actor, tags: currentTags } }, error: '' };
   }
   return {
     context: {
+      ...withWorldDefaults(context),
       actor: {
         ...context.actor,
         tags: [...currentTags, tag],
@@ -88,6 +253,7 @@ export function addSimulationTag(context: SimulationTestContext, rawTag: string)
 
 export function removeSimulationTag(context: SimulationTestContext, tag: string): SimulationTestContext {
   return {
+    ...withWorldDefaults(context),
     actor: {
       ...context.actor,
       tags: normalizeSimulationTags(context.actor.tags).filter((item) => item !== tag),
@@ -109,7 +275,8 @@ export function normalizeSimulationTags(tags: string[]): string[] {
 }
 
 export function validateSimulationTestContext(context: SimulationTestContext): string {
-  const displayName = context.actor.displayName.trim();
+  const normalized = withWorldDefaults(context);
+  const displayName = normalized.actor.displayName.trim();
   if (!displayName) {
     return '测试玩家名称不能为空。';
   }
@@ -120,7 +287,7 @@ export function validateSimulationTestContext(context: SimulationTestContext): s
     return '测试玩家名称不能包含换行或控制字符。';
   }
 
-  const tags = normalizeSimulationTags(context.actor.tags);
+  const tags = normalizeSimulationTags(normalized.actor.tags);
   if (tags.length > simulationTagLimit) {
     return '标签数量不能超过 32 个。';
   }
@@ -130,19 +297,205 @@ export function validateSimulationTestContext(context: SimulationTestContext): s
       return error;
     }
   }
-  return '';
+
+  return validateWorld(normalized.world);
 }
 
 export function simulationTestPayload(context: SimulationTestContext): { testContext: SimulationTestContext } {
+  const normalized = normalizeSimulationTestContext(context);
   return {
-    testContext: {
-      actor: {
-        ...context.actor,
-        displayName: context.actor.displayName.trim(),
-        tags: normalizeSimulationTags(context.actor.tags),
+    testContext: normalized,
+  };
+}
+
+export function formatSimulationPosition(position?: SimulationPosition): string {
+  const next = position ?? defaultSimulationPosition();
+  return `${next.dimensionId} (${integerOrDefault(next.x, 0)}, ${integerOrDefault(next.y, 64)}, ${integerOrDefault(next.z, 0)})`;
+}
+
+export function formatSimulationTargetBlock(targetBlock?: SimulationTargetBlock): string {
+  const target = targetBlock ?? defaultSimulationTargetBlock();
+  if (!target.enabled) {
+    return '未设置';
+  }
+  return `${target.blockId} @ ${formatSimulationPosition(target)}`;
+}
+
+export function formatSimulationRegions(regions?: SimulationRegionFact[]): string {
+  const items = regions ?? [];
+  if (items.length === 0) {
+    return '未设置';
+  }
+  const names = items.map((region) => region.name).filter(Boolean).slice(0, 3).join('，');
+  return `${items.length} 个${names ? `：${names}` : ''}`;
+}
+
+function normalizeSimulationTestContext(context: SimulationTestContext): SimulationTestContext {
+  const normalized = cloneSimulationTestContext(context);
+  return {
+    actor: {
+      ...normalized.actor,
+      displayName: normalized.actor.displayName.trim(),
+      tags: normalizeSimulationTags(normalized.actor.tags),
+    },
+    world: {
+      playerPosition: normalizePosition(normalized.world.playerPosition, defaultSimulationPosition()),
+      targetBlock: {
+        ...normalizePosition(normalized.world.targetBlock, defaultSimulationTargetBlock()),
+        enabled: normalized.world.targetBlock.enabled,
+        blockId: normalized.world.targetBlock.blockId.trim() || defaultBlockId,
       },
+      regions: normalized.world.regions.map(normalizeRegion),
     },
   };
+}
+
+function withWorldDefaults(context: SimulationTestContext): SimulationTestContext {
+  return {
+    actor: context.actor,
+    world: {
+      playerPosition: context.world?.playerPosition ?? defaultSimulationPosition(),
+      targetBlock: context.world?.targetBlock ?? defaultSimulationTargetBlock(),
+      regions: context.world?.regions ?? [],
+    },
+  };
+}
+
+function defaultSimulationWorld(): SimulationTestWorld {
+  return {
+    playerPosition: defaultSimulationPosition(),
+    targetBlock: defaultSimulationTargetBlock(),
+    regions: [],
+  };
+}
+
+function defaultSimulationPosition(): SimulationPosition {
+  return {
+    dimensionId: defaultDimensionId,
+    x: 0,
+    y: 64,
+    z: 0,
+  };
+}
+
+function defaultSimulationTargetBlock(): SimulationTargetBlock {
+  return {
+    enabled: false,
+    dimensionId: defaultDimensionId,
+    x: 0,
+    y: 64,
+    z: 0,
+    blockId: defaultBlockId,
+  };
+}
+
+function updatePosition<T extends SimulationPosition>(position: T, field: keyof SimulationPosition, value: string): T {
+  return {
+    ...position,
+    [field]: field === 'dimensionId' ? value : toNumberInput(value),
+  };
+}
+
+function normalizePosition<T extends SimulationPosition>(position: T, fallback: T): T {
+  return {
+    ...position,
+    dimensionId: position.dimensionId.trim() || fallback.dimensionId,
+    x: integerOrDefault(position.x, fallback.x),
+    y: integerOrDefault(position.y, fallback.y),
+    z: integerOrDefault(position.z, fallback.z),
+  };
+}
+
+function normalizeRegion(region: SimulationRegionFact): SimulationRegionFact {
+  return {
+    name: region.name.trim(),
+    dimensionId: region.dimensionId.trim() || defaultDimensionId,
+    minX: Math.min(integerOrDefault(region.minX, 0), integerOrDefault(region.maxX, 0)),
+    minY: Math.min(integerOrDefault(region.minY, 64), integerOrDefault(region.maxY, 64)),
+    minZ: Math.min(integerOrDefault(region.minZ, 0), integerOrDefault(region.maxZ, 0)),
+    maxX: Math.max(integerOrDefault(region.minX, 0), integerOrDefault(region.maxX, 0)),
+    maxY: Math.max(integerOrDefault(region.minY, 64), integerOrDefault(region.maxY, 64)),
+    maxZ: Math.max(integerOrDefault(region.minZ, 0), integerOrDefault(region.maxZ, 0)),
+  };
+}
+
+function validateWorld(world: SimulationTestWorld): string {
+  const positionError = validatePosition(world.playerPosition, '玩家位置');
+  if (positionError) {
+    return positionError;
+  }
+  const targetPositionError = validatePosition(world.targetBlock, '目标方块位置');
+  if (targetPositionError) {
+    return targetPositionError;
+  }
+  if (!isNamespacedId(world.targetBlock.blockId.trim())) {
+    return '目标方块 ID 必须类似 minecraft:stone。';
+  }
+  if (world.regions.length > simulationRegionLimit) {
+    return '测试区域数量不能超过 8 个。';
+  }
+  for (const region of world.regions) {
+    const error = validateRegion(region);
+    if (error) {
+      return error;
+    }
+  }
+  return '';
+}
+
+function validatePosition(position: SimulationPosition, label: string): string {
+  if (!isNamespacedId(position.dimensionId.trim())) {
+    return `${label}的维度 ID 不合法。`;
+  }
+  return validateCoordinateTriplet(position, label);
+}
+
+function validateRegion(region: SimulationRegionFact): string {
+  const name = region.name.trim();
+  if (!name) {
+    return '测试区域名称不能为空。';
+  }
+  if (name.length > simulationRegionNameLengthLimit) {
+    return '测试区域名称不能超过 64 个字符。';
+  }
+  if (hasControlCharacter(name)) {
+    return '测试区域名称不能包含换行或控制字符。';
+  }
+  if (!isNamespacedId(region.dimensionId.trim())) {
+    return '测试区域的维度 ID 不合法。';
+  }
+  return validateCoordinateTriplet({
+    x: region.minX,
+    y: region.minY,
+    z: region.minZ,
+  }, '测试区域最小坐标')
+    || validateCoordinateTriplet({
+      x: region.maxX,
+      y: region.maxY,
+      z: region.maxZ,
+    }, '测试区域最大坐标');
+}
+
+function validateCoordinateTriplet(position: Pick<SimulationPosition, 'x' | 'y' | 'z'>, label: string): string {
+  const xError = validateCoordinate(position.x, `${label} X`, -simulationCoordinateLimit, simulationCoordinateLimit);
+  if (xError) {
+    return xError;
+  }
+  const yError = validateCoordinate(position.y, `${label} Y`, simulationMinY, simulationMaxY);
+  if (yError) {
+    return yError;
+  }
+  return validateCoordinate(position.z, `${label} Z`, -simulationCoordinateLimit, simulationCoordinateLimit);
+}
+
+function validateCoordinate(value: number, label: string, min: number, max: number): string {
+  if (!Number.isInteger(value)) {
+    return `${label} 必须是整数。`;
+  }
+  if (value < min || value > max) {
+    return `${label} 超出允许范围。`;
+  }
+  return '';
 }
 
 function validateTag(tag: string, currentTags: string[]): string {
@@ -156,6 +509,21 @@ function validateTag(tag: string, currentTags: string[]): string {
     return '标签数量不能超过 32 个。';
   }
   return '';
+}
+
+function isNamespacedId(value: string): boolean {
+  return namespacedIdPattern.test(value);
+}
+
+function toNumberInput(value: string): number {
+  if (value.trim() === '') {
+    return Number.NaN;
+  }
+  return Number(value);
+}
+
+function integerOrDefault(value: number, fallback: number): number {
+  return Number.isInteger(value) ? value : fallback;
 }
 
 function hasControlCharacter(value: string): boolean {

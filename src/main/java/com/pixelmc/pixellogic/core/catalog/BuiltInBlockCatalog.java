@@ -22,6 +22,10 @@ public final class BuiltInBlockCatalog {
     public static final String ACTION_MESSAGE_ACTIONBAR = "action.message.actionbar";
     public static final String CONDITION_PLAYER_HAS_TAG = "condition.player.has_tag";
     public static final String CONDITION_PLAYER_IS_ADMIN = "condition.player.is_admin";
+    public static final String CONDITION_PLAYER_DIMENSION_IS = "condition.player.dimension_is";
+    public static final String CONDITION_PLAYER_IN_REGION = "condition.player.in_region";
+    public static final String CONDITION_TARGET_BLOCK_IS_TYPE = "condition.target_block.is_type";
+    public static final String CONDITION_TARGET_BLOCK_IN_REGION = "condition.target_block.in_region";
     public static final String ACTION_PLAYER_ADD_TAG = "action.player.add_tag";
     public static final String ACTION_PLAYER_REMOVE_TAG = "action.player.remove_tag";
     public static final String STATE_SET = "state.set";
@@ -91,6 +95,8 @@ public final class BuiltInBlockCatalog {
                 subcategory("trigger.manual", "trigger", "手动测试", "用于 WebUI 和本地验证的测试入口。", 10),
                 subcategory("condition.state", "condition", "状态条件", "基于玩家、全局或会话状态做判断。", 10),
                 subcategory("condition.player", "condition", "玩家条件", "基于当前模拟玩家做判断。", 20),
+                subcategory("condition.region", "condition", "区域条件", "基于测试上下文中的区域事实做判断。", 30),
+                subcategory("condition.block", "condition", "方块条件", "基于测试上下文中的目标方块事实做判断。", 40),
                 subcategory("player.tag", "player", "标签", "写入当前模拟玩家的标签。", 10),
                 subcategory("message.player", "message", "玩家消息", "面向玩家的文本反馈。", 10),
                 subcategory("message.screen", "message", "屏幕提示", "显示标题、副标题或快捷栏消息。", 20),
@@ -236,6 +242,94 @@ public final class BuiltInBlockCatalog {
                         BlockCapabilityLevel.APPROXIMATE_SIMULATION,
                         BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
                         List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER),
+                        List.of()
+                ),
+                block(
+                        CONDITION_PLAYER_DIMENSION_IS,
+                        "玩家所在维度是否为",
+                        "按当前模拟玩家所在维度继续流程。",
+                        "condition",
+                        "condition.player",
+                        "condition",
+                        NodeType.PLAYER_DIMENSION_CONDITION,
+                        Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "dimensionId", "minecraft:overworld"),
+                        List.of(
+                                conditionMode("在该维度时继续", "不在该维度时继续", "分开执行"),
+                                text("dimensionId", "维度 ID", false, "minecraft:overworld", "维度 ID 示例：minecraft:overworld")
+                        ),
+                        "按当前玩家所在维度是否为「{dimensionId}」继续。",
+                        "condition.player.dimension_is",
+                        List.of(in("input")),
+                        List.of(out("pass"), out("fail")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER),
+                        List.of()
+                ),
+                block(
+                        CONDITION_PLAYER_IN_REGION,
+                        "玩家是否在区域内",
+                        "按当前模拟玩家是否位于测试区域内继续流程。",
+                        "condition",
+                        "condition.region",
+                        "condition",
+                        NodeType.PLAYER_IN_REGION_CONDITION,
+                        Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "regionName", "出生区"),
+                        List.of(
+                                conditionMode("在区域内时继续", "不在区域内时继续", "分开执行"),
+                                text("regionName", "区域名称", false, "例如 出生区", "区域名称需要与测试上下文中的区域名称一致。")
+                        ),
+                        "按当前玩家是否在区域「{regionName}」内继续。",
+                        "condition.player.in_region",
+                        List.of(in("input")),
+                        List.of(out("pass"), out("fail")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER, BlockSafetyFlag.REQUIRES_WORLD),
+                        List.of()
+                ),
+                block(
+                        CONDITION_TARGET_BLOCK_IS_TYPE,
+                        "目标方块是否为",
+                        "按测试上下文中的目标方块类型继续流程。",
+                        "condition",
+                        "condition.block",
+                        "condition",
+                        NodeType.TARGET_BLOCK_TYPE_CONDITION,
+                        Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "blockId", "minecraft:stone"),
+                        List.of(
+                                conditionMode("为该方块时继续", "不为该方块时继续", "分开执行"),
+                                text("blockId", "方块 ID", false, "minecraft:stone", "方块 ID 示例：minecraft:stone")
+                        ),
+                        "按目标方块是否为「{blockId}」继续。",
+                        "condition.target_block.is_type",
+                        List.of(in("input")),
+                        List.of(out("pass"), out("fail")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_WORLD),
+                        List.of()
+                ),
+                block(
+                        CONDITION_TARGET_BLOCK_IN_REGION,
+                        "目标方块是否在区域内",
+                        "按测试上下文中的目标方块是否位于测试区域内继续流程。",
+                        "condition",
+                        "condition.region",
+                        "condition",
+                        NodeType.TARGET_BLOCK_IN_REGION_CONDITION,
+                        Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "regionName", "出生区"),
+                        List.of(
+                                conditionMode("在区域内时继续", "不在区域内时继续", "分开执行"),
+                                text("regionName", "区域名称", false, "例如 出生区", "区域名称需要与测试上下文中的区域名称一致。")
+                        ),
+                        "按目标方块是否在区域「{regionName}」内继续。",
+                        "condition.target_block.in_region",
+                        List.of(in("input")),
+                        List.of(out("pass"), out("fail")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_WORLD),
                         List.of()
                 ),
                 block(
@@ -454,7 +548,11 @@ public final class BuiltInBlockCatalog {
     }
 
     private static BlockFormFieldDefinition text(String key, String label, boolean full, String placeholder) {
-        return field(key, "string", label, "", true, "", placeholder, List.of(), "", "", "", full ? "fullWidth" : "", "");
+        return text(key, label, full, placeholder, "");
+    }
+
+    private static BlockFormFieldDefinition text(String key, String label, boolean full, String placeholder, String description) {
+        return field(key, "string", label, description, true, "", placeholder, List.of(), "", "", "", full ? "fullWidth" : "", "");
     }
 
     private static BlockFormFieldDefinition textarea(String key, String label, boolean full, String description) {

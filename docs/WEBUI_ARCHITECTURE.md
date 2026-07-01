@@ -43,7 +43,7 @@ GET  /api/pixellogic/traces/latest
 GET  /api/pixellogic/traces
 ```
 
-The Vite dev server proxies `/api` to `http://127.0.0.1:18111`. The UI defaults to `WebUI 模拟玩家`. The `测试运行` control is a split button: the left side starts the run, and the right arrow opens a small dropdown with brief helper copy and `编辑测试玩家`.
+The Vite dev server proxies `/api` to `http://127.0.0.1:18111`. The UI defaults to `WebUI 模拟玩家`. The `测试运行` control is a split button: the left side starts the run, and the right arrow opens a small dropdown with brief helper copy and `编辑测试上下文`.
 
 Long-term, `/api` should be treated as a WebUI transport boundary rather than a permanent direct server HTTP assumption. The current transport is dev/local HTTP. A future transport candidate is client localhost bridge -> Minecraft networking -> server core. This is not the active near-term implementation track; the user-facing WebUI API shape should stay stable where possible: catalog, graph, save/validate/commit, simulation, and trace.
 
@@ -57,12 +57,17 @@ Long-term, `/api` should be treated as a WebUI transport boundary rather than a 
       "displayName": "WebUI 模拟玩家",
       "tags": ["runner"],
       "operator": false
+    },
+    "world": {
+      "playerPosition": { "dimensionId": "minecraft:overworld", "x": 0, "y": 64, "z": 0 },
+      "targetBlock": { "enabled": false, "dimensionId": "minecraft:overworld", "x": 0, "y": 64, "z": 0, "blockId": "minecraft:stone" },
+      "regions": []
     }
   }
 }
 ```
 
-This context is temporary input for the next run only. It is not written to graph JSON, not saved as a named scenario, and not reused from the previous run result. The result summary displays the run actor, initial tags, final tags, tag changes, and administrator status.
+This context is temporary input for the next run only. It is not written to graph JSON, not saved as a named scenario, and not reused from the previous run result. The result summary displays the run actor, player position, target block, region count/name summary, initial tags, final tags, tag changes, and administrator status.
 
 ## Graph Draft Flow
 
@@ -88,8 +93,8 @@ Important user semantics:
 - Invalid edits do not replace the committed runtime graph.
 - `上一步` / `下一步` plus `Ctrl+Z`, `Ctrl+Y`, and `Ctrl+Shift+Z` roll back and reapply graph operations such as naming, configuration, add/delete, drag, and connection edits.
 - `测试运行` waits for pending automatic save, resets the demo test state, starts the run, and refreshes the trace.
-- `编辑测试玩家` opens a modal using the same local-draft, save, close animation, and unsaved-close confirmation pattern as block editing.
-- The test-player modal sends display name, tags, and administrator status with the test run; tag chips use a left-side `×` remove button, and final tags from `action.player.add_tag` stay in the result summary and do not rewrite the input tags.
+- `编辑测试上下文` opens a modal using the same local-draft, save, close animation, and unsaved-close confirmation pattern as block editing.
+- The test-context modal sends display name, tags, administrator status, player position, optional target block, and simple region facts with the test run; tag chips use a left-side `×` remove button, and final tags from `action.player.add_tag` stay in the result summary and do not rewrite the input tags.
 - Reset remains an internal API step, not a primary user button.
 - The right panel is an information surface, not the main field editor.
 - Closing the editor modal without saving discards only the modal-local draft and does not mutate the graph.
@@ -105,10 +110,20 @@ Important user semantics:
   - `不满足时继续` renders a normal-height single red output condition card.
   - `分成两路` keeps the current dual-branch condition shape.
 - Player condition blocks override those labels through catalog schema, such as `拥有标签时继续` / `不拥有标签时继续` / `分开执行` and `是管理员时继续` / `不是管理员时继续` / `分开执行`.
+- Context condition blocks also override those labels through catalog schema:
+  - `玩家所在维度是否为`: `在该维度时继续` / `不在该维度时继续` / `分开执行`.
+  - `玩家是否在区域内`: `在区域内时继续` / `不在区域内时继续` / `分开执行`.
+  - `目标方块是否为`: `为该方块时继续` / `不为该方块时继续` / `分开执行`.
+  - `目标方块是否在区域内`: `在区域内时继续` / `不在区域内时继续` / `分开执行`.
+- These context blocks edit only dimension id, block id, region name, and condition usage. Coordinates and target block facts stay in `编辑测试上下文`.
 - Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
 - Card gray type labels and the right-panel selected-block badge show the catalog top-level category, such as `条件判断`, `玩家操作`, or `消息显示`, instead of repeating the concrete block name.
+- Block card titles stay on one line. If the rendered title actually overflows, it scrolls horizontally back and forth instead of wrapping or using a fixed ellipsis.
+- Block card summaries reserve about three lines. If the rendered summary actually overflows, it scrolls vertically back and forth; short summaries and summaries that fit in three lines do not animate.
 - The block editor title uses `未命名(官方积木名)` when the current display name still equals the catalog name, and `自定义名称(官方积木名)` after the user renames it.
 - The editor base-info block type is static metadata in the format `积木类别：官方积木名`; it is not styled as an editable or readonly input.
+- Region-name fields for region condition blocks read current test-context `world.regions[].name` values into a project-styled dropdown when regions exist, preserve an old value that is not in the list, and fall back to text input when no regions exist.
+- Editor select/scope controls use the project custom dropdown style instead of relying on the browser's native blue select popup.
 
 Safety bounds:
 
@@ -126,6 +141,7 @@ The slot-based canvas now supports a minimal direct-manipulation graph editing l
 - Single click selects the block; pointer movement past the drag threshold starts drag; double click opens the existing editor modal.
 - Dragging a block moves that block and all downstream nodes reachable from outgoing typed edges.
 - Dragging a dual-branch Condition moves both pass and fail downstream branches; single-output conditions behave like normal chain blocks.
+- Single-output conditions can be appended, attached, or inserted as a normal chain tail even when the active slot id is `pass` or `fail`; dual-branch conditions still are not treated as a single tail.
 - Inactive condition outputs are hidden and ignored by visual connection, chain dragging, append, attach, and insert candidate detection.
 - Dragging follows only edges whose puzzle mouths are still visually snapped together; visually separated stale edges are ignored.
 - Magnetic snap has a wider hit area, but connected-state detection uses a tight snapped-position tolerance so near-misses are not treated as one chain.
@@ -156,7 +172,7 @@ Current responsibility boundaries:
 - `model/blockCatalog.ts`: catalog sorting/lookup helpers, catalog-block-to-graph-node conversion, and a minimal API-offline fallback placeholder.
 - `model/richText.ts`: rich text component helpers for structured storage, named/hex color normalization, selected-range formatting, and plain text display.
 - `ui/editor/richText/`: shared rich text editor toolbar, contenteditable rendering, and selection-offset helpers.
-- `model/simulationTestContext.ts`: per-run WebUI test actor model, validation, tag normalization, and request payload.
+- `model/simulationTestContext.ts`: per-run WebUI test context model, validation, tag normalization, simple world facts, and request payload.
 - `state/`: mutable app state and canvas world dimensions.
 - `ui/app.ts`: orchestration, app shell assembly, event binding, autosave, undo/redo, and API actions.
 - `ui/canvas/`: puzzle block view, slot-flow view-model building, block constants, and drag/insert graph rules.

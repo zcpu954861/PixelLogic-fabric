@@ -102,6 +102,12 @@ Known condition config compatibility:
 - Unconnected condition outputs are valid and mean that path ends.
 - Unconnected condition inputs are valid during editing; the block is saved but unreachable until connected into a trigger path.
 - The normal WebUI renders this as `条件用途`; catalog blocks may override option labels, for example `拥有标签时继续` / `不拥有标签时继续` / `分开执行` or `是管理员时继续` / `不是管理员时继续` / `分开执行`.
+- Context condition blocks use the same `outputMode` field and store only the check target:
+  - `condition.player.dimension_is`: `dimensionId`.
+  - `condition.player.in_region`: `regionName`.
+  - `condition.target_block.is_type`: `blockId`.
+  - `condition.target_block.in_region`: `regionName`.
+- These blocks read per-run `testContext.world` facts during simulation; those facts are not stored in graph JSON.
 
 ## Endpoints
 
@@ -145,9 +151,10 @@ Error shape:
 - Commit loads the draft, validates it, writes committed JSON, and swaps the runtime compiled graph only after validation passes.
 - If validation fails, committed graph and current runtime remain unchanged.
 - Test run uses the committed graph, even when a draft exists.
-- Test run may receive a per-run `testContext.actor` with display name, tags, and administrator flag. This context is runtime input only and is not stored in graph JSON.
+- Test run may receive a per-run `testContext.actor` with display name, tags, and administrator flag plus `testContext.world` facts for player position, optional target block, and simple regions. This context is runtime input only and is not stored in graph JSON.
 - Condition runtime follows `outputMode`: `PASS_ONLY` only follows `pass` when true, `FAIL_ONLY` only follows `fail` when false, and `BRANCH` selects `pass` or `fail`.
 - If the selected condition output has no edge, runtime records that no next block is connected and ends successfully.
+- Context condition runtime evaluates missing target block or missing region as false and records a readable trace explanation.
 
 ## WebUI Semantics
 
@@ -156,7 +163,7 @@ The WebUI keeps the Slot-Based horizontal block flow. It loads the graph from th
 The API layer still exposes draft, validate, and commit as separate operations, but the normal user UI does not expose that engineering sequence as separate buttons. The user-facing actions are:
 
 - `保存`: save the current edits, validate them, and promote them only when validation passes.
-- `测试运行`: if there are unsaved edits, save/validate/promote them first; then reset the demo test state, start the test run with the current `测试玩家` input, and refresh the trace.
+- `测试运行`: if there are unsaved edits, save/validate/promote them first; then reset the demo test state, start the test run with the current `测试上下文` input, and refresh the trace.
 
 Block fields are edited in a focused modal opened from the Slot-Based canvas. The right panel only shows selected-block information and status.
 
@@ -188,6 +195,13 @@ These edits are still submitted as the same graph draft JSON. `保存` continues
       "displayName": "WebUI 模拟玩家",
       "tags": ["runner"],
       "operator": false
+    },
+    "world": {
+      "playerPosition": { "dimensionId": "minecraft:overworld", "x": 0, "y": 64, "z": 0 },
+      "targetBlock": { "enabled": false, "dimensionId": "minecraft:overworld", "x": 0, "y": 64, "z": 0, "blockId": "minecraft:stone" },
+      "regions": [
+        { "name": "出生区", "dimensionId": "minecraft:overworld", "minX": 0, "minY": 64, "minZ": 0, "maxX": 10, "maxY": 80, "maxZ": 10 }
+      ]
     }
   }
 }
@@ -200,11 +214,18 @@ Validation:
 - display name is trimmed, required when provided, max 64 characters, and cannot contain control characters.
 - tags are trimmed, deduplicated, capped at 32 values, max 64 characters each, and cannot contain control characters.
 - administrator defaults to `false`.
+- dimension ids and block ids must be namespaced ids such as `minecraft:overworld` and `minecraft:stone`.
+- coordinates must be integers; x/z are limited to +/-30,000,000 and y to -2048..4096.
+- target block defaults to disabled `minecraft:stone @ minecraft:overworld (0, 64, 0)`.
+- regions are capped at 8, require a non-empty name up to 64 characters, and normalize min/max bounds.
 
 The response includes the simulation summary:
 
 - actor display name.
 - administrator flag.
+- player position.
+- target block.
+- region facts.
 - initial actor tags.
 - final actor tags after simulated actions.
 

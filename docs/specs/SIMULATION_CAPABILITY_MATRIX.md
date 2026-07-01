@@ -54,8 +54,27 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 - `action.player.add_tag`: still mutates only the current run actor and returns final tags.
 - no scenario persistence, multiplayer, inventory, world, container, or game mode context is implemented.
 
+## Simulation Context Expansion v1 Status
+
+`feature/v1-simulation-context-expansion` adds the first small world facts to that same per-run context:
+
+- player position: dimension id plus integer x/y/z, default `minecraft:overworld (0, 64, 0)`.
+- target block: disabled by default, with dimension id, integer x/y/z, and block id such as `minecraft:stone`.
+- regions: up to 8 named inclusive boxes with normalized min/max coordinates.
+- result summary: returns player position, target block state, and region facts so WebUI can show them after a test run.
+- still no new blocks, named scenario persistence, inventory/container/entity simulation, full world map, region system, or Minecraft adapter.
+
 ## Catalog Expansion v1 Player + Message Status
 
 - `condition.player.is_admin`: approximate simulation against the per-run actor administrator flag.
 - `action.message.title`, `action.message.subtitle`, and `action.message.actionbar`: approximate simulation records message result channels `TITLE`, `SUBTITLE`, and `ACTIONBAR`.
 - The rich text payload now supports selected-text color and formatting controls in WebUI. Simulation still records readable plain text for trace and preserves the structured payload in message results; real Minecraft Text delivery remains future adapter work.
+
+## Catalog Expansion v2 Context Blocks Status
+
+- `condition.player.dimension_is`: fully simulatable against the per-run player position dimension.
+- `condition.player.in_region`: fully simulatable against named test region facts, with inclusive bounds and dimension match.
+- `condition.target_block.is_type`: fully simulatable against the optional target block fact when enabled; missing target block evaluates false.
+- `condition.target_block.in_region`: fully simulatable against target block position plus named region facts; missing target block or region evaluates false.
+- These blocks still require a future Minecraft adapter for real server execution; current semantics are WebUI/API simulation facts only.
+- No world mutation, world block map, Region system, inventory/container/entity simulation, named scenario, or persistence is added.

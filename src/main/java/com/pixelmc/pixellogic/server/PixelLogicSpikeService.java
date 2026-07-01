@@ -12,6 +12,7 @@ import com.pixelmc.pixellogic.core.runtime.RuntimeLimits;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationActor;
+import com.pixelmc.pixellogic.core.simulation.context.SimulationWorld;
 import com.pixelmc.pixellogic.core.simulation.executor.SimulationExecutionRegistry;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionRequest;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionResult;
@@ -130,6 +131,10 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     }
 
     public RuntimeResult startManualTest(SimulationActor actor) {
+        return startManualTest(actor, SimulationWorld.overworld());
+    }
+
+    public RuntimeResult startManualTest(SimulationActor actor, SimulationWorld world) {
         SimulationRunner currentRunner = simulationRunner;
         GraphDocument graph = committedGraph;
         if (validator.hasErrors(validationIssues) || currentRunner == null || graph == null) {
@@ -143,6 +148,7 @@ public final class PixelLogicSpikeService implements AutoCloseable {
                 DemoGraphFactory.TRIGGER_TYPE,
                 "/pixellogic test start",
                 actor,
+                world,
                 MANUAL_SESSION_ID,
                 runtimeGeneration.get()
         ));

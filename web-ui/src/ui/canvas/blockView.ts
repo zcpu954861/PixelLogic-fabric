@@ -90,8 +90,8 @@ export function renderBlock(block: SlotBlock, recentNodeId: string | null): stri
       <div class="block-topline">
         <span>${escapeHtml(block.type)}</span>
       </div>
-      <h3>${escapeHtml(block.title)}</h3>
-      <p>${escapeHtml(block.summary)}</p>
+      <h3><span class="block-title-text">${escapeHtml(block.title)}</span></h3>
+      <p><span class="block-summary-text">${escapeHtml(block.summary)}</span></p>
     </article>
   `;
 }

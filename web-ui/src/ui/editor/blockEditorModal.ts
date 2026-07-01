@@ -1,9 +1,14 @@
 import type { BlockCatalog, GraphNode } from '../../model/graphTypes';
+import type { SimulationTestContext } from '../../model/simulationTestContext';
 import { escapeHtml } from '../../utils/dom';
 import { nodeOfficialLabel, nodeSummary } from '../humanize/labels';
 import { renderNodeEditor } from './formControls';
 
-export function renderEditorModal(nodeItem: GraphNode, catalog: BlockCatalog, options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string }): string {
+export function renderEditorModal(
+  nodeItem: GraphNode,
+  catalog: BlockCatalog,
+  options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string; steady: boolean; simulationTestContext: SimulationTestContext },
+): string {
   const officialName = nodeOfficialLabel(nodeItem, catalog);
   const customName = nodeItem.displayName.trim();
   const titleName = customName && customName !== officialName ? customName : '未命名';
@@ -11,7 +16,7 @@ export function renderEditorModal(nodeItem: GraphNode, catalog: BlockCatalog, op
   const modalIssue = options.modalIssue;
 
   return `
-    <div class="editor-overlay${options.editorClosing ? ' is-closing' : ''}" data-modal-overlay>
+    <div class="editor-overlay${options.editorClosing ? ' is-closing' : ''}${options.steady ? ' is-steady' : ''}" data-modal-overlay>
       <section class="editor-dialog" role="dialog" aria-modal="true" aria-labelledby="block-editor-title">
         <header class="editor-head">
           <div>
@@ -25,7 +30,7 @@ export function renderEditorModal(nodeItem: GraphNode, catalog: BlockCatalog, op
             <b>当前摘要</b>
             <p data-modal-summary>${escapeHtml(nodeSummary(nodeItem, catalog))}</p>
           </section>
-          ${renderNodeEditor(nodeItem, catalog)}
+          ${renderNodeEditor(nodeItem, catalog, options.simulationTestContext)}
           ${options.error || options.hasValidation ? `
             <section class="editor-issues" role="${options.error ? 'alert' : 'status'}">
               <b>${options.error ? '保存提示' : '检查结果'}</b>

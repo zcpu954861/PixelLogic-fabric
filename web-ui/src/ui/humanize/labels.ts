@@ -68,6 +68,10 @@ export function nodeTypeLabel(type: string): string {
       return '发送消息';
     case 'PLAYER_HAS_TAG_CONDITION':
     case 'PLAYER_IS_ADMIN_CONDITION':
+    case 'PLAYER_DIMENSION_CONDITION':
+    case 'PLAYER_IN_REGION_CONDITION':
+    case 'TARGET_BLOCK_TYPE_CONDITION':
+    case 'TARGET_BLOCK_IN_REGION_CONDITION':
       return '条件判断';
     case 'PLAYER_ADD_TAG_ACTION':
       return '添加玩家标签';
@@ -121,6 +125,18 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   if (blockItem.id === 'condition.player.is_admin') {
     return playerAdminConditionSummary(nodeItem);
   }
+  if (blockItem.id === 'condition.player.dimension_is') {
+    return playerDimensionConditionSummary(nodeItem);
+  }
+  if (blockItem.id === 'condition.player.in_region') {
+    return playerRegionConditionSummary(nodeItem);
+  }
+  if (blockItem.id === 'condition.target_block.is_type') {
+    return targetBlockTypeConditionSummary(nodeItem);
+  }
+  if (blockItem.id === 'condition.target_block.in_region') {
+    return targetBlockRegionConditionSummary(nodeItem);
+  }
   const template = blockItem.summaryTemplate;
   if (!template) {
     return legacyNodeTypeSummary(nodeItem);
@@ -152,6 +168,14 @@ function legacyNodeTypeSummary(nodeItem: GraphNode): string {
       return playerTagConditionSummary(nodeItem);
     case 'PLAYER_IS_ADMIN_CONDITION':
       return playerAdminConditionSummary(nodeItem);
+    case 'PLAYER_DIMENSION_CONDITION':
+      return playerDimensionConditionSummary(nodeItem);
+    case 'PLAYER_IN_REGION_CONDITION':
+      return playerRegionConditionSummary(nodeItem);
+    case 'TARGET_BLOCK_TYPE_CONDITION':
+      return targetBlockTypeConditionSummary(nodeItem);
+    case 'TARGET_BLOCK_IN_REGION_CONDITION':
+      return targetBlockRegionConditionSummary(nodeItem);
     case 'PLAYER_ADD_TAG_ACTION':
       return `给当前玩家添加标签“${config.tag ?? '标签'}”。`;
     case 'PLAYER_REMOVE_TAG_ACTION':
@@ -217,6 +241,54 @@ function playerAdminConditionSummary(nodeItem: GraphNode): string {
       return '当不是管理员时继续。';
     case 'BRANCH':
       return '按当前玩家是否为管理员分开执行。';
+  }
+}
+
+function playerDimensionConditionSummary(nodeItem: GraphNode): string {
+  const dimensionId = nodeItem.config.dimensionId || 'minecraft:overworld';
+  switch (conditionOutputMode(nodeItem)) {
+    case 'PASS_ONLY':
+      return `当当前玩家位于维度「${dimensionId}」时继续。`;
+    case 'FAIL_ONLY':
+      return `当当前玩家不在维度「${dimensionId}」时继续。`;
+    case 'BRANCH':
+      return `按当前玩家所在维度是否为「${dimensionId}」分开执行。`;
+  }
+}
+
+function playerRegionConditionSummary(nodeItem: GraphNode): string {
+  const regionName = nodeItem.config.regionName || '区域名称';
+  switch (conditionOutputMode(nodeItem)) {
+    case 'PASS_ONLY':
+      return `当当前玩家在区域「${regionName}」内时继续。`;
+    case 'FAIL_ONLY':
+      return `当区域「${regionName}」不包含当前玩家时继续。`;
+    case 'BRANCH':
+      return `按当前玩家是否在区域「${regionName}」内分开执行。`;
+  }
+}
+
+function targetBlockTypeConditionSummary(nodeItem: GraphNode): string {
+  const blockId = nodeItem.config.blockId || 'minecraft:stone';
+  switch (conditionOutputMode(nodeItem)) {
+    case 'PASS_ONLY':
+      return `当目标方块为「${blockId}」时继续。`;
+    case 'FAIL_ONLY':
+      return `当目标方块不为「${blockId}」时继续。`;
+    case 'BRANCH':
+      return `按目标方块是否为「${blockId}」分开执行。`;
+  }
+}
+
+function targetBlockRegionConditionSummary(nodeItem: GraphNode): string {
+  const regionName = nodeItem.config.regionName || '区域名称';
+  switch (conditionOutputMode(nodeItem)) {
+    case 'PASS_ONLY':
+      return `当目标方块在区域「${regionName}」内时继续。`;
+    case 'FAIL_ONLY':
+      return `当区域「${regionName}」不包含目标方块时继续。`;
+    case 'BRANCH':
+      return `按目标方块是否在区域「${regionName}」内分开执行。`;
   }
 }
 

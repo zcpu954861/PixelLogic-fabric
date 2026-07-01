@@ -19,7 +19,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 Near-term track:
 
 1. Move more current demo block behavior toward per-block simulation executors only when it reduces real duplication.
-2. Add more simulation context fields only when a concrete block requires them.
+2. Build the next catalog expansion on the Simulation Context Expansion v1 branch when adding position, target-block, or region-aware blocks.
 3. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
 4. Continue graph/editor/runtime improvements only where they support the current visual editor and simulation loop.
 5. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
@@ -55,10 +55,12 @@ Long-term architecture track:
 - Simulation Backend skeleton branch adds minimal `core/simulation` context/event/runner/result/executor code, routes manual/WebUI test-run through `SimulationRunner`, and registers the first simulation-backed player tag condition/action blocks.
 - Condition output mode branch adds `满足时继续` / `不满足时继续` / `分成两路`, makes unconnected condition outputs end gracefully, allows unconnected condition inputs during editing, moves `condition.player.has_tag` to 条件判断 / 玩家条件, and keeps the demo graph as explicit dual-branch.
 - Simulation Test Context MVP lets WebUI test runs send a temporary simulated player display name, tags, and administrator flag; results show initial/final tags without writing the context into graph JSON or saving scenarios.
+- Simulation Context Expansion v1 extends that temporary test context with player position, optional target block, and simple region facts for future block expansion, still without named scenarios, graph writes, or a real MC adapter.
 - Catalog Expansion v1 adds `玩家是否拥有标签`, `玩家是否为管理员`, `移除玩家标签`, and the title/subtitle/actionbar message blocks; message color and formatting toolbar remains a follow-up.
 - Maintainability Cleanup v1 reduces frontend catalog duplication, extracts slot-flow/catalog rendering helpers from `app.ts`, consolidates self-check support, and removes runtime future-switch naming noise without changing product behavior.
 - Text Component Editor v1 adds the shared rich text component editor for message/title/subtitle/actionbar fields.
 - Admin Client Bridge design audit records the long-term direction: authorized client-hosted WebUI, local bridge transport, server-authoritative capability checks, and capability-gated future tool items.
+- Catalog Expansion v2 Context Blocks builds on `feature/v1-simulation-context-expansion` and adds read-only conditions for player dimension, player in region, target block type, and target block in region.
 
 ## Follow-Ups
 
@@ -71,6 +73,7 @@ P2 before broader runtime use:
 - In-memory state now has a spike-level cap and reset/stop cleanup. Broader runtime still needs durable lifecycle and persistence policy before non-spike use.
 - Draft saves return fingerprints but do not yet enforce `expectedFingerprint`; add optimistic conflict handling before multi-user or multi-tab editing.
 - Server HTTP API is still the current dev/local/self-check WebUI transport. The long-term recommended admin flow is client-hosted WebUI through an authorized PixelLogic client session, but that track is deferred until a future scoped prompt.
+- Context-aware condition blocks currently consume only per-run Simulation Test Context facts. Real Minecraft adapter behavior, Region old system integration, world mutation, named scenarios, and persisted test contexts remain deferred.
 
 ## Loader Event Policy
 

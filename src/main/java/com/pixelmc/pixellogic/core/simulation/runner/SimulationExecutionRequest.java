@@ -48,6 +48,7 @@ public record SimulationExecutionRequest(
             String triggerType,
             String commandText,
             SimulationActor actor,
+            SimulationWorld world,
             String sessionId,
             long generation
     ) {
@@ -55,9 +56,20 @@ public record SimulationExecutionRequest(
                 graphId,
                 SimulationEvent.manual(triggerType, commandText, sessionId),
                 actor,
-                SimulationWorld.overworld(),
+                world,
                 SimulationRunOptions.realTime(),
                 generation
         );
+    }
+
+    public static SimulationExecutionRequest manual(
+            String graphId,
+            String triggerType,
+            String commandText,
+            SimulationActor actor,
+            String sessionId,
+            long generation
+    ) {
+        return manual(graphId, triggerType, commandText, actor, SimulationWorld.overworld(), sessionId, generation);
     }
 }

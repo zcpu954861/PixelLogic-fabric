@@ -3,10 +3,16 @@
   --block-outline: var(--outline);
   --accent: var(--outline);
   --fill: #ffffff;
+  --summary-lines: 3;
+  --marquee-x: 0px;
+  --marquee-y: 0px;
+  --marquee-duration: 10s;
   position: absolute;
   z-index: 5;
+  display: flex;
+  flex-direction: column;
   overflow: visible;
-  padding: 18px 38px 18px 38px;
+  padding: 24px 38px 5px 38px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -149,41 +155,95 @@
   justify-content: space-between;
   gap: 12px;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 900;
+  line-height: 1.05;
 }
 
 .logic-block h3 {
-  margin: 13px 0 8px;
+  max-width: 100%;
+  margin: 9px 0 5px;
   color: var(--ink);
-  font-size: 1.32rem;
-  line-height: 1.12;
+  font-size: 1.28rem;
+  line-height: 1.04;
   letter-spacing: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.block-title-text {
+  display: inline-block;
+  max-width: none;
+  will-change: transform;
 }
 
 .logic-block p {
   max-width: 22ch;
+  max-height: calc(var(--summary-lines) * 1.3em + 3px);
+  min-height: 0;
   margin: 0;
   color: #40534a;
-  font-size: 1rem;
-  line-height: 1.42;
+  font-size: 0.96rem;
+  line-height: 1.3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.block-summary-text {
+  display: block;
+  will-change: transform;
+}
+
+.logic-block h3.is-overflowing .block-title-text {
+  animation: block-title-marquee var(--marquee-duration) ease-in-out 680ms infinite alternate;
+}
+
+.logic-block p.is-overflowing .block-summary-text {
+  animation: block-summary-marquee var(--marquee-duration) ease-in-out 820ms infinite alternate;
 }
 
 .logic-block.condition {
   padding-top: var(--condition-content-top, 145px);
   padding-right: 54px;
+  --summary-lines: 3;
 }
 
 .logic-block.condition-single {
-  padding-top: 18px;
+  padding-top: 24px;
   padding-right: 38px;
+  --summary-lines: 3;
 }
 
 .logic-block.condition h3 {
-  margin-top: 13px;
+  margin-top: 8px;
   font-size: 1.55rem;
 }
 
 .logic-block.condition-single h3 {
-  font-size: 1.32rem;
+  font-size: 1.28rem;
+}
+
+@keyframes block-title-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--marquee-x));
+  }
+}
+
+@keyframes block-summary-marquee {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(var(--marquee-y));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logic-block h3.is-overflowing .block-title-text,
+  .logic-block p.is-overflowing .block-summary-text {
+    animation: none;
+  }
 }

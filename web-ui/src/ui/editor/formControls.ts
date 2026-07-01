@@ -1,12 +1,13 @@
 import { catalogBlock } from '../../model/blockCatalog';
 import type { BlockCatalog, CatalogFormField, EditableField, EditorSection, FieldOption, GraphNode } from '../../model/graphTypes';
 import { richTextPlainText } from '../../model/richText';
+import type { SimulationTestContext } from '../../model/simulationTestContext';
 import { escapeAttr, escapeHtml } from '../../utils/dom';
 import { booleanLabel, booleanOptions, conditionOutputModeLabel, nodeTypeLabel, nodeTypeMetaLabel, stateScopeOptions, targetLabel, valueTypeOptions } from '../humanize/labels';
 import { renderRichTextEditor } from './richText/richTextEditor';
 
-export function renderNodeEditor(nodeItem: GraphNode, catalog: BlockCatalog): string {
-  const section = editorSection(nodeItem, catalog);
+export function renderNodeEditor(nodeItem: GraphNode, catalog: BlockCatalog, simulationTestContext?: SimulationTestContext): string {
+  const section = editorSection(nodeItem, catalog, simulationTestContext);
 
   return `
     <section class="form-card editor-section">
@@ -62,13 +63,7 @@ export function renderEditableField(field: EditableField): string {
 
 function renderFieldControl(field: EditableField, describedBy: string): string {
   if (field.control === 'select' || field.control === 'scope') {
-    return `
-      <select data-config-key="${escapeAttr(field.key)}"${field.required ? ' required' : ''}${describedBy ? ` aria-describedby="${describedBy}"` : ''}>
-        ${fieldOptions(field)
-          .map((option) => `<option value="${escapeAttr(option.value)}"${option.value === field.value ? ' selected' : ''}>${escapeHtml(option.label)}</option>`)
-          .join('')}
-      </select>
-    `;
+    return renderSelectField(field, describedBy);
   }
   if (field.control === 'boolean' || field.control === 'segmented') {
     return `
@@ -106,10 +101,48 @@ function renderFieldControl(field: EditableField, describedBy: string): string {
   `;
 }
 
-export function editorSection(nodeItem: GraphNode, catalog: BlockCatalog): EditorSection {
+function renderSelectField(field: EditableField, describedBy: string): string {
+  const options = fieldOptions(field);
+  const selected = options.find((option) => option.value === field.value) ?? options[0] ?? { value: '', label: field.value || '请选择' };
+  return `
+    <div class="custom-select" data-custom-select>
+      <button
+        type="button"
+        class="custom-select-trigger"
+        data-custom-select-toggle
+        aria-haspopup="listbox"
+        aria-expanded="false"
+        ${field.required ? ' aria-required="true"' : ''}
+        ${describedBy ? ` aria-describedby="${describedBy}"` : ''}
+      >
+        <span>${escapeHtml(selected.label)}</span>
+      </button>
+      <div class="custom-select-list" role="listbox" hidden>
+        ${options
+          .map((option) => `
+            <button
+              type="button"
+              class="custom-select-option"
+              role="option"
+              data-custom-select-option
+              data-config-key="${escapeAttr(field.key)}"
+              data-config-value="${escapeAttr(option.value)}"
+              aria-selected="${option.value === field.value}"
+              aria-pressed="${option.value === field.value}"
+            >
+              ${escapeHtml(option.label)}
+            </button>
+          `)
+          .join('')}
+      </div>
+    </div>
+  `;
+}
+
+export function editorSection(nodeItem: GraphNode, catalog: BlockCatalog, simulationTestContext?: SimulationTestContext): EditorSection {
   const blockItem = catalogBlock(catalog, nodeItem.blockId ?? '') ?? uniqueCatalogBlockForNodeType(catalog, nodeItem.type);
   if (blockItem) {
-    return { title: blockItem.displayName, fields: schemaDrivenFields(nodeItem, blockItem.formSchema) };
+    return { title: blockItem.displayName, fields: schemaDrivenFields(nodeItem, blockItem.formSchema, simulationTestContext) };
   }
   return legacyNodeTypeEditorSection(nodeItem);
 }
@@ -119,12 +152,15 @@ function uniqueCatalogBlockForNodeType(catalog: BlockCatalog, nodeType: string) 
   return matches.length === 1 ? matches[0] : null;
 }
 
-function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[]): EditableField[] {
+function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[], simulationTestContext?: SimulationTestContext): EditableField[] {
   return formSchema
     .filter((field) => field.type !== 'hidden')
     .map((field) => {
       const value = nodeItem.config[field.key] ?? field.defaultValue ?? '';
-      const control = field.key === 'value' && nodeItem.config.valueType && nodeItem.config.valueType !== 'BOOLEAN'
+      const options = fieldOptionsForSchema(field, value, simulationTestContext);
+      const control = field.key === 'regionName' && options.length > 0
+        ? 'select'
+        : field.key === 'value' && nodeItem.config.valueType && nodeItem.config.valueType !== 'BOOLEAN'
         ? nodeItem.config.valueType === 'INTEGER' ? 'integer' : 'string'
         : field.type;
       return {
@@ -136,7 +172,7 @@ function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[])
         defaultValue: field.defaultValue,
         placeholder: field.placeholder,
         required: field.required,
-        options: fieldOptionsForSchema(field),
+        options,
         full: field.ui.includes('fullWidth') || field.type === 'rich_text_component' || field.type === 'textarea',
         min: field.min,
         max: field.max,
@@ -147,7 +183,10 @@ function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[])
     });
 }
 
-function fieldOptionsForSchema(field: CatalogFormField): FieldOption[] {
+function fieldOptionsForSchema(field: CatalogFormField, currentValue = '', simulationTestContext?: SimulationTestContext): FieldOption[] {
+  if (field.key === 'regionName') {
+    return regionNameOptions(simulationTestContext, currentValue);
+  }
   if (field.type === 'boolean' || field.type === 'segmented') {
     return field.options.length > 0 ? field.options : booleanOptions();
   }
@@ -155,6 +194,22 @@ function fieldOptionsForSchema(field: CatalogFormField): FieldOption[] {
     return field.options.length > 0 ? field.options : stateScopeOptions();
   }
   return field.options;
+}
+
+function regionNameOptions(simulationTestContext: SimulationTestContext | undefined, currentValue: string): FieldOption[] {
+  const seen = new Set<string>();
+  const options = (simulationTestContext?.world.regions ?? [])
+    .map((region) => region.name.trim())
+    .filter((name) => {
+      if (!name || seen.has(name)) {
+        return false;
+      }
+      seen.add(name);
+      return true;
+    })
+    .map((name) => ({ value: name, label: name }));
+  const value = currentValue.trim();
+  return options.length > 0 && value && !seen.has(value) ? [{ value, label: value }, ...options] : options;
 }
 
 // legacy fallback: only used when an old/unknown node cannot resolve a catalog BlockDefinition.

@@ -35,6 +35,10 @@ public final class BlockCatalogSelfCheck {
                 BuiltInBlockCatalog.ACTION_MESSAGE_ACTIONBAR,
                 BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG,
                 BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN,
+                BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS,
+                BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION,
+                BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE,
+                BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IN_REGION,
                 BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG,
                 BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG,
                 BuiltInBlockCatalog.STATE_SET,
@@ -117,6 +121,14 @@ public final class BlockCatalogSelfCheck {
         require(messageBlock(BuiltInBlockCatalog.ACTION_MESSAGE_ACTIONBAR).formSchema().stream()
                         .anyMatch(field -> field.key().equals("message") && field.type().equals("rich_text_component")),
                 "actionbar message block should use rich_text_component");
+        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS).subcategoryId().equals("condition.player"),
+                "player dimension condition should live under player conditions");
+        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION).subcategoryId().equals("condition.region"),
+                "player region condition should live under region conditions");
+        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE).subcategoryId().equals("condition.block"),
+                "target block type condition should live under block conditions");
+        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IN_REGION).subcategoryId().equals("condition.region"),
+                "target block region condition should live under region conditions");
         });
     }
 
@@ -171,6 +183,10 @@ public final class BlockCatalogSelfCheck {
     }
 
     private static BlockDefinition messageBlock(String blockId) {
+        return BuiltInBlockCatalog.block(blockId).orElseThrow();
+    }
+
+    private static BlockDefinition block(String blockId) {
         return BuiltInBlockCatalog.block(blockId).orElseThrow();
     }
 

@@ -20,11 +20,17 @@ import {
   addSimulationTag,
   cloneSimulationTestContext,
   defaultSimulationTestContext,
+  addSimulationRegion,
   removeSimulationTag,
+  removeSimulationRegion,
   simulationTestPayload,
   type SimulationTestContext,
   updateSimulationDisplayName,
   updateSimulationOperator,
+  updateSimulationPlayerPosition,
+  updateSimulationRegion,
+  updateSimulationTargetBlock,
+  updateSimulationTargetEnabled,
   validateSimulationTestContext,
 } from '../model/simulationTestContext';
 import { state, world } from '../state/appState';
@@ -104,12 +110,35 @@ let confirmedModeSwitchSignature: string | null = null;
 const undoStack: GraphHistoryEntry[] = [];
 const redoStack: GraphHistoryEntry[] = [];
 
+type ModalScrollSnapshot = {
+  editor: number | null;
+  simulation: number | null;
+};
+
 
 
 
 
 function currentGraph(): GraphDocument {
   return state.graph ?? fallbackGraph;
+}
+
+function captureModalScrollSnapshot(): ModalScrollSnapshot {
+  return {
+    editor: document.querySelector<HTMLElement>('[data-modal-overlay] .editor-body')?.scrollTop ?? null,
+    simulation: document.querySelector<HTMLElement>('[data-sim-modal-overlay] .editor-body')?.scrollTop ?? null,
+  };
+}
+
+function restoreModalScrollSnapshot(snapshot: ModalScrollSnapshot): void {
+  const editorBody = document.querySelector<HTMLElement>('[data-modal-overlay] .editor-body');
+  if (snapshot.editor !== null && editorBody) {
+    editorBody.scrollTop = snapshot.editor;
+  }
+  const simulationBody = document.querySelector<HTMLElement>('[data-sim-modal-overlay] .editor-body');
+  if (snapshot.simulation !== null && simulationBody) {
+    simulationBody.scrollTop = snapshot.simulation;
+  }
 }
 
 
@@ -124,7 +153,9 @@ function renderApp(): void {
     return;
   }
 
+  const editorWasOpen = Boolean(document.querySelector('[data-modal-overlay]'));
   const simulationEditorWasOpen = Boolean(document.querySelector('[data-sim-modal-overlay]'));
+  const modalScroll = captureModalScrollSnapshot();
   const graph = currentGraph();
   const blocks = buildBlocks(graph, activeCatalog(), state.selectedNodeId);
   updateWorldSize(blocks, world);
@@ -231,18 +262,43 @@ function renderApp(): void {
           </ol>
         </section>
       </footer>
-      ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation && !state.validation.valid), modalIssue: state.error || validationSummaryText(state) }) : ''}
+      ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation && !state.validation.valid), modalIssue: state.error || validationSummaryText(state), steady: editorWasOpen, simulationTestContext: state.simulationTestContext }) : ''}
       ${state.simulationEditorOpen && state.simulationDraftContext ? renderSimulationTestContextModal(state.simulationDraftContext, { closing: state.simulationEditorClosing, error: state.simulationTestContextError, steady: simulationEditorWasOpen }) : ''}
     </section>
   `;
 
   bindInteractions();
   setTransform();
-  focusEditor(simulationEditorWasOpen);
+  updateBlockOverflowMotion();
+  restoreModalScrollSnapshot(modalScroll);
+  focusEditor(editorWasOpen, simulationEditorWasOpen);
+  window.requestAnimationFrame(updateBlockOverflowMotion);
 }
 
 function activeCatalog(): BlockCatalog {
   return state.catalog ?? fallbackCatalog;
+}
+
+function updateBlockOverflowMotion(): void {
+  document.querySelectorAll<HTMLElement>('.logic-block h3').forEach((titleEl) => {
+    const textEl = titleEl.querySelector<HTMLElement>('.block-title-text');
+    const distance = textEl ? Math.ceil(textEl.scrollWidth - titleEl.clientWidth) : 0;
+    titleEl.classList.toggle('is-overflowing', distance > 2);
+    if (distance > 2) {
+      titleEl.style.setProperty('--marquee-x', `${-distance}px`);
+      titleEl.style.setProperty('--marquee-duration', `${Math.min(18, Math.max(8, distance / 7))}s`);
+    }
+  });
+
+  document.querySelectorAll<HTMLElement>('.logic-block p').forEach((summaryEl) => {
+    const textEl = summaryEl.querySelector<HTMLElement>('.block-summary-text');
+    const distance = textEl ? Math.ceil(textEl.scrollHeight - summaryEl.clientHeight) : 0;
+    summaryEl.classList.toggle('is-overflowing', distance > 4);
+    if (distance > 4) {
+      summaryEl.style.setProperty('--marquee-y', `${-distance}px`);
+      summaryEl.style.setProperty('--marquee-duration', `${Math.min(18, Math.max(9, distance / 3))}s`);
+    }
+  });
 }
 
 
@@ -554,6 +610,7 @@ function bindInteractions(): void {
       }
     });
   });
+  bindCustomSelectControls();
   bindRichTextToolbar();
 
   document.querySelectorAll<HTMLElement>('.slot-join').forEach((joinEl) => {
@@ -1154,6 +1211,62 @@ function bindSimulationDraftFields(): void {
       updateSimulationDraft(updateSimulationOperator(simulationDraft(), buttonEl.dataset.simDraftAdminValue === 'true'));
     });
   });
+
+  document.querySelectorAll<HTMLInputElement>('[data-sim-player-position-field]').forEach((inputEl) => {
+    inputEl.addEventListener('input', () => {
+      updateSimulationDraft(
+        updateSimulationPlayerPosition(simulationDraft(), inputEl.dataset.simPlayerPositionField as 'dimensionId' | 'x' | 'y' | 'z', inputEl.value),
+        false,
+      );
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-sim-target-enabled]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      updateSimulationDraft(updateSimulationTargetEnabled(simulationDraft(), buttonEl.dataset.simTargetEnabled === 'true'));
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('[data-sim-target-field]').forEach((inputEl) => {
+    inputEl.addEventListener('input', () => {
+      updateSimulationDraft(
+        updateSimulationTargetBlock(
+          simulationDraft(),
+          inputEl.dataset.simTargetField as 'dimensionId' | 'x' | 'y' | 'z' | 'blockId' | 'enabled',
+          inputEl.value,
+        ),
+        false,
+      );
+    });
+  });
+
+  document.querySelector('[data-sim-region-action="add"]')?.addEventListener('click', () => {
+    const result = addSimulationRegion(simulationDraft());
+    if (result.error) {
+      state.simulationTestContextError = result.error;
+      renderApp();
+      return;
+    }
+    updateSimulationDraft(result.context);
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-sim-region-action="remove"]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      updateSimulationDraft(removeSimulationRegion(simulationDraft(), Number(buttonEl.dataset.simRegionIndex)));
+    });
+  });
+  document.querySelectorAll<HTMLInputElement>('[data-sim-region-field]').forEach((inputEl) => {
+    inputEl.addEventListener('input', () => {
+      updateSimulationDraft(
+        updateSimulationRegion(
+          simulationDraft(),
+          Number(inputEl.dataset.simRegionIndex),
+          inputEl.dataset.simRegionField as 'name' | 'dimensionId' | 'minX' | 'minY' | 'minZ' | 'maxX' | 'maxY' | 'maxZ',
+          inputEl.value,
+        ),
+        false,
+      );
+    });
+  });
   document.querySelector('[data-sim-draft-action="reset"]')?.addEventListener('click', () => {
     updateSimulationDraft(defaultSimulationTestContext());
   });
@@ -1195,12 +1308,15 @@ function saveSimulationEditorDraft(): void {
   state.simulationTestContext = cloneSimulationTestContext(simulationTestPayload(draft).testContext);
   state.simulationOriginalContext = cloneSimulationTestContext(state.simulationTestContext);
   state.simulationDraftContext = cloneSimulationTestContext(state.simulationTestContext);
-  state.lastAction = '测试玩家已更新';
+  state.lastAction = '测试上下文已更新';
   closeSimulationEditor();
 }
 
-function focusEditor(simulationEditorWasOpen = false): void {
+function focusEditor(editorWasOpen = false, simulationEditorWasOpen = false): void {
   if (!state.editorOpen && !state.simulationEditorOpen) {
+    return;
+  }
+  if (state.editorOpen && editorWasOpen) {
     return;
   }
   if (state.simulationEditorOpen && simulationEditorWasOpen) {
@@ -1238,6 +1354,58 @@ function updateEditorDraft(inputEl: HTMLInputElement | HTMLSelectElement | HTMLT
   if (inputEl.dataset.configKey) {
     updateEditorDraftValue(inputEl.dataset.configKey, inputEl.value);
   }
+}
+
+function bindCustomSelectControls(): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-custom-select-toggle]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', (event) => {
+      event.preventDefault();
+      const selectEl = buttonEl.closest<HTMLElement>('[data-custom-select]');
+      if (!selectEl) {
+        return;
+      }
+      const willOpen = !selectEl.classList.contains('is-open');
+      closeCustomSelects(selectEl);
+      selectEl.classList.toggle('is-open', willOpen);
+      buttonEl.setAttribute('aria-expanded', String(willOpen));
+      selectEl.querySelector<HTMLElement>('.custom-select-list')?.toggleAttribute('hidden', !willOpen);
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-custom-select-option]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      const selectEl = buttonEl.closest<HTMLElement>('[data-custom-select]');
+      const triggerText = selectEl?.querySelector<HTMLElement>('.custom-select-trigger span');
+      if (triggerText) {
+        triggerText.textContent = buttonEl.textContent?.trim() ?? '';
+      }
+      selectEl?.querySelectorAll<HTMLButtonElement>('[data-custom-select-option]').forEach((item) => {
+        const selected = item === buttonEl;
+        item.setAttribute('aria-selected', String(selected));
+        item.setAttribute('aria-pressed', String(selected));
+      });
+      closeCustomSelects();
+    });
+  });
+
+  document.querySelectorAll<HTMLElement>('.editor-dialog').forEach((dialogEl) => {
+    dialogEl.addEventListener('pointerdown', (event) => {
+      if (!(event.target as HTMLElement).closest('[data-custom-select]')) {
+        closeCustomSelects();
+      }
+    });
+  });
+}
+
+function closeCustomSelects(except?: HTMLElement): void {
+  document.querySelectorAll<HTMLElement>('[data-custom-select].is-open').forEach((selectEl) => {
+    if (except && selectEl === except) {
+      return;
+    }
+    selectEl.classList.remove('is-open');
+    selectEl.querySelector<HTMLButtonElement>('[data-custom-select-toggle]')?.setAttribute('aria-expanded', 'false');
+    selectEl.querySelector<HTMLElement>('.custom-select-list')?.setAttribute('hidden', '');
+  });
 }
 
 function bindRichTextToolbar(): void {
@@ -2020,7 +2188,7 @@ async function startTest(): Promise<void> {
     if (contextError) {
       state.simulationTestContextError = contextError;
       state.error = contextError;
-      state.lastAction = '测试玩家信息需要调整';
+      state.lastAction = '测试上下文需要调整';
       return;
     }
     state.simulationTestContextError = '';

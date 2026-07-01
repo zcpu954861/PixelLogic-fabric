@@ -89,10 +89,11 @@ The WebUI now also uses a local graph version and save sequence before applying 
 
 Known message config compatibility:
 
-- Message action nodes store `config.message` as a rich text component payload string containing `version`, `plainText`, and `segments`.
+- Message action nodes store `config.message` as a rich text component payload string containing `version`, derived `plainText`, and `segments`.
+- Segment style may include a Minecraft named `color` and boolean style flags for bold, italic, underlined, strikethrough, and obfuscated text.
 - `action.message.title`, `action.message.subtitle`, and `action.message.actionbar` use the same message field and are separate blocks.
 - Old graph documents with a plain string `config.message` remain valid and are treated as `plainText`.
-- The normal WebUI does not expose raw JSON editing for this field.
+- The normal WebUI does not expose raw JSON editing or component/segment list management for this field.
 
 Known condition config compatibility:
 

@@ -7,7 +7,15 @@ import {
   fallbackCatalog,
 } from '../model/blockCatalog';
 import { fallbackGraph, graphId } from '../model/demoGraph';
-import { richTextConfig, richTextPlainText } from '../model/richText';
+import {
+  applyRichTextStyle,
+  normalizeRichTextColor,
+  richTextSelectionState,
+  serializeRichText,
+  type RichTextColor,
+  type RichTextStyle,
+  type RichTextStyleKey,
+} from '../model/richText';
 import {
   addSimulationTag,
   cloneSimulationTestContext,
@@ -60,6 +68,13 @@ import {
 } from './canvas/dragInsert';
 import { renderCatalogLibrary } from './catalog/catalogLibrary';
 import { renderEditorModal } from './editor/blockEditorModal';
+import {
+  insertTextAtRichTextSelection,
+  renderRichTextContent,
+  richTextSegmentsFromEditor,
+  richTextSelectionOffsets,
+  setRichTextSelectionOffsets,
+} from './editor/richText/richTextEditor';
 import { renderSimulationTestContextModal, renderSimulationTestResultSummary, renderTestRunControl } from './simulation/simulationTestContextPanel';
 import { renderTrace } from './trace/traceView';
 import { draftStatusText, uncommittedNotice, validationErrorText, validationList, validationSummaryText, validationTitle } from './validation/validationView';
@@ -67,6 +82,9 @@ import { renderNodeInfo } from './sidebar/selectionSummary';
 
 
 const app = document.querySelector<HTMLDivElement>('#app');
+const customRichTextColorsKey = 'pixelLogic.richText.customColors';
+const customRichTextColorLimit = 10;
+type RichTextColorPickMode = 'hue' | 'board';
 
 let scale = 0.86;
 let offsetX = 28;
@@ -463,7 +481,11 @@ function bindInteractions(): void {
     });
   });
   document.querySelector('.editor-overlay')?.addEventListener('pointerdown', (event) => {
-    if ((event.target as HTMLElement).hasAttribute('data-modal-overlay')) {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.rich-text-custom-colors') && closeOpenRichTextColorPickers(document)) {
+      return;
+    }
+    if (target.hasAttribute('data-modal-overlay')) {
       requestCloseEditor();
     }
   });
@@ -503,13 +525,25 @@ function bindInteractions(): void {
   };
   window.onbeforeunload = state.dirty || state.hasDraft || autoSaveInFlight ? () => '还有修改正在自动保存，确定要离开吗？' : null;
 
-  document.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('[data-node-field], [data-config-key]').forEach((inputEl) => {
+  document.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input[data-node-field], input[data-config-key], select[data-config-key], textarea[data-config-key]').forEach((inputEl) => {
     if (inputEl instanceof HTMLSelectElement) {
       inputEl.addEventListener('change', () => updateEditorDraft(inputEl));
       return;
     }
     inputEl.addEventListener('input', () => updateEditorDraft(inputEl));
   });
+  document.querySelectorAll<HTMLElement>('[data-rich-editor="true"]').forEach((editorEl) => {
+    editorEl.addEventListener('input', () => {
+      updateRichTextEditorDraft(editorEl);
+      updateRichTextToolbarState(editorEl.closest('.rich-text-field'));
+    });
+    editorEl.addEventListener('keydown', (event) => handleRichTextEditorKeydown(event, editorEl));
+    editorEl.addEventListener('paste', (event) => handleRichTextEditorPaste(event, editorEl));
+    editorEl.addEventListener('keyup', () => updateRichTextToolbarState(editorEl.closest('.rich-text-field')));
+    editorEl.addEventListener('mouseup', () => updateRichTextToolbarState(editorEl.closest('.rich-text-field')));
+    editorEl.addEventListener('focus', () => updateRichTextToolbarState(editorEl.closest('.rich-text-field')));
+  });
+  document.onselectionchange = () => updateActiveRichTextToolbarState();
   document.querySelectorAll<HTMLButtonElement>('[data-config-value]').forEach((buttonEl) => {
     buttonEl.addEventListener('click', () => {
       if (buttonEl.dataset.configKey && buttonEl.dataset.configValue) {
@@ -520,6 +554,7 @@ function bindInteractions(): void {
       }
     });
   });
+  bindRichTextToolbar();
 
   document.querySelectorAll<HTMLElement>('.slot-join').forEach((joinEl) => {
     joinEl.addEventListener('mouseenter', () => markJoinFocus(joinEl));
@@ -812,7 +847,8 @@ function isRedoShortcut(event: KeyboardEvent): boolean {
 function isEditableTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLInputElement
     || target instanceof HTMLTextAreaElement
-    || target instanceof HTMLSelectElement;
+    || target instanceof HTMLSelectElement
+    || (target instanceof HTMLElement && target.isContentEditable);
 }
 
 
@@ -1171,13 +1207,13 @@ function focusEditor(simulationEditorWasOpen = false): void {
     return;
   }
   window.setTimeout(() => {
-    const target = document.querySelector<HTMLElement>('.editor-dialog input, .editor-dialog textarea, .editor-dialog select, #block-editor-title, #simulation-editor-title');
+    const target = document.querySelector<HTMLElement>('.editor-dialog input, .editor-dialog textarea, .editor-dialog select, .editor-dialog [data-rich-editor="true"], #block-editor-title, #simulation-editor-title');
     target?.focus();
   }, 0);
 }
 
 function trapEditorFocus(event: KeyboardEvent): void {
-  const focusSelector = '.editor-dialog button:not([disabled]), .editor-dialog input:not([disabled]), .editor-dialog textarea:not([disabled]), .editor-dialog select:not([disabled]), #block-editor-title';
+  const focusSelector = '.editor-dialog button:not([disabled]), .editor-dialog input:not([disabled]), .editor-dialog textarea:not([disabled]), .editor-dialog select:not([disabled]), .editor-dialog [data-rich-editor="true"], #block-editor-title';
   const focusables = Array.from(
     document.querySelectorAll<HTMLElement>(focusSelector),
   ).filter((item) => item.offsetParent !== null);
@@ -1200,15 +1236,429 @@ function updateEditorDraft(inputEl: HTMLInputElement | HTMLSelectElement | HTMLT
     updateEditorDraftValue('displayName', inputEl.value, 'node');
   }
   if (inputEl.dataset.configKey) {
-    const value = inputEl.dataset.richText === 'true' ? richTextConfig(inputEl.value) : inputEl.value;
-    updateEditorDraftValue(inputEl.dataset.configKey, value);
-    if (inputEl.dataset.richText === 'true') {
-      const preview = document.querySelector<HTMLElement>('[data-rich-preview]');
-      if (preview) {
-        preview.textContent = inputEl.value || '未填写';
-      }
-    }
+    updateEditorDraftValue(inputEl.dataset.configKey, inputEl.value);
   }
+}
+
+function bindRichTextToolbar(): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-style]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => {
+      const key = buttonEl.dataset.richStyle as RichTextStyleKey | undefined;
+      if (key) {
+        applyRichTextToolbarStyle(buttonEl, key);
+      }
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-color]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => applyRichTextToolbarColor(buttonEl));
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-custom-color-open]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => toggleRichTextColorPicker(buttonEl));
+  });
+  document.querySelectorAll<HTMLElement>('[data-rich-color-ring]').forEach((ringEl) => {
+    bindRichTextColorPickerSurface(ringEl, 'hue');
+  });
+  document.querySelectorAll<HTMLElement>('[data-rich-color-board]').forEach((boardEl) => {
+    bindRichTextColorPickerSurface(boardEl, 'board');
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-color-apply]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => applyRichTextCustomColor(buttonEl));
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-color-close]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => closeRichTextColorPicker(buttonEl.closest('.rich-text-custom-colors')));
+  });
+  bindRichTextRecentColorButtons();
+  hydrateRichTextRecentColors();
+}
+
+function updateRichTextEditorDraft(editorEl: HTMLElement): void {
+  const key = editorEl.dataset.configKey;
+  if (!key || !state.editorDraftNode) {
+    return;
+  }
+  const segments = editorEl.textContent ? richTextSegmentsFromEditor(editorEl) : [];
+  updateEditorDraftValue(key, serializeRichText({ segments }));
+}
+
+function handleRichTextEditorKeydown(event: KeyboardEvent, editorEl: HTMLElement): void {
+  if (event.key !== 'Enter') {
+    return;
+  }
+  event.preventDefault();
+  if (insertTextAtRichTextSelection(editorEl, '\n')) {
+    updateRichTextEditorDraft(editorEl);
+    updateRichTextToolbarState(editorEl.closest('.rich-text-field'));
+  }
+}
+
+function handleRichTextEditorPaste(event: ClipboardEvent, editorEl: HTMLElement): void {
+  event.preventDefault();
+  const text = event.clipboardData?.getData('text/plain') ?? '';
+  if (insertTextAtRichTextSelection(editorEl, text)) {
+    updateRichTextEditorDraft(editorEl);
+    updateRichTextToolbarState(editorEl.closest('.rich-text-field'));
+  }
+}
+
+function applyRichTextToolbarStyle(controlEl: HTMLElement, key: RichTextStyleKey): void {
+  const context = richTextToolbarContext(controlEl);
+  if (!context) {
+    return;
+  }
+  const selectionState = richTextSelectionState(context.raw, context.start, context.end);
+  applyRichTextToolbarPatch(context, { [key]: !selectionState.styles[key] } as Partial<RichTextStyle>);
+}
+
+function applyRichTextToolbarColor(controlEl: HTMLElement): void {
+  const context = richTextToolbarContext(controlEl);
+  if (!context) {
+    return;
+  }
+  const selectedColor = normalizeRichTextColor(controlEl.dataset.richColor ?? '') ?? '';
+  const selectionState = richTextSelectionState(context.raw, context.start, context.end);
+  const nextColor = selectionState.color === selectedColor ? undefined : selectedColor || undefined;
+  applyRichTextToolbarPatch(context, { color: nextColor });
+}
+
+function bindRichTextRecentColorButtons(): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-recent-color]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => {
+      if (buttonEl.dataset.richColor) {
+        applyRichTextToolbarColor(buttonEl);
+      }
+    });
+  });
+}
+
+function toggleRichTextColorPicker(controlEl: HTMLElement): void {
+  const picker = controlEl.closest('.rich-text-custom-colors')?.querySelector<HTMLElement>('[data-rich-color-picker]');
+  if (!picker) {
+    return;
+  }
+  delete picker.dataset.richConfigKey;
+  delete picker.dataset.richSelectionStart;
+  delete picker.dataset.richSelectionEnd;
+  captureRichTextPickerContext(controlEl, picker);
+  picker.hidden = !picker.hidden;
+  updateRichTextColorPickerPreview(picker);
+}
+
+function closeRichTextColorPicker(root: Element | null): void {
+  const picker = root?.querySelector<HTMLElement>('[data-rich-color-picker]');
+  if (picker) {
+    picker.hidden = true;
+  }
+}
+
+function closeOpenRichTextColorPickers(root: ParentNode): boolean {
+  const pickers = Array.from(root.querySelectorAll<HTMLElement>('[data-rich-color-picker]:not([hidden])'));
+  pickers.forEach((picker) => {
+    picker.hidden = true;
+  });
+  return pickers.length > 0;
+}
+
+function bindRichTextColorPickerSurface(surfaceEl: HTMLElement, mode: RichTextColorPickMode): void {
+  surfaceEl.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    surfaceEl.setPointerCapture(event.pointerId);
+    updateRichTextColorPickerFromPointer(event, surfaceEl, mode);
+  });
+  surfaceEl.addEventListener('pointermove', (event) => {
+    if (surfaceEl.hasPointerCapture(event.pointerId)) {
+      updateRichTextColorPickerFromPointer(event, surfaceEl, mode);
+    }
+  });
+  surfaceEl.addEventListener('pointerup', (event) => {
+    if (surfaceEl.hasPointerCapture(event.pointerId)) {
+      surfaceEl.releasePointerCapture(event.pointerId);
+    }
+  });
+}
+
+function updateRichTextColorPickerFromPointer(event: PointerEvent, surfaceEl: HTMLElement, mode: RichTextColorPickMode): void {
+  const picker = surfaceEl.closest<HTMLElement>('[data-rich-color-picker]');
+  if (!picker) {
+    return;
+  }
+  const rect = surfaceEl.getBoundingClientRect();
+  if (mode === 'hue') {
+    const dx = event.clientX - rect.left - rect.width / 2;
+    const dy = event.clientY - rect.top - rect.height / 2;
+    picker.dataset.richHue = String(Math.round((Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360));
+    if (Number(picker.dataset.richValue) < 20) {
+      picker.dataset.richValue = '100';
+    }
+    if (Number(picker.dataset.richSaturation) < 20) {
+      picker.dataset.richSaturation = '100';
+    }
+  } else {
+    const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+    picker.dataset.richSaturation = String(Math.round(x * 100));
+    picker.dataset.richValue = String(Math.round((1 - y) * 100));
+  }
+  updateRichTextColorPickerPreview(picker);
+}
+
+function updateRichTextColorPickerPreview(picker: HTMLElement | null): void {
+  if (!picker) {
+    return;
+  }
+  const hue = clampNumber(Number(picker.dataset.richHue), 0, 360, 120);
+  const saturation = clampNumber(Number(picker.dataset.richSaturation), 0, 100, 67);
+  const value = clampNumber(Number(picker.dataset.richValue), 0, 100, 100);
+  const color = hsvToHex(hue, saturation, value);
+  picker.dataset.richColor = color;
+  picker.style.setProperty('--picked-hue', String(hue));
+  picker.style.setProperty('--picked-saturation', `${saturation}%`);
+  picker.style.setProperty('--picked-value', `${value}%`);
+  picker.style.setProperty('--picked-color', color);
+  const valueEl = picker.querySelector<HTMLElement>('[data-rich-color-value]');
+  if (valueEl) {
+    valueEl.textContent = color;
+  }
+}
+
+function applyRichTextCustomColor(controlEl: HTMLElement): void {
+  const root = controlEl.closest<HTMLElement>('.rich-text-custom-colors');
+  const picker = root?.querySelector<HTMLElement>('[data-rich-color-picker]');
+  const displayedColor = picker?.querySelector<HTMLElement>('[data-rich-color-value]')?.textContent?.trim() ?? '';
+  const color = normalizeRichTextColor(displayedColor || picker?.dataset.richColor || '');
+  if (!color) {
+    return;
+  }
+  const context = richTextPickerContext(controlEl);
+  rememberRichTextCustomColor(color);
+  hydrateRichTextRecentColors();
+  closeRichTextColorPicker(root);
+  if (!context) {
+    return;
+  }
+  controlEl.dataset.richColor = color;
+  applyRichTextToolbarColor(controlEl);
+  delete controlEl.dataset.richColor;
+}
+
+function captureRichTextPickerContext(controlEl: HTMLElement, picker: HTMLElement): void {
+  const context = richTextToolbarContext(controlEl);
+  if (!context) {
+    return;
+  }
+  picker.dataset.richConfigKey = context.key;
+  picker.dataset.richSelectionStart = String(context.start);
+  picker.dataset.richSelectionEnd = String(context.end);
+  storeRichTextSelection(context.fieldEl, context);
+}
+
+function richTextPickerContext(controlEl: HTMLElement): {
+  fieldEl: HTMLElement;
+  editorEl: HTMLElement;
+  key: string;
+  raw: string;
+  start: number;
+  end: number;
+} | null {
+  const fieldEl = controlEl.closest<HTMLElement>('.rich-text-field');
+  const editorEl = fieldEl?.querySelector<HTMLElement>('[data-rich-editor="true"]');
+  const picker = controlEl.closest<HTMLElement>('[data-rich-color-picker]');
+  const key = picker?.dataset.richConfigKey ?? editorEl?.dataset.configKey;
+  const start = Number(picker?.dataset.richSelectionStart);
+  const end = Number(picker?.dataset.richSelectionEnd);
+  const pickerSelection = Number.isFinite(start) && Number.isFinite(end) && start !== end
+    ? { start: Math.min(start, end), end: Math.max(start, end) }
+    : null;
+  const fallbackSelection = fieldEl ? richTextStoredSelection(fieldEl) : null;
+  const activeSelection = pickerSelection ?? fallbackSelection;
+  if (!fieldEl || !editorEl || !key || !state.editorDraftNode || !activeSelection) {
+    return null;
+  }
+  return {
+    fieldEl,
+    editorEl,
+    key,
+    raw: state.editorDraftNode.config[key] ?? '',
+    start: activeSelection.start,
+    end: activeSelection.end,
+  };
+}
+
+function rememberRichTextCustomColor(color: RichTextColor): void {
+  if (!String(color).startsWith('#')) {
+    return;
+  }
+  const colors = [color, ...readRichTextCustomColors().filter((item) => item !== color)].slice(0, customRichTextColorLimit);
+  try {
+    window.localStorage.setItem(customRichTextColorsKey, JSON.stringify(colors));
+  } catch {
+    // localStorage may be blocked; the current apply still works.
+  }
+}
+
+function readRichTextCustomColors(): RichTextColor[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(customRichTextColorsKey) ?? '[]') as string[];
+    return parsed.map((item) => normalizeRichTextColor(item)).filter((item): item is RichTextColor => Boolean(item && String(item).startsWith('#')));
+  } catch {
+    return [];
+  }
+}
+
+function hydrateRichTextRecentColors(): void {
+  const colors = readRichTextCustomColors();
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-recent-color]').forEach((buttonEl) => {
+    const index = Number(buttonEl.dataset.richRecentColor ?? '0');
+    const color = colors[index];
+    if (color) {
+      buttonEl.dataset.richColor = color;
+      buttonEl.style.setProperty('--recent-color', color);
+      buttonEl.title = color;
+      buttonEl.setAttribute('aria-label', `最近自定义颜色 ${color}`);
+      return;
+    }
+    delete buttonEl.dataset.richColor;
+    buttonEl.style.removeProperty('--recent-color');
+    buttonEl.title = '空自定义颜色';
+    buttonEl.setAttribute('aria-label', '空自定义颜色');
+  });
+}
+
+function clampNumber(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, value));
+}
+
+function hsvToHex(hue: number, saturation: number, value: number): `#${string}` {
+  const h = ((hue % 360) + 360) % 360 / 60;
+  const s = saturation / 100;
+  const v = value / 100;
+  const c = v * s;
+  const x = c * (1 - Math.abs(h % 2 - 1));
+  const m = v - c;
+  const [r, g, b] = h < 1 ? [c, x, 0]
+    : h < 2 ? [x, c, 0]
+      : h < 3 ? [0, c, x]
+        : h < 4 ? [0, x, c]
+          : h < 5 ? [x, 0, c]
+            : [c, 0, x];
+  return `#${[r, g, b].map((channel) => Math.round((channel + m) * 255).toString(16).padStart(2, '0')).join('')}`;
+}
+
+function richTextToolbarContext(controlEl: HTMLElement): {
+  fieldEl: HTMLElement;
+  editorEl: HTMLElement;
+  key: string;
+  raw: string;
+  start: number;
+  end: number;
+} | null {
+  const fieldEl = controlEl.closest<HTMLElement>('.rich-text-field');
+  const editorEl = fieldEl?.querySelector<HTMLElement>('[data-rich-editor="true"]');
+  const key = editorEl?.dataset.configKey;
+  if (!fieldEl || !editorEl || !key || !state.editorDraftNode) {
+    return null;
+  }
+  const selection = richTextSelectionOffsets(editorEl);
+  const storedSelection = richTextStoredSelection(fieldEl);
+  if (selection && selection.start !== selection.end) {
+    storeRichTextSelection(fieldEl, selection);
+  }
+  const activeSelection = selection && selection.start !== selection.end ? selection : storedSelection;
+  if (!activeSelection || activeSelection.start === activeSelection.end) {
+    editorEl.focus();
+    return null;
+  }
+  return {
+    fieldEl,
+    editorEl,
+    key,
+    raw: state.editorDraftNode.config[key] ?? '',
+    start: activeSelection.start,
+    end: activeSelection.end,
+  };
+}
+
+function richTextStoredSelection(fieldEl: HTMLElement): { start: number; end: number } | null {
+  const start = Number(fieldEl.dataset.richSelectionStart);
+  const end = Number(fieldEl.dataset.richSelectionEnd);
+  if (Number.isFinite(start) && Number.isFinite(end) && start !== end) {
+    return { start: Math.min(start, end), end: Math.max(start, end) };
+  }
+  return null;
+}
+
+function storeRichTextSelection(fieldEl: HTMLElement, selection: { start: number; end: number }): void {
+  fieldEl.dataset.richSelectionStart = String(selection.start);
+  fieldEl.dataset.richSelectionEnd = String(selection.end);
+}
+
+function applyRichTextToolbarPatch(
+  context: { fieldEl: HTMLElement; editorEl: HTMLElement; key: string; raw: string; start: number; end: number },
+  patch: Partial<RichTextStyle>,
+): void {
+  const currentRaw = serializeRichText({ segments: richTextSegmentsFromEditor(context.editorEl) });
+  const next = applyRichTextStyle(currentRaw, context.start, context.end, patch);
+  context.editorEl.innerHTML = renderRichTextContent(next);
+  updateEditorDraftValue(context.key, next);
+  setRichTextSelectionOffsets(context.editorEl, context.start, context.end);
+  updateRichTextToolbarState(context.fieldEl);
+}
+
+function updateActiveRichTextToolbarState(): void {
+  const editorEl = activeRichTextEditor();
+  if (!editorEl) {
+    resetRichTextToolbarState(document);
+    return;
+  }
+  updateRichTextToolbarState(editorEl.closest('.rich-text-field'));
+}
+
+function updateRichTextToolbarState(root: Element | null): void {
+  if (!root) {
+    resetRichTextToolbarState(document);
+    return;
+  }
+  resetRichTextToolbarState(root);
+  const editorEl = root.querySelector<HTMLElement>('[data-rich-editor="true"]');
+  const key = editorEl?.dataset.configKey;
+  if (!editorEl || !key || !state.editorDraftNode) {
+    return;
+  }
+  const selection = richTextSelectionOffsets(editorEl);
+  if (!selection || selection.start === selection.end) {
+    return;
+  }
+  storeRichTextSelection(root as HTMLElement, selection);
+  const selectionState = richTextSelectionState(state.editorDraftNode.config[key] ?? '', selection.start, selection.end);
+  root.querySelectorAll<HTMLButtonElement>('[data-rich-style]').forEach((buttonEl) => {
+    const keyName = buttonEl.dataset.richStyle as RichTextStyleKey | undefined;
+    buttonEl.setAttribute('aria-pressed', String(Boolean(keyName && selectionState.styles[keyName])));
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-rich-color]').forEach((buttonEl) => {
+    const color = buttonEl.dataset.richColor ?? '';
+    buttonEl.setAttribute('aria-pressed', String(selectionState.color !== undefined && color === selectionState.color));
+  });
+}
+
+function resetRichTextToolbarState(root: ParentNode): void {
+  root.querySelectorAll<HTMLButtonElement>('[data-rich-style], [data-rich-color]').forEach((buttonEl) => {
+    buttonEl.setAttribute('aria-pressed', 'false');
+  });
+}
+
+function activeRichTextEditor(): HTMLElement | null {
+  const selection = window.getSelection();
+  const node = selection?.anchorNode;
+  const element = node instanceof HTMLElement ? node : node?.parentElement;
+  return element?.closest<HTMLElement>('[data-rich-editor="true"]') ?? null;
 }
 
 function updateEditorDraftValue(key: string, value: string, target: 'config' | 'node' = 'config'): void {
@@ -1284,7 +1734,7 @@ async function saveEditorDraft(): Promise<void> {
   state.editorOriginalNode = cloneNode(state.editorDraftNode);
   state.editorSaving = true;
   confirmedModeSwitchSignature = null;
-  applyGraphEdit(nextGraph, '内容已修改，正在保存。', { selectedNodeId: nextNode.id });
+  applyGraphEdit(nextGraph, '内容已修改，正在保存。', { selectedNodeId: nextNode.id, refreshOnly: true });
   clearPendingAutoSaveTimer();
 
   try {
@@ -1315,12 +1765,8 @@ function refreshEditorDraftIndicators(): void {
   }
   const modalSummary = document.querySelector<HTMLElement>('[data-modal-summary]');
   const modalError = document.querySelector<HTMLElement>('[data-modal-error]');
-  const richPreview = document.querySelector<HTMLElement>('[data-rich-preview]');
   if (modalSummary) {
     modalSummary.textContent = nodeSummary(draftNode, activeCatalog());
-  }
-  if (richPreview) {
-    richPreview.textContent = richTextPlainText(draftNode.config.message ?? '') || '未填写';
   }
   if (modalError) {
     modalError.textContent = state.error || validationSummaryText(state);
@@ -1336,7 +1782,6 @@ function refreshDraftIndicators(): void {
   const issueList = document.querySelector<HTMLElement>('[data-issue-list]');
   const modalSummary = document.querySelector<HTMLElement>('[data-modal-summary]');
   const modalError = document.querySelector<HTMLElement>('[data-modal-error]');
-  const richPreview = document.querySelector<HTMLElement>('[data-rich-preview]');
   const undoButton = document.querySelector<HTMLButtonElement>('[data-history-action="undo"]');
   const redoButton = document.querySelector<HTMLButtonElement>('[data-history-action="redo"]');
 
@@ -1366,10 +1811,6 @@ function refreshDraftIndicators(): void {
   if (modalSummary) {
     const selected = state.editorDraftNode ?? selectedNodeFrom(currentGraph());
     modalSummary.textContent = selected ? nodeSummary(selected, activeCatalog()) : '';
-  }
-  if (richPreview) {
-    const selected = state.editorDraftNode ?? selectedNodeFrom(currentGraph());
-    richPreview.textContent = selected ? richTextPlainText(selected.config.message ?? '') || '未填写' : '未填写';
   }
   if (modalError) {
     modalError.textContent = state.error || validationSummaryText(state);

@@ -51,7 +51,8 @@ public final class SimulationExecutionRegistry {
 
         @Override
         public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
-            String message = RichTextComponentValue.plainText(node.config().getOrDefault("message", ""));
+            String component = RichTextComponentValue.normalize(node.config().getOrDefault("message", ""));
+            String message = RichTextComponentValue.plainText(component);
             String channel = messageResultKind(node.blockId());
             if ("CHAT".equals(channel)) {
                 services.sendPlayerMessage(context.actor().id(), message);
@@ -62,7 +63,7 @@ public final class SimulationExecutionRegistry {
                 case "ACTIONBAR" -> "向「" + context.actor().displayName() + "」显示快捷栏消息：「" + message + "」";
                 default -> "向「" + context.actor().displayName() + "」发送聊天消息：「" + message + "」";
             };
-            context.addMessageResult(new SimulationMessageResult(node.id(), context.actor().id(), message, channel));
+            context.addMessageResult(new SimulationMessageResult(node.id(), context.actor().id(), message, channel, component));
             context.addActionResult(new SimulationActionResult(node.id(), "message", trace));
             return new RuntimeNodeExecutionResult("done", trace);
         }

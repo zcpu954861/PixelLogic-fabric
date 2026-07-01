@@ -54,7 +54,7 @@ P2 before broader runtime use:
 
 - The current simulation runtime now has a small `SimulationRunner` wrapper, but most demo behavior still lives in `GraphRuntime`; move behavior out gradually only when the executor split is useful.
 - `web-ui/src/ui/app.ts` remains the composition root and largest frontend file; keep extracting cohesive helpers only when new work would otherwise make it larger.
-- Rich text message blocks still have only the base multiline text component editor; add color and formatting controls later when the text component editor expands.
+- Rich text message blocks now have the v1 shared text component editor with selected-text color and formatting controls; hover/click events, translate/score/nbt, variables, and a real Minecraft Text adapter remain future work.
 - Pending timers now have a spike-level max pending count plus reset/commit/stop cleanup. Broader runtime still needs a real capacity/backpressure policy.
 - In-memory state now has a spike-level cap and reset/stop cleanup. Broader runtime still needs durable lifecycle and persistence policy before non-spike use.
 - Draft saves return fingerprints but do not yet enforce `expectedFingerprint`; add optimistic conflict handling before multi-user or multi-tab editing.

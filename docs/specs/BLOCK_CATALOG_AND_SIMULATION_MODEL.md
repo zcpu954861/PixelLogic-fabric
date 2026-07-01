@@ -38,7 +38,7 @@
 - Current demo blocks resolve `node.blockId` into Block Catalog `formSchema` before falling back to legacy `NodeType` field builders.
 - Block definitions now expose `summaryTemplate` metadata used by the WebUI card, modal, and sidebar summaries.
 - `action.message.chat` uses a `rich_text_component` field for its `message` config.
-- The rich text MVP supports multiline plain text, a structured `{ version, plainText, segments }` payload, and a simple preview.
+- The rich text MVP supports multiline formatted text in the editor surface and a structured `{ version, plainText, segments }` payload.
 - Legacy string messages remain compatible and are interpreted as rich text plain text.
 - Runtime still dispatches by `NodeType`; this is not a Minecraft executor split or real Text adapter.
 
@@ -353,6 +353,8 @@ debug.trace_marker
 - 表单只展示该具体积木需要的字段，不展示万能动作的全部可能配置。
 
 Current MVP supports `string`, `textarea`, `number`, `integer`, `boolean`, `select`, `segmented`, `readonly`, `hidden`, `scope`, and `rich_text_component`. The frontend uses catalog schema as the main path and reserves legacy `NodeType` builders for unknown old nodes only. The frontend fallback catalog is not a full registry and must not be treated as authoritative.
+
+`rich_text_component` v1 is a continuous text editor with selected-range color and formatting controls. It stores `version`, derived `plainText`, and `segments` with Minecraft named preset colors, custom `#RRGGBB` colors, and boolean style flags. Normal UI does not ask users to edit raw JSON or manage component lists.
 
 ## Summary Direction
 

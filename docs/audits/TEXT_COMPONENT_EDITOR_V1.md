@@ -4,8 +4,9 @@
 
 - Adds a shared editor for every `rich_text_component` field.
 - Supports continuous multiline text editing through the existing block editor modal.
-- Supports local formatting by textarea selection: color, bold, italic, underline, strikethrough, obfuscated, and clear formatting.
-- Provides a close visual preview for colors and text styles.
+- Supports local formatting directly in the editable text surface: color, bold, italic, underline, strikethrough, and obfuscated.
+- Uses Word-like toolbar buttons whose active state is shown with a green outline when the whole selection has that color or style.
+- Clicking an active style button removes that style from the selection; clicking the active color returns that selection to the default color.
 - Stores structured rich text payloads in the existing string-valued graph config.
 - Keeps normal users away from raw JSON and internal component/segment management.
 
@@ -24,11 +25,11 @@
 
 ## UX
 
-- The user edits one continuous text area, not a list of components.
+- The user edits one continuous formatted text surface, not a list of components.
 - Toolbar controls apply formatting only to the selected text.
 - Color controls use Chinese names/tooltips and swatches while storing Minecraft color keys.
-- Preview renders approximate color, bold, italic, underline, strikethrough, obfuscated text, and line breaks.
-- Preview copy notes that game display may differ slightly.
+- The editor surface itself renders approximate color, bold, italic, underline, strikethrough, obfuscated text, and line breaks.
+- There is no separate preview panel in the normal modal.
 - The editor still uses modal-local draft state; graph JSON changes only after the user clicks `保存`.
 
 ## Message Blocks

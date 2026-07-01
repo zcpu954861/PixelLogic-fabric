@@ -38,7 +38,7 @@
 - Current demo blocks resolve `node.blockId` into Block Catalog `formSchema` before falling back to legacy `NodeType` field builders.
 - Block definitions now expose `summaryTemplate` metadata used by the WebUI card, modal, and sidebar summaries.
 - `action.message.chat` uses a `rich_text_component` field for its `message` config.
-- The rich text MVP supports multiline plain text, a structured `{ version, plainText, segments }` payload, and a simple preview.
+- The rich text MVP supports multiline formatted text in the editor surface and a structured `{ version, plainText, segments }` payload.
 - Legacy string messages remain compatible and are interpreted as rich text plain text.
 - Runtime still dispatches by `NodeType`; this is not a Minecraft executor split or real Text adapter.
 

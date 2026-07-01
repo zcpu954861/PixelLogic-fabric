@@ -265,30 +265,6 @@ select {
   gap: 8px;
 }
 
-.rich-text-preview {
-  display: grid;
-  gap: 4px;
-  padding: 10px;
-  border: 1px solid #c9d6cc;
-  border-radius: 8px;
-  background: #f7fbf5;
-}
-
-.rich-text-preview > span {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 900;
-}
-
-.rich-text-preview p {
-  margin: 0;
-  color: var(--ink);
-  font-weight: 800;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 .rich-text-row {
   align-content: start;
 }
@@ -332,6 +308,31 @@ select {
   cursor: pointer;
 }
 
+.rich-text-editor {
+  width: 100%;
+  border: 1px solid #b8c8bc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 9px 10px;
+  font-weight: 700;
+  line-height: 1.42;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+}
+
+.rich-text-editor:focus {
+  border-color: #2d6f9f;
+  box-shadow: 0 0 0 2px rgba(45, 111, 159, 0.12);
+}
+
+.rich-text-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #8b988d;
+  font-weight: 700;
+}
+
 .rich-color-button {
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0) 46%),
@@ -359,6 +360,30 @@ select {
   outline-offset: 2px;
 }
 
-.rich-text-preview p span {
-  white-space: inherit;
+.rich-color-button[aria-pressed="true"],
+.rich-color-default[aria-pressed="true"],
+.rich-text-styles button[aria-pressed="true"] {
+  border-color: #149447;
+  box-shadow: 0 0 0 2px rgba(20, 148, 71, 0.18);
+}
+
+.rich-style-bold {
+  font-weight: 950;
+}
+
+.rich-style-italic {
+  font-style: italic;
+}
+
+.rich-style-underlined {
+  text-decoration: underline;
+}
+
+.rich-style-strikethrough {
+  text-decoration: line-through;
+}
+
+.rich-style-obfuscated {
+  font-family: monospace;
+  text-shadow: 0 0 2px currentColor;
 }

@@ -36,6 +36,14 @@ export type RichTextConfig = {
   segments: RichTextSegment[];
 };
 
+export const richTextStyleKeys = ['bold', 'italic', 'underlined', 'strikethrough', 'obfuscated'] as const;
+export type RichTextStyleKey = typeof richTextStyleKeys[number];
+
+export type RichTextSelectionState = {
+  color?: MinecraftColor | '';
+  styles: Record<RichTextStyleKey, boolean>;
+};
+
 export const minecraftColors: Array<{ value: MinecraftColor | ''; label: string; css: string }> = [
   { value: '', label: '默认', css: '#17211d' },
   { value: 'black', label: '黑色', css: '#000000' },
@@ -57,7 +65,7 @@ export const minecraftColors: Array<{ value: MinecraftColor | ''; label: string;
 ];
 
 const colorValues = new Set<string>(minecraftColors.map((color) => color.value).filter(Boolean));
-const styleKeys = ['bold', 'italic', 'underlined', 'strikethrough', 'obfuscated'] as const;
+const styleKeys = richTextStyleKeys;
 
 export function richTextConfig(plainText: string): string {
   return serializeRichText({ segments: [{ text: plainText ?? '', style: {} }] });
@@ -154,6 +162,22 @@ export function applyRichTextStyle(
       ...sliceSegments(config.segments, to, config.plainText.length),
     ],
   });
+}
+
+export function richTextSelectionState(raw: string, start: number, end: number): RichTextSelectionState {
+  const config = normalizeRichText(raw);
+  const from = Math.max(0, Math.min(start, end));
+  const to = Math.min(config.plainText.length, Math.max(start, end));
+  const selected = from === to ? [] : sliceSegments(config.segments, from, to);
+  const styles = Object.fromEntries(
+    styleKeys.map((key) => [key, selected.length > 0 && selected.every((segment) => segment.style[key] === true)]),
+  ) as Record<RichTextStyleKey, boolean>;
+  if (selected.length === 0) {
+    return { styles };
+  }
+  const firstColor = selected[0].style.color ?? '';
+  const color = selected.every((segment) => (segment.style.color ?? '') === firstColor) ? firstColor : undefined;
+  return { color, styles };
 }
 
 export function shortRichText(raw = '', max = 42): string {

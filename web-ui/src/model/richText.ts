@@ -16,8 +16,11 @@ export type MinecraftColor =
   | 'yellow'
   | 'white';
 
+export type HexColor = `#${string}`;
+export type RichTextColor = MinecraftColor | HexColor;
+
 export type RichTextStyle = {
-  color?: MinecraftColor;
+  color?: RichTextColor;
   bold?: boolean;
   italic?: boolean;
   underlined?: boolean;
@@ -40,7 +43,7 @@ export const richTextStyleKeys = ['bold', 'italic', 'underlined', 'strikethrough
 export type RichTextStyleKey = typeof richTextStyleKeys[number];
 
 export type RichTextSelectionState = {
-  color?: MinecraftColor | '';
+  color?: RichTextColor | '';
   styles: Record<RichTextStyleKey, boolean>;
 };
 
@@ -65,7 +68,28 @@ export const minecraftColors: Array<{ value: MinecraftColor | ''; label: string;
 ];
 
 const colorValues = new Set<string>(minecraftColors.map((color) => color.value).filter(Boolean));
+const hexColorPattern = /^#[0-9a-f]{6}$/i;
 const styleKeys = richTextStyleKeys;
+
+export function normalizeRichTextColor(value: string): RichTextColor | undefined {
+  if (colorValues.has(value)) {
+    return value as MinecraftColor;
+  }
+  if (hexColorPattern.test(value)) {
+    return value.toLowerCase() as HexColor;
+  }
+  return undefined;
+}
+
+export function richTextColorCss(color: RichTextColor | undefined): string | undefined {
+  if (!color) {
+    return undefined;
+  }
+  if (hexColorPattern.test(color)) {
+    return color;
+  }
+  return minecraftColors.find((item) => item.value === color)?.css;
+}
 
 export function richTextConfig(plainText: string): string {
   return serializeRichText({ segments: [{ text: plainText ?? '', style: {} }] });
@@ -251,8 +275,11 @@ function normalizeStyle(raw: unknown): RichTextStyle {
   }
   const source = raw as Record<string, unknown>;
   const style: RichTextStyle = {};
-  if (typeof source.color === 'string' && colorValues.has(source.color)) {
-    style.color = source.color as MinecraftColor;
+  if (typeof source.color === 'string') {
+    const color = normalizeRichTextColor(source.color);
+    if (color) {
+      style.color = color;
+    }
   }
   styleKeys.forEach((key) => {
     if (source[key] === true) {
@@ -264,8 +291,11 @@ function normalizeStyle(raw: unknown): RichTextStyle {
 
 function cleanStyle(style: Partial<RichTextStyle>): RichTextStyle {
   const result: RichTextStyle = {};
-  if (style.color && colorValues.has(style.color)) {
-    result.color = style.color;
+  if (style.color) {
+    const color = normalizeRichTextColor(style.color);
+    if (color) {
+      result.color = color;
+    }
   }
   styleKeys.forEach((key) => {
     if (style[key] === true) {

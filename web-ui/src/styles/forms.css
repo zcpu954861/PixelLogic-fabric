@@ -289,6 +289,13 @@ select {
   align-items: center;
 }
 
+.rich-text-custom-colors {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
 .rich-color-default,
 .rich-style-button {
   min-width: 28px;
@@ -318,6 +325,41 @@ select {
   color: #1d2a23;
   padding: 0;
   cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.rich-custom-color-button,
+.rich-recent-color-button {
+  min-width: 22px;
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  border: 1px solid #9fb3a5;
+  border-radius: 999px;
+  background: #ffffff;
+  padding: 0;
+  cursor: pointer;
+}
+
+.rich-custom-color-button > span {
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: 3px;
+  border-radius: 999px;
+  background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+}
+
+.rich-recent-color-button {
+  background:
+    linear-gradient(135deg, rgba(210, 222, 214, 0.88) 25%, transparent 25% 50%, rgba(210, 222, 214, 0.88) 50% 75%, transparent 75%),
+    #ffffff;
+  background-size: 8px 8px;
+}
+
+.rich-recent-color-button[data-rich-color] {
+  background: var(--recent-color);
+  background-color: var(--recent-color);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
 }
 
@@ -355,23 +397,89 @@ select {
 
 .rich-style-button:hover,
 .rich-color-button:hover,
-.rich-color-default:hover {
+.rich-color-default:hover,
+.rich-custom-color-button:hover,
+.rich-recent-color-button:hover {
   border-color: #2d6f9f;
   box-shadow: 0 0 0 2px rgba(45, 111, 159, 0.12);
 }
 
 .rich-style-button:focus-visible,
 .rich-color-button:focus-visible,
-.rich-color-default:focus-visible {
+.rich-color-default:focus-visible,
+.rich-custom-color-button:focus-visible,
+.rich-recent-color-button:focus-visible {
   outline: 2px solid #2d6f9f;
   outline-offset: 2px;
 }
 
 .rich-color-button[aria-pressed="true"],
 .rich-color-default[aria-pressed="true"],
-.rich-style-button[aria-pressed="true"] {
+.rich-style-button[aria-pressed="true"],
+.rich-recent-color-button[aria-pressed="true"] {
   border-color: #149447;
   box-shadow: 0 0 0 2px rgba(20, 148, 71, 0.18);
+}
+
+.rich-color-picker {
+  position: absolute;
+  z-index: 8;
+  top: 30px;
+  left: 0;
+  display: grid;
+  gap: 8px;
+  width: 170px;
+  padding: 10px;
+  border: 1px solid #b8c8bc;
+  border-radius: 8px;
+  background: #fbfff9;
+  box-shadow: 0 12px 26px rgba(25, 43, 32, 0.18);
+}
+
+.rich-color-ring {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  justify-self: center;
+  border: 1px solid #9fb3a5;
+  border-radius: 999px;
+  background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+  box-shadow: inset 0 0 0 18px #fbfff9;
+  cursor: pointer;
+}
+
+.rich-color-ring::after {
+  content: "";
+  position: absolute;
+  inset: 32px;
+  border: 1px solid #9fb3a5;
+  border-radius: 999px;
+  background: var(--picked-color, #55ff55);
+}
+
+.rich-color-picker input[type="color"] {
+  width: 100%;
+  height: 34px;
+  min-height: 34px;
+  padding: 2px;
+}
+
+.rich-color-picker-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: end;
+}
+
+.rich-color-picker-actions button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #9fb3a5;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #1d2a23;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .rich-style-button > span {

@@ -16,7 +16,8 @@
 - Existing `{ version, plainText, segments }` payloads still load.
 - New payloads keep `version: 1`, a derived `plainText`, and `segments`.
 - Each segment stores `text` plus a `style` object.
-- Supported color values are Minecraft named colors: black, dark_blue, dark_green, dark_aqua, dark_red, dark_purple, gold, gray, dark_gray, blue, green, aqua, red, light_purple, yellow, and white.
+- Supported preset color values are Minecraft named colors: black, dark_blue, dark_green, dark_aqua, dark_red, dark_purple, gold, gray, dark_gray, blue, green, aqua, red, light_purple, yellow, and white.
+- Custom colors are stored as vanilla text component hex colors in `#RRGGBB` form and are remembered locally as the ten most recent custom choices.
 - Supported style flags are boolean values: bold, italic, underlined, strikethrough, and obfuscated.
 - Frontend editing normalizes adjacent equal-style segments and drops empty saved segments.
 - Backend validation rejects invalid color values, non-boolean style flags, empty saved segments, too many segments, and text over the configured length limit.
@@ -27,7 +28,7 @@
 
 - The user edits one continuous formatted text surface, not a list of components.
 - Toolbar controls apply formatting only to the selected text.
-- Color controls use Chinese names/tooltips and swatches while storing Minecraft color keys.
+- Preset color controls use Chinese names/tooltips and swatches while storing Minecraft color keys; custom colors use a compact picker and write hex values.
 - The editor surface itself renders approximate color, bold, italic, underline, strikethrough, obfuscated text, and line breaks.
 - There is no separate preview panel in the normal modal.
 - The editor still uses modal-local draft state; graph JSON changes only after the user clicks `保存`.
@@ -44,7 +45,7 @@
 - `textComponentEditorSelfCheck` covers:
   - old plain text normalization;
   - structured formatted payloads;
-  - color validation;
+  - named and hex color validation;
   - boolean style validation;
   - newline preservation;
   - empty segment rejection;

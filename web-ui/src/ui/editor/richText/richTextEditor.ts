@@ -2,8 +2,9 @@ import type { EditableField } from '../../../model/graphTypes';
 import {
   minecraftColors,
   normalizeRichText,
+  normalizeRichTextColor,
+  richTextColorCss,
   richTextStyleKeys,
-  type MinecraftColor,
   type RichTextConfig,
   type RichTextSegment,
   type RichTextStyle,
@@ -50,6 +51,22 @@ export function renderRichTextEditor(field: EditableField, rows: number): string
               <span>${escapeHtml(button.label)}</span>
             </button>
           `).join('')}
+        </div>
+        <div class="rich-text-custom-colors" aria-label="自定义颜色">
+          <button type="button" class="rich-custom-color-button" data-rich-custom-color-open title="自定义颜色" aria-label="自定义颜色">
+            <span></span>
+          </button>
+          ${Array.from({ length: 10 }, (_, index) => `
+            <button type="button" class="rich-recent-color-button" data-rich-recent-color="${index}" title="最近自定义颜色" aria-label="最近自定义颜色 ${index + 1}" aria-pressed="false"></button>
+          `).join('')}
+          <div class="rich-color-picker" data-rich-color-picker hidden>
+            <div class="rich-color-ring" data-rich-color-ring></div>
+            <input type="color" data-rich-color-input value="#55ff55" aria-label="选择自定义颜色">
+            <div class="rich-color-picker-actions">
+              <button type="button" data-rich-color-apply>使用</button>
+              <button type="button" data-rich-color-close>关闭</button>
+            </div>
+          </div>
         </div>
       </div>
       <div
@@ -163,9 +180,9 @@ export function insertTextAtRichTextSelection(editorEl: HTMLElement, text: strin
 
 function cssText(style: RichTextStyle): string {
   const rules: string[] = [];
-  const color = minecraftColors.find((item) => item.value === style.color);
+  const color = richTextColorCss(style.color);
   if (color) {
-    rules.push(`color:${color.css}`);
+    rules.push(`color:${color}`);
   }
   if (style.bold) {
     rules.push('font-weight:950;text-shadow:.35px 0 0 currentColor,-.35px 0 0 currentColor');
@@ -203,8 +220,9 @@ function mergeElementStyle(inheritedStyle: RichTextStyle, element: HTMLElement):
   const style: RichTextStyle = { ...inheritedStyle };
   const color = element.dataset.richColor;
   if (color !== undefined) {
-    if (minecraftColors.some((item) => item.value === color && color)) {
-      style.color = color as MinecraftColor;
+    const normalized = normalizeRichTextColor(color);
+    if (normalized) {
+      style.color = normalized;
     } else {
       delete style.color;
     }

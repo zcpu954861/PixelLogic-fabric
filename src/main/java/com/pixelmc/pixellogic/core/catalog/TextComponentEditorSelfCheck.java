@@ -61,8 +61,12 @@ public final class TextComponentEditorSelfCheck {
         require(RichTextComponentValue.validationErrors("旧纯文本").isEmpty(), "old plain text should validate");
         require(RichTextComponentValue.validationErrors(FORMATTED).isEmpty(), "formatted component should validate");
         require(RichTextComponentValue.plainText(FORMATTED).equals("欢迎 PixelMC\n开始"), "formatted plain text should preserve newline");
+        require(RichTextComponentValue.validationErrors(FORMATTED.replace("\"blue\"", "\"#12abEF\"")).isEmpty(),
+                "hex colors should be accepted for vanilla JSON text components");
         require(!RichTextComponentValue.validationErrors(FORMATTED.replace("\"blue\"", "\"pink\"")).isEmpty(),
                 "invalid color should be rejected");
+        require(!RichTextComponentValue.validationErrors(FORMATTED.replace("\"blue\"", "\"#12abeg\"")).isEmpty(),
+                "invalid hex colors should be rejected");
         require(!RichTextComponentValue.validationErrors(FORMATTED.replace("\"bold\":true", "\"bold\":\"true\"")).isEmpty(),
                 "style flags should be booleans");
         require(!RichTextComponentValue.validationErrors("{\"version\":1,\"plainText\":\"\",\"segments\":[{\"text\":\"\",\"style\":{}}]}").isEmpty(),

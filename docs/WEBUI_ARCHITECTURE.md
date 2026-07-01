@@ -94,7 +94,7 @@ Important user semantics:
 - Modal open/close uses short CSS animation and respects reduced motion.
 - The editor modal uses humanized Chinese form labels and controls. Internal graph values such as `PLAYER`, `BOOLEAN`, and `true` remain storage/runtime values, but normal UI renders them as labels such as `玩家`, `是或否`, and `是`.
 - The editor modal now prefers Block Catalog `formSchema` for known `blockId` values. Nodes without `blockId` only infer catalog schema when their `node.type` maps to one catalog block; legacy `NodeType` form builders remain only as fallback for old or unknown nodes.
-- `action.message.chat` uses a shared `rich_text_component` editor: multiline continuous formatted text editing, selected-text color/style controls, Word-like active button outlines, and structured storage. The normal UI does not expose raw JSON or component/segment management.
+- `action.message.chat` uses a shared `rich_text_component` editor: multiline continuous formatted text editing, selected-text color/style controls, Word-like active button outlines, and structured storage. Preset colors store Minecraft JSON named colors, while custom colors store `#RRGGBB` hex values and show recent local choices. The normal UI does not expose raw JSON or component/segment management.
 - `action.message.title`, `action.message.subtitle`, and `action.message.actionbar` use the same shared rich text editor and remain separate blocks; no combined title+subtitle block or timing controls are included yet.
 - Rich text typing updates only the modal-local draft; one click on `保存` creates one graph edit/history entry.
 - Short configuration fields use compact two-column layout where space allows; long text fields remain full-width.
@@ -152,7 +152,7 @@ Current responsibility boundaries:
 - `api/`: localhost PixelLogic API client and connection/content-type errors.
 - `model/`: graph/API types, seeded demo graph, pure graph layout, connection, and cloning helpers.
 - `model/blockCatalog.ts`: catalog sorting/lookup helpers, catalog-block-to-graph-node conversion, and a minimal API-offline fallback placeholder.
-- `model/richText.ts`: rich text component helpers for structured storage, normalization, selected-range formatting, and plain text display.
+- `model/richText.ts`: rich text component helpers for structured storage, named/hex color normalization, selected-range formatting, and plain text display.
 - `ui/editor/richText/`: shared rich text editor toolbar, contenteditable rendering, and selection-offset helpers.
 - `model/simulationTestContext.ts`: per-run WebUI test actor model, validation, tag normalization, and request payload.
 - `state/`: mutable app state and canvas world dimensions.

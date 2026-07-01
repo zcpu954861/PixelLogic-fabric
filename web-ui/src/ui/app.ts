@@ -9,9 +9,10 @@ import {
 import { fallbackGraph, graphId } from '../model/demoGraph';
 import {
   applyRichTextStyle,
+  normalizeRichTextColor,
   richTextSelectionState,
   serializeRichText,
-  type MinecraftColor,
+  type RichTextColor,
   type RichTextStyle,
   type RichTextStyleKey,
 } from '../model/richText';
@@ -81,6 +82,8 @@ import { renderNodeInfo } from './sidebar/selectionSummary';
 
 
 const app = document.querySelector<HTMLDivElement>('#app');
+const customRichTextColorsKey = 'pixelLogic.richText.customColors';
+const customRichTextColorLimit = 10;
 
 let scale = 0.86;
 let offsetX = 28;
@@ -1246,6 +1249,26 @@ function bindRichTextToolbar(): void {
     buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
     buttonEl.addEventListener('click', () => applyRichTextToolbarColor(buttonEl));
   });
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-custom-color-open]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => toggleRichTextColorPicker(buttonEl));
+  });
+  document.querySelectorAll<HTMLElement>('[data-rich-color-ring]').forEach((ringEl) => {
+    ringEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    ringEl.addEventListener('click', () => ringEl.closest('.rich-text-custom-colors')?.querySelector<HTMLInputElement>('[data-rich-color-input]')?.click());
+  });
+  document.querySelectorAll<HTMLInputElement>('[data-rich-color-input]').forEach((inputEl) => {
+    inputEl.addEventListener('input', () => updateRichTextColorPickerPreview(inputEl));
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-color-apply]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => applyRichTextCustomColor(buttonEl));
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-color-close]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => closeRichTextColorPicker(buttonEl.closest('.rich-text-custom-colors')));
+  });
+  bindRichTextRecentColorButtons();
+  hydrateRichTextRecentColors();
 }
 
 function updateRichTextEditorDraft(editorEl: HTMLElement): void {
@@ -1291,10 +1314,108 @@ function applyRichTextToolbarColor(controlEl: HTMLElement): void {
   if (!context) {
     return;
   }
-  const selectedColor = (controlEl.dataset.richColor ?? '') as MinecraftColor | '';
+  const selectedColor = normalizeRichTextColor(controlEl.dataset.richColor ?? '') ?? '';
   const selectionState = richTextSelectionState(context.raw, context.start, context.end);
   const nextColor = selectionState.color === selectedColor ? undefined : selectedColor || undefined;
   applyRichTextToolbarPatch(context, { color: nextColor });
+}
+
+function bindRichTextRecentColorButtons(): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-recent-color]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => {
+      if (buttonEl.dataset.richColor) {
+        applyRichTextToolbarColor(buttonEl);
+      }
+    });
+  });
+}
+
+function toggleRichTextColorPicker(controlEl: HTMLElement): void {
+  const context = richTextToolbarContext(controlEl);
+  if (context) {
+    context.fieldEl.dataset.richSelectionStart = String(context.start);
+    context.fieldEl.dataset.richSelectionEnd = String(context.end);
+  }
+  const picker = controlEl.closest('.rich-text-custom-colors')?.querySelector<HTMLElement>('[data-rich-color-picker]');
+  if (!picker) {
+    return;
+  }
+  picker.hidden = !picker.hidden;
+  updateRichTextColorPickerPreview(picker.querySelector<HTMLInputElement>('[data-rich-color-input]'));
+}
+
+function closeRichTextColorPicker(root: Element | null): void {
+  const picker = root?.querySelector<HTMLElement>('[data-rich-color-picker]');
+  if (picker) {
+    picker.hidden = true;
+  }
+}
+
+function updateRichTextColorPickerPreview(inputEl: HTMLInputElement | null): void {
+  const root = inputEl?.closest<HTMLElement>('.rich-text-custom-colors');
+  const color = normalizeRichTextColor(inputEl?.value ?? '');
+  const ring = root?.querySelector<HTMLElement>('[data-rich-color-ring]');
+  if (ring && color) {
+    ring.style.setProperty('--picked-color', color);
+  }
+}
+
+function applyRichTextCustomColor(controlEl: HTMLElement): void {
+  const root = controlEl.closest<HTMLElement>('.rich-text-custom-colors');
+  const inputEl = root?.querySelector<HTMLInputElement>('[data-rich-color-input]');
+  const color = normalizeRichTextColor(inputEl?.value ?? '');
+  if (!color) {
+    return;
+  }
+  const context = richTextToolbarContext(controlEl);
+  if (!context) {
+    return;
+  }
+  rememberRichTextCustomColor(color);
+  hydrateRichTextRecentColors();
+  applyRichTextToolbarPatch(context, { color });
+  closeRichTextColorPicker(root);
+}
+
+function rememberRichTextCustomColor(color: RichTextColor): void {
+  if (!String(color).startsWith('#')) {
+    return;
+  }
+  const colors = [color, ...readRichTextCustomColors().filter((item) => item !== color)].slice(0, customRichTextColorLimit);
+  try {
+    window.localStorage.setItem(customRichTextColorsKey, JSON.stringify(colors));
+  } catch {
+    // localStorage may be blocked; the current apply still works.
+  }
+}
+
+function readRichTextCustomColors(): RichTextColor[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(customRichTextColorsKey) ?? '[]') as string[];
+    return parsed.map((item) => normalizeRichTextColor(item)).filter((item): item is RichTextColor => Boolean(item && String(item).startsWith('#')));
+  } catch {
+    return [];
+  }
+}
+
+function hydrateRichTextRecentColors(): void {
+  const colors = readRichTextCustomColors();
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-recent-color]').forEach((buttonEl) => {
+    const index = Number(buttonEl.dataset.richRecentColor ?? '0');
+    const color = colors[index];
+    if (color) {
+      buttonEl.dataset.richColor = color;
+      buttonEl.style.setProperty('--recent-color', color);
+      buttonEl.title = color;
+      buttonEl.setAttribute('aria-label', `最近自定义颜色 ${color}`);
+      return;
+    }
+    delete buttonEl.dataset.richColor;
+    buttonEl.style.removeProperty('--recent-color');
+    buttonEl.title = '空自定义颜色';
+    buttonEl.setAttribute('aria-label', '空自定义颜色');
+  });
 }
 
 function richTextToolbarContext(controlEl: HTMLElement): {
@@ -1312,7 +1433,9 @@ function richTextToolbarContext(controlEl: HTMLElement): {
     return null;
   }
   const selection = richTextSelectionOffsets(editorEl);
-  if (!selection || selection.start === selection.end) {
+  const storedSelection = richTextStoredSelection(fieldEl);
+  const activeSelection = selection && selection.start !== selection.end ? selection : storedSelection;
+  if (!activeSelection || activeSelection.start === activeSelection.end) {
     editorEl.focus();
     return null;
   }
@@ -1321,9 +1444,18 @@ function richTextToolbarContext(controlEl: HTMLElement): {
     editorEl,
     key,
     raw: state.editorDraftNode.config[key] ?? '',
-    start: selection.start,
-    end: selection.end,
+    start: activeSelection.start,
+    end: activeSelection.end,
   };
+}
+
+function richTextStoredSelection(fieldEl: HTMLElement): { start: number; end: number } | null {
+  const start = Number(fieldEl.dataset.richSelectionStart);
+  const end = Number(fieldEl.dataset.richSelectionEnd);
+  if (Number.isFinite(start) && Number.isFinite(end) && start !== end) {
+    return { start: Math.min(start, end), end: Math.max(start, end) };
+  }
+  return null;
 }
 
 function applyRichTextToolbarPatch(

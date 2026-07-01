@@ -13,11 +13,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public final class RichTextComponentValue {
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     public static final int MAX_TEXT_LENGTH = 1024;
     public static final int MAX_SEGMENTS = 64;
+    private static final Pattern HEX_COLOR = Pattern.compile("^#[0-9a-fA-F]{6}$");
     private static final Set<String> COLORS = Set.of(
             "black",
             "dark_blue",
@@ -213,13 +215,17 @@ public final class RichTextComponentValue {
                 continue;
             }
             if ("color".equals(key)) {
-                if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString() || !COLORS.contains(value.getAsString())) {
+                if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString() || !isValidColor(value.getAsString())) {
                     errors.add("富文本颜色无效：" + segmentIndex);
                 }
             } else if (BOOLEAN_STYLES.contains(key) && (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean())) {
                 errors.add("富文本样式必须是是/否值：" + key);
             }
         }
+    }
+
+    private static boolean isValidColor(String color) {
+        return COLORS.contains(color) || HEX_COLOR.matcher(color).matches();
     }
 
     private static void validateTextLength(String text, List<String> errors) {

@@ -16,12 +16,20 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Next
 
-1. Review the Admin Client Bridge & Authorized Tool Session design before any implementation prompt.
-2. If accepted, start with a tiny client/server handshake/status slice only; do not jump straight to graph editing, tool items, or custom payload multiplexing.
-3. Move more current demo block behavior toward per-block simulation executors only when it reduces real duplication.
-4. Add more simulation context fields only when a concrete block requires them.
-5. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
-6. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+Near-term track:
+
+1. Move more current demo block behavior toward per-block simulation executors only when it reduces real duplication.
+2. Add more simulation context fields only when a concrete block requires them.
+3. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
+4. Continue graph/editor/runtime improvements only where they support the current visual editor and simulation loop.
+5. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+
+Long-term architecture track:
+
+- Admin Client Bridge / Authorized Tool Session.
+- Client-hosted WebUI.
+- Capability-gated tool items.
+- These are not current active implementation items; future prompts should scope them only after prerequisite Simulation Backend, catalog, graph, runtime, and editor capabilities are mature.
 
 ## Completed Checkpoints
 
@@ -62,7 +70,7 @@ P2 before broader runtime use:
 - Pending timers now have a spike-level max pending count plus reset/commit/stop cleanup. Broader runtime still needs a real capacity/backpressure policy.
 - In-memory state now has a spike-level cap and reset/stop cleanup. Broader runtime still needs durable lifecycle and persistence policy before non-spike use.
 - Draft saves return fingerprints but do not yet enforce `expectedFingerprint`; add optimistic conflict handling before multi-user or multi-tab editing.
-- Server HTTP API is still the current dev/local WebUI transport. The long-term recommended admin flow is client-hosted WebUI through an authorized PixelLogic client session.
+- Server HTTP API is still the current dev/local/self-check WebUI transport. The long-term recommended admin flow is client-hosted WebUI through an authorized PixelLogic client session, but that track is deferred until a future scoped prompt.
 
 ## Loader Event Policy
 

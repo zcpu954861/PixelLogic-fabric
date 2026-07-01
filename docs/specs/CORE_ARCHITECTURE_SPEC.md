@@ -106,7 +106,7 @@ The long-term admin transport is client-hosted WebUI with an authorized client-l
 Browser -> client localhost bridge -> Minecraft networking -> PixelLogic server core
 ```
 
-This does not change the core rule: the server remains authority for graph, validation, runtime, storage, trace, and permissions. A client mod installing PixelLogic does not grant management power. The server must authorize a session and check capability on every bridge request. The current server HTTP API remains dev/local transport until the bridge reaches parity.
+This does not change the core rule: the server remains authority for graph, validation, runtime, storage, trace, and permissions. A client mod installing PixelLogic does not grant management power. The server must authorize a session and check capability on every bridge request. The current server HTTP API remains dev/local/self-check transport. Admin Client Bridge is a long-term track, not the active near-term implementation roadmap.
 
 ## No Channel Core Model
 

@@ -2,6 +2,8 @@
 
 This document is a docs-only architecture design. It does not authorize implementation, networking, item registration, permission integration, WebUI packaging, tag, release, or merge work.
 
+Admin Client Bridge is a long-term architecture direction / future track. It is not the current active implementation roadmap. Near-term PixelLogic development remains Simulation Backend first: catalog, graph, runtime, WebUI editor, new block simulation semantics, trace/result/debug, and maintainable executor boundaries.
+
 ## Goals
 
 - client-hosted WebUI: the long-term recommended admin UI runs from an authorized PixelLogic client on local `127.0.0.1`, not from an always-on public server WebAdmin endpoint.
@@ -348,12 +350,23 @@ WebUI API call
 
 Transport changes must not fork graph validation, catalog authority, simulation semantics, trace formatting, or storage.
 
-## Implementation Phases
+## Future Implementation Candidates
 
-1. Phase 0 docs: keep this as architecture only.
-2. Phase 1 handshake/status: add client/server protocol version handshake and server-side client capability status, with no WebUI bridge and no tools.
-3. Phase 2 local bridge read-only: authorized session can read catalog, committed graph, and traces through localhost bridge.
-4. Phase 3 graph edit/save: route draft save, validate, and commit through the bridge with graph version/sequence checks.
-5. Phase 4 simulation run: route WebUI test/simulation requests through the bridge.
-6. Phase 5 tool item selection: register the smallest useful tool item and gate it by capability; start with block selection before Region/entity.
-7. Phase 6 server HTTP dev-only: keep server HTTP as optional dev/local mode, not the recommended admin route.
+These candidates are a long-term phased reference, not an active roadmap and not a commitment to implement them next. Each candidate needs a fresh implementation prompt after its prerequisites are mature.
+
+Current near-term development remains Simulation Backend first:
+
+- Simulation Backend capability expansion.
+- Catalog / graph / runtime capability.
+- WebUI editor experience.
+- New block simulation semantics.
+- Trace / result / debug capability.
+
+Long-term candidate sequence:
+
+1. handshake/status only: client/server protocol version and capability status, with no WebUI bridge and no tools.
+2. local bridge read-only: authorized session can read catalog, committed graph, and traces through localhost bridge.
+3. graph edit/save: route draft save, validate, and commit through the bridge with graph version/sequence checks.
+4. simulation run: route WebUI test/simulation requests through the bridge.
+5. tool item selection: register the smallest useful tool item and gate it by capability; start with block selection before Region/entity.
+6. server HTTP dev/local mode: keep server HTTP as optional dev/local/self-check transport until the bridge is proven.

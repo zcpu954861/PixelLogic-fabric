@@ -195,6 +195,8 @@ The future Admin Client Bridge is a transport and interaction layer, not a simul
 - Do not put simulation rules or Minecraft behavior in the WebUI or client bridge.
 - Do not let client bridge payloads bypass graph validation, capability checks, runtime limits, trace bounds, or stale graph guards.
 
+This bridge is a long-term transport direction. Current near-term development remains Simulation Backend first: catalog, graph, runtime, WebUI editor, new block simulation semantics, trace/result/debug, and maintainable executor boundaries.
+
 ## Proposed Backend Package Structure
 
 This is a target shape, not an instruction to create every file at once.

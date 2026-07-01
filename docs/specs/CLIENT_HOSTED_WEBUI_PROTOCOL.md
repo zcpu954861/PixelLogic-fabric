@@ -1,6 +1,8 @@
 # PixelLogic Client-Hosted WebUI Protocol
 
-This is a protocol design note, not an implementation instruction.
+This is a draft protocol design note, not an implementation instruction.
+
+The message names and envelope shape are design placeholders. They are not implemented and must not be treated as stable wire compatibility before a future handshake/status implementation prompt explicitly locks a first protocol version.
 
 ## Protocol Goals
 
@@ -16,7 +18,7 @@ This is a protocol design note, not an implementation instruction.
 - compatibility: the server decides whether a client version is accepted, degraded, or rejected.
 - mismatch handling: incompatible clients receive a user-readable error and no admin session.
 
-The first implemented version should be intentionally small. Avoid negotiating optional behavior that is not implemented yet.
+Any first implemented version should be intentionally small. Avoid negotiating optional behavior that is not implemented yet.
 
 ## Message Types
 

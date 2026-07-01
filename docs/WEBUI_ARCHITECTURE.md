@@ -45,7 +45,7 @@ GET  /api/pixellogic/traces
 
 The Vite dev server proxies `/api` to `http://127.0.0.1:18111`. The UI defaults to `WebUI 模拟玩家`. The `测试运行` control is a split button: the left side starts the run, and the right arrow opens a small dropdown with brief helper copy and `编辑测试玩家`.
 
-Long-term, `/api` should be treated as a WebUI transport boundary rather than a permanent direct server HTTP assumption. The current transport is dev HTTP. A future transport is client localhost bridge -> Minecraft networking -> server core. The user-facing WebUI API shape should stay stable where possible: catalog, graph, save/validate/commit, simulation, and trace.
+Long-term, `/api` should be treated as a WebUI transport boundary rather than a permanent direct server HTTP assumption. The current transport is dev/local HTTP. A future transport candidate is client localhost bridge -> Minecraft networking -> server core. This is not the active near-term implementation track; the user-facing WebUI API shape should stay stable where possible: catalog, graph, save/validate/commit, simulation, and trace.
 
 `POST /api/pixellogic/test/start` may include:
 
@@ -182,4 +182,4 @@ Future client-hosted WebUI rules:
 - The client-hosted WebUI only starts after a server-authorized admin session.
 - The local bridge must bind to `127.0.0.1`, use a random port and one-time token, and reject wildcard CORS.
 - The WebUI must not rely on client-side authorization. The server checks every request.
-- Server HTTP remains the current dev/local transport until client bridge parity exists.
+- Server HTTP remains the current dev/local/self-check transport; client bridge implementation is deferred to a future scoped prompt.

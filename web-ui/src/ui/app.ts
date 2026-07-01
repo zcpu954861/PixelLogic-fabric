@@ -562,7 +562,11 @@ function bindInteractions(): void {
   document.querySelectorAll<HTMLButtonElement>('[data-config-value]').forEach((buttonEl) => {
     buttonEl.addEventListener('click', () => {
       if (buttonEl.dataset.configKey && buttonEl.dataset.configValue) {
+        const shouldRerender = editorDraftKeyNeedsRerender(buttonEl.dataset.configKey);
         updateEditorDraftValue(buttonEl.dataset.configKey, buttonEl.dataset.configValue);
+        if (shouldRerender) {
+          return;
+        }
         document.querySelectorAll<HTMLButtonElement>(`[data-config-key="${buttonEl.dataset.configKey}"][data-config-value]`).forEach((item) => {
           item.setAttribute('aria-pressed', String(item === buttonEl));
         });
@@ -1584,11 +1588,15 @@ function updateEditorDraftValue(key: string, value: string, target: 'config' | '
     confirmedModeSwitchSignature = null;
     hideModeSwitchConfirm();
   }
-  if (key === 'valueType') {
+  if (editorDraftKeyNeedsRerender(key)) {
     renderApp();
     return;
   }
   refreshEditorDraftIndicators();
+}
+
+function editorDraftKeyNeedsRerender(key: string): boolean {
+  return key === 'valueType' || key === 'compareMode';
 }
 
 async function saveEditorDraft(): Promise<void> {

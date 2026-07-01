@@ -155,17 +155,17 @@ function uniqueCatalogBlockForNodeType(catalog: BlockCatalog, nodeType: string) 
 function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[], simulationTestContext?: SimulationTestContext): EditableField[] {
   return formSchema
     .filter((field) => field.type !== 'hidden')
-    .filter((field) => fieldVisible(field, nodeItem.config))
+    .filter((field) => fieldVisible(field, nodeItem.config, formSchema))
     .map((field) => {
       const value = nodeItem.config[field.key] ?? field.defaultValue ?? '';
-      const options = fieldOptionsForSchema(field, value, simulationTestContext);
+      const options = fieldOptionsForSchema(field, value, simulationTestContext, nodeItem);
       const control = field.key === 'regionName' && options.length > 0
         ? 'select'
         : field.key === 'value' && nodeItem.config.valueType && nodeItem.config.valueType !== 'BOOLEAN'
         ? nodeItem.config.valueType === 'INTEGER' ? 'integer' : 'string'
         : field.type;
       return {
-        label: field.label,
+        label: schemaFieldLabel(field, nodeItem),
         key: field.key,
         value,
         control,
@@ -184,7 +184,20 @@ function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[],
     });
 }
 
-function fieldVisible(field: CatalogFormField, config: Record<string, string>): boolean {
+function schemaFieldLabel(field: CatalogFormField, nodeItem: GraphNode): string {
+  if (!isYCompareCondition(nodeItem)) {
+    return field.label;
+  }
+  if (field.key === 'minY') {
+    return '最低 Y 值';
+  }
+  if (field.key === 'maxY') {
+    return '最高 Y 值';
+  }
+  return field.label;
+}
+
+function fieldVisible(field: CatalogFormField, config: Record<string, string>, formSchema: CatalogFormField[]): boolean {
   const showWhen = field.ui.split(/\s+/).find((token) => token.startsWith('showWhen:'));
   if (!showWhen) {
     return true;
@@ -194,12 +207,16 @@ function fieldVisible(field: CatalogFormField, config: Record<string, string>): 
   if (!key || !rawValues) {
     return true;
   }
-  return rawValues.split(',').includes(config[key] ?? '');
+  const currentValue = config[key] ?? formSchema.find((schemaField) => schemaField.key === key)?.defaultValue ?? '';
+  return rawValues.split(',').includes(currentValue);
 }
 
-function fieldOptionsForSchema(field: CatalogFormField, currentValue = '', simulationTestContext?: SimulationTestContext): FieldOption[] {
+function fieldOptionsForSchema(field: CatalogFormField, currentValue = '', simulationTestContext?: SimulationTestContext, nodeItem?: GraphNode): FieldOption[] {
   if (field.key === 'regionName') {
     return regionNameOptions(simulationTestContext, currentValue);
+  }
+  if (field.key === 'outputMode' && isYCompareCondition(nodeItem)) {
+    return yCompareConditionOptions(nodeItem?.config.compareMode);
   }
   if (field.type === 'boolean' || field.type === 'segmented') {
     return field.options.length > 0 ? field.options : booleanOptions();
@@ -208,6 +225,33 @@ function fieldOptionsForSchema(field: CatalogFormField, currentValue = '', simul
     return field.options.length > 0 ? field.options : stateScopeOptions();
   }
   return field.options;
+}
+
+function isYCompareCondition(nodeItem?: GraphNode): boolean {
+  return nodeItem?.blockId === 'condition.player.y_compare'
+    || nodeItem?.blockId === 'condition.target_block.y_compare'
+    || nodeItem?.type === 'PLAYER_Y_COMPARE_CONDITION'
+    || nodeItem?.type === 'TARGET_BLOCK_Y_COMPARE_CONDITION';
+}
+
+function yCompareConditionOptions(compareMode = 'AT_OR_ABOVE'): FieldOption[] {
+  const labels = (() => {
+    switch (compareMode) {
+      case 'AT_OR_BELOW':
+        return ['不满足高度时继续', '满足高度时继续'];
+      case 'EQUAL':
+        return ['等于时继续', '不等于时继续'];
+      case 'BETWEEN':
+        return ['在范围内时继续', '不在范围内时继续'];
+      default:
+        return ['满足高度时继续', '不满足高度时继续'];
+    }
+  })();
+  return [
+    { value: 'PASS_ONLY', label: labels[0] },
+    { value: 'FAIL_ONLY', label: labels[1] },
+    { value: 'BRANCH', label: '分开执行' },
+  ];
 }
 
 function regionNameOptions(simulationTestContext: SimulationTestContext | undefined, currentValue: string): FieldOption[] {

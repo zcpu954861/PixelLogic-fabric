@@ -688,8 +688,8 @@ public final class BuiltInBlockCatalog {
                         option("BETWEEN", "在范围内")
                 )),
                 conditionalInteger("targetY", "目标 Y", "showWhen:compareMode=AT_OR_ABOVE,AT_OR_BELOW,EQUAL"),
-                conditionalInteger("minY", "最小 Y", "showWhen:compareMode=BETWEEN"),
-                conditionalInteger("maxY", "最大 Y", "showWhen:compareMode=BETWEEN")
+                conditionalInteger("minY", "最低 Y 值", "showWhen:compareMode=BETWEEN"),
+                conditionalInteger("maxY", "最高 Y 值", "showWhen:compareMode=BETWEEN")
         );
     }
 

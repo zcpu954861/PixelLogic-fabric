@@ -3,7 +3,11 @@ import { escapeHtml } from '../../utils/dom';
 import { nodeOfficialLabel, nodeSummary } from '../humanize/labels';
 import { renderNodeEditor } from './formControls';
 
-export function renderEditorModal(nodeItem: GraphNode, catalog: BlockCatalog, options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string }): string {
+export function renderEditorModal(
+  nodeItem: GraphNode,
+  catalog: BlockCatalog,
+  options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string; steady: boolean },
+): string {
   const officialName = nodeOfficialLabel(nodeItem, catalog);
   const customName = nodeItem.displayName.trim();
   const titleName = customName && customName !== officialName ? customName : '未命名';
@@ -11,7 +15,7 @@ export function renderEditorModal(nodeItem: GraphNode, catalog: BlockCatalog, op
   const modalIssue = options.modalIssue;
 
   return `
-    <div class="editor-overlay${options.editorClosing ? ' is-closing' : ''}" data-modal-overlay>
+    <div class="editor-overlay${options.editorClosing ? ' is-closing' : ''}${options.steady ? ' is-steady' : ''}" data-modal-overlay>
       <section class="editor-dialog" role="dialog" aria-modal="true" aria-labelledby="block-editor-title">
         <header class="editor-head">
           <div>

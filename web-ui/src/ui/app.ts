@@ -110,12 +110,35 @@ let confirmedModeSwitchSignature: string | null = null;
 const undoStack: GraphHistoryEntry[] = [];
 const redoStack: GraphHistoryEntry[] = [];
 
+type ModalScrollSnapshot = {
+  editor: number | null;
+  simulation: number | null;
+};
+
 
 
 
 
 function currentGraph(): GraphDocument {
   return state.graph ?? fallbackGraph;
+}
+
+function captureModalScrollSnapshot(): ModalScrollSnapshot {
+  return {
+    editor: document.querySelector<HTMLElement>('[data-modal-overlay] .editor-body')?.scrollTop ?? null,
+    simulation: document.querySelector<HTMLElement>('[data-sim-modal-overlay] .editor-body')?.scrollTop ?? null,
+  };
+}
+
+function restoreModalScrollSnapshot(snapshot: ModalScrollSnapshot): void {
+  const editorBody = document.querySelector<HTMLElement>('[data-modal-overlay] .editor-body');
+  if (snapshot.editor !== null && editorBody) {
+    editorBody.scrollTop = snapshot.editor;
+  }
+  const simulationBody = document.querySelector<HTMLElement>('[data-sim-modal-overlay] .editor-body');
+  if (snapshot.simulation !== null && simulationBody) {
+    simulationBody.scrollTop = snapshot.simulation;
+  }
 }
 
 
@@ -130,7 +153,9 @@ function renderApp(): void {
     return;
   }
 
+  const editorWasOpen = Boolean(document.querySelector('[data-modal-overlay]'));
   const simulationEditorWasOpen = Boolean(document.querySelector('[data-sim-modal-overlay]'));
+  const modalScroll = captureModalScrollSnapshot();
   const graph = currentGraph();
   const blocks = buildBlocks(graph, activeCatalog(), state.selectedNodeId);
   updateWorldSize(blocks, world);
@@ -237,14 +262,15 @@ function renderApp(): void {
           </ol>
         </section>
       </footer>
-      ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation && !state.validation.valid), modalIssue: state.error || validationSummaryText(state) }) : ''}
+      ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation && !state.validation.valid), modalIssue: state.error || validationSummaryText(state), steady: editorWasOpen }) : ''}
       ${state.simulationEditorOpen && state.simulationDraftContext ? renderSimulationTestContextModal(state.simulationDraftContext, { closing: state.simulationEditorClosing, error: state.simulationTestContextError, steady: simulationEditorWasOpen }) : ''}
     </section>
   `;
 
   bindInteractions();
   setTransform();
-  focusEditor(simulationEditorWasOpen);
+  restoreModalScrollSnapshot(modalScroll);
+  focusEditor(editorWasOpen, simulationEditorWasOpen);
 }
 
 function activeCatalog(): BlockCatalog {
@@ -1261,8 +1287,11 @@ function saveSimulationEditorDraft(): void {
   closeSimulationEditor();
 }
 
-function focusEditor(simulationEditorWasOpen = false): void {
+function focusEditor(editorWasOpen = false, simulationEditorWasOpen = false): void {
   if (!state.editorOpen && !state.simulationEditorOpen) {
+    return;
+  }
+  if (state.editorOpen && editorWasOpen) {
     return;
   }
   if (state.simulationEditorOpen && simulationEditorWasOpen) {

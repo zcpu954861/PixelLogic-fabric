@@ -215,6 +215,9 @@ function fieldOptionsForSchema(field: CatalogFormField, currentValue = '', simul
   if (field.key === 'regionName') {
     return regionNameOptions(simulationTestContext, currentValue);
   }
+  if (field.key === 'compareMode' && isYCompareCondition(nodeItem)) {
+    return yCompareModeOptions();
+  }
   if (field.key === 'outputMode' && isYCompareCondition(nodeItem)) {
     return yCompareConditionOptions(nodeItem?.config.compareMode);
   }
@@ -238,19 +241,28 @@ function yCompareConditionOptions(compareMode = 'AT_OR_ABOVE'): FieldOption[] {
   const labels = (() => {
     switch (compareMode) {
       case 'AT_OR_BELOW':
-        return ['不满足高度时继续', '满足高度时继续'];
+        return ['不高于时继续', '高于时继续'];
       case 'EQUAL':
         return ['等于时继续', '不等于时继续'];
       case 'BETWEEN':
         return ['在范围内时继续', '不在范围内时继续'];
       default:
-        return ['满足高度时继续', '不满足高度时继续'];
+        return ['不低于时继续', '低于时继续'];
     }
   })();
   return [
     { value: 'PASS_ONLY', label: labels[0] },
     { value: 'FAIL_ONLY', label: labels[1] },
     { value: 'BRANCH', label: '分开执行' },
+  ];
+}
+
+function yCompareModeOptions(): FieldOption[] {
+  return [
+    { value: 'AT_OR_ABOVE', label: '不低' },
+    { value: 'AT_OR_BELOW', label: '不高' },
+    { value: 'EQUAL', label: '等于' },
+    { value: 'BETWEEN', label: '在范围内' },
   ];
 }
 

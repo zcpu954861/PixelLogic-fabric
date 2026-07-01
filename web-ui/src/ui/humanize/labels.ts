@@ -70,8 +70,11 @@ export function nodeTypeLabel(type: string): string {
     case 'PLAYER_IS_ADMIN_CONDITION':
     case 'PLAYER_DIMENSION_CONDITION':
     case 'PLAYER_IN_REGION_CONDITION':
+    case 'PLAYER_Y_COMPARE_CONDITION':
     case 'TARGET_BLOCK_TYPE_CONDITION':
     case 'TARGET_BLOCK_IN_REGION_CONDITION':
+    case 'TARGET_BLOCK_Y_COMPARE_CONDITION':
+    case 'PLAYER_NEAR_TARGET_BLOCK_CONDITION':
       return '条件判断';
     case 'PLAYER_ADD_TAG_ACTION':
       return '添加玩家标签';
@@ -131,11 +134,20 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   if (blockItem.id === 'condition.player.in_region') {
     return playerRegionConditionSummary(nodeItem);
   }
+  if (blockItem.id === 'condition.player.y_compare') {
+    return playerYCompareConditionSummary(nodeItem);
+  }
   if (blockItem.id === 'condition.target_block.is_type') {
     return targetBlockTypeConditionSummary(nodeItem);
   }
   if (blockItem.id === 'condition.target_block.in_region') {
     return targetBlockRegionConditionSummary(nodeItem);
+  }
+  if (blockItem.id === 'condition.target_block.y_compare') {
+    return targetBlockYCompareConditionSummary(nodeItem);
+  }
+  if (blockItem.id === 'condition.player.near_target_block') {
+    return playerNearTargetBlockConditionSummary(nodeItem);
   }
   const template = blockItem.summaryTemplate;
   if (!template) {
@@ -172,10 +184,16 @@ function legacyNodeTypeSummary(nodeItem: GraphNode): string {
       return playerDimensionConditionSummary(nodeItem);
     case 'PLAYER_IN_REGION_CONDITION':
       return playerRegionConditionSummary(nodeItem);
+    case 'PLAYER_Y_COMPARE_CONDITION':
+      return playerYCompareConditionSummary(nodeItem);
     case 'TARGET_BLOCK_TYPE_CONDITION':
       return targetBlockTypeConditionSummary(nodeItem);
     case 'TARGET_BLOCK_IN_REGION_CONDITION':
       return targetBlockRegionConditionSummary(nodeItem);
+    case 'TARGET_BLOCK_Y_COMPARE_CONDITION':
+      return targetBlockYCompareConditionSummary(nodeItem);
+    case 'PLAYER_NEAR_TARGET_BLOCK_CONDITION':
+      return playerNearTargetBlockConditionSummary(nodeItem);
     case 'PLAYER_ADD_TAG_ACTION':
       return `给当前玩家添加标签“${config.tag ?? '标签'}”。`;
     case 'PLAYER_REMOVE_TAG_ACTION':
@@ -268,6 +286,18 @@ function playerRegionConditionSummary(nodeItem: GraphNode): string {
   }
 }
 
+function playerYCompareConditionSummary(nodeItem: GraphNode): string {
+  const condition = yCompareLabel(nodeItem);
+  switch (conditionOutputMode(nodeItem)) {
+    case 'PASS_ONLY':
+      return `当当前玩家高度${condition}时继续。`;
+    case 'FAIL_ONLY':
+      return `当当前玩家高度不满足条件时继续。`;
+    case 'BRANCH':
+      return `按当前玩家高度是否满足条件分开执行。`;
+  }
+}
+
 function targetBlockTypeConditionSummary(nodeItem: GraphNode): string {
   const blockId = nodeItem.config.blockId || 'minecraft:stone';
   switch (conditionOutputMode(nodeItem)) {
@@ -280,6 +310,31 @@ function targetBlockTypeConditionSummary(nodeItem: GraphNode): string {
   }
 }
 
+function targetBlockYCompareConditionSummary(nodeItem: GraphNode): string {
+  const condition = yCompareLabel(nodeItem);
+  switch (conditionOutputMode(nodeItem)) {
+    case 'PASS_ONLY':
+      return `当目标方块高度${condition}时继续。`;
+    case 'FAIL_ONLY':
+      return `当目标方块高度不满足条件时继续。`;
+    case 'BRANCH':
+      return `按目标方块高度是否满足条件分开执行。`;
+  }
+}
+
+function playerNearTargetBlockConditionSummary(nodeItem: GraphNode): string {
+  const maxDistance = nodeItem.config.maxDistance || '5';
+  const distanceMode = nodeItem.config.horizontalOnly === 'false' ? '三维距离' : '水平距离';
+  switch (conditionOutputMode(nodeItem)) {
+    case 'PASS_ONLY':
+      return `当玩家${distanceMode}距离目标方块不超过 ${maxDistance} 格时继续。`;
+    case 'FAIL_ONLY':
+      return `当玩家不靠近目标方块时继续。`;
+    case 'BRANCH':
+      return `按玩家是否靠近目标方块分开执行。`;
+  }
+}
+
 function targetBlockRegionConditionSummary(nodeItem: GraphNode): string {
   const regionName = nodeItem.config.regionName || '区域名称';
   switch (conditionOutputMode(nodeItem)) {
@@ -289,6 +344,19 @@ function targetBlockRegionConditionSummary(nodeItem: GraphNode): string {
       return `当区域「${regionName}」不包含目标方块时继续。`;
     case 'BRANCH':
       return `按目标方块是否在区域「${regionName}」内分开执行。`;
+  }
+}
+
+function yCompareLabel(nodeItem: GraphNode): string {
+  switch (nodeItem.config.compareMode || 'AT_OR_ABOVE') {
+    case 'AT_OR_BELOW':
+      return `不高于 ${nodeItem.config.targetY || '64'}`;
+    case 'EQUAL':
+      return `等于 ${nodeItem.config.targetY || '64'}`;
+    case 'BETWEEN':
+      return `在 ${nodeItem.config.minY || '60'} 到 ${nodeItem.config.maxY || '80'} 之间`;
+    default:
+      return `不低于 ${nodeItem.config.targetY || '64'}`;
   }
 }
 

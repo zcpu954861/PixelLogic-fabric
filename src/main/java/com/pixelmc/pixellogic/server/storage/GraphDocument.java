@@ -109,8 +109,11 @@ public record GraphDocument(
             case PLAYER_IS_ADMIN_CONDITION -> "判断管理员";
             case PLAYER_DIMENSION_CONDITION -> "判断玩家维度";
             case PLAYER_IN_REGION_CONDITION -> "判断玩家区域";
+            case PLAYER_Y_COMPARE_CONDITION -> "判断玩家高度";
             case TARGET_BLOCK_TYPE_CONDITION -> "判断目标方块";
             case TARGET_BLOCK_IN_REGION_CONDITION -> "判断目标方块区域";
+            case TARGET_BLOCK_Y_COMPARE_CONDITION -> "判断目标方块高度";
+            case PLAYER_NEAR_TARGET_BLOCK_CONDITION -> "判断玩家靠近目标方块";
             case PLAYER_ADD_TAG_ACTION -> "添加玩家标签";
             case PLAYER_REMOVE_TAG_ACTION -> "移除玩家标签";
             case STATE_SET_ACTION -> "记录开始状态";

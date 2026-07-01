@@ -37,8 +37,11 @@ public final class BlockCatalogSelfCheck {
                 BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN,
                 BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS,
                 BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION,
+                BuiltInBlockCatalog.CONDITION_PLAYER_Y_COMPARE,
                 BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE,
                 BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IN_REGION,
+                BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_Y_COMPARE,
+                BuiltInBlockCatalog.CONDITION_PLAYER_NEAR_TARGET_BLOCK,
                 BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG,
                 BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG,
                 BuiltInBlockCatalog.STATE_SET,
@@ -129,6 +132,12 @@ public final class BlockCatalogSelfCheck {
                 "target block type condition should live under block conditions");
         require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IN_REGION).subcategoryId().equals("condition.region"),
                 "target block region condition should live under region conditions");
+        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_Y_COMPARE).subcategoryId().equals("condition.player"),
+                "player y compare condition should live under player conditions");
+        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_Y_COMPARE).subcategoryId().equals("condition.block"),
+                "target block y compare condition should live under block conditions");
+        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_NEAR_TARGET_BLOCK).subcategoryId().equals("condition.spatial"),
+                "near target condition should live under spatial conditions");
         });
     }
 

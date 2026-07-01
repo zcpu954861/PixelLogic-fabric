@@ -24,8 +24,11 @@ public final class BuiltInBlockCatalog {
     public static final String CONDITION_PLAYER_IS_ADMIN = "condition.player.is_admin";
     public static final String CONDITION_PLAYER_DIMENSION_IS = "condition.player.dimension_is";
     public static final String CONDITION_PLAYER_IN_REGION = "condition.player.in_region";
+    public static final String CONDITION_PLAYER_Y_COMPARE = "condition.player.y_compare";
     public static final String CONDITION_TARGET_BLOCK_IS_TYPE = "condition.target_block.is_type";
     public static final String CONDITION_TARGET_BLOCK_IN_REGION = "condition.target_block.in_region";
+    public static final String CONDITION_TARGET_BLOCK_Y_COMPARE = "condition.target_block.y_compare";
+    public static final String CONDITION_PLAYER_NEAR_TARGET_BLOCK = "condition.player.near_target_block";
     public static final String ACTION_PLAYER_ADD_TAG = "action.player.add_tag";
     public static final String ACTION_PLAYER_REMOVE_TAG = "action.player.remove_tag";
     public static final String STATE_SET = "state.set";
@@ -97,6 +100,7 @@ public final class BuiltInBlockCatalog {
                 subcategory("condition.player", "condition", "玩家条件", "基于当前模拟玩家做判断。", 20),
                 subcategory("condition.region", "condition", "区域条件", "基于测试上下文中的区域事实做判断。", 30),
                 subcategory("condition.block", "condition", "方块条件", "基于测试上下文中的目标方块事实做判断。", 40),
+                subcategory("condition.spatial", "condition", "空间关系", "基于玩家和目标方块之间的位置关系做判断。", 50),
                 subcategory("player.tag", "player", "标签", "写入当前模拟玩家的标签。", 10),
                 subcategory("message.player", "message", "玩家消息", "面向玩家的文本反馈。", 10),
                 subcategory("message.screen", "message", "屏幕提示", "显示标题、副标题或快捷栏消息。", 20),
@@ -289,6 +293,31 @@ public final class BuiltInBlockCatalog {
                         List.of()
                 ),
                 block(
+                        CONDITION_PLAYER_Y_COMPARE,
+                        "玩家高度是否满足",
+                        "按当前模拟玩家的 Y 高度继续流程。",
+                        "condition",
+                        "condition.player",
+                        "condition",
+                        NodeType.PLAYER_Y_COMPARE_CONDITION,
+                        Map.of(
+                                "outputMode", ConditionOutputMode.PASS_ONLY.name(),
+                                "compareMode", "AT_OR_ABOVE",
+                                "targetY", "64",
+                                "minY", "60",
+                                "maxY", "80"
+                        ),
+                        yCompareFields("满足高度时继续", "不满足高度时继续", "分开执行"),
+                        "按当前玩家高度是否满足条件继续。",
+                        "condition.player.y_compare",
+                        List.of(in("input")),
+                        List.of(out("pass"), out("fail")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER),
+                        List.of()
+                ),
+                block(
                         CONDITION_TARGET_BLOCK_IS_TYPE,
                         "目标方块是否为",
                         "按测试上下文中的目标方块类型继续流程。",
@@ -308,6 +337,58 @@ public final class BuiltInBlockCatalog {
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
                         BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
                         List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_WORLD),
+                        List.of()
+                ),
+                block(
+                        CONDITION_TARGET_BLOCK_Y_COMPARE,
+                        "目标方块高度是否满足",
+                        "按测试上下文中的目标方块 Y 高度继续流程。",
+                        "condition",
+                        "condition.block",
+                        "condition",
+                        NodeType.TARGET_BLOCK_Y_COMPARE_CONDITION,
+                        Map.of(
+                                "outputMode", ConditionOutputMode.PASS_ONLY.name(),
+                                "compareMode", "AT_OR_ABOVE",
+                                "targetY", "64",
+                                "minY", "60",
+                                "maxY", "80"
+                        ),
+                        yCompareFields("满足高度时继续", "不满足高度时继续", "分开执行"),
+                        "按目标方块高度是否满足条件继续。",
+                        "condition.target_block.y_compare",
+                        List.of(in("input")),
+                        List.of(out("pass"), out("fail")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_WORLD),
+                        List.of()
+                ),
+                block(
+                        CONDITION_PLAYER_NEAR_TARGET_BLOCK,
+                        "玩家是否靠近目标方块",
+                        "按当前模拟玩家与目标方块的距离继续流程。",
+                        "condition",
+                        "condition.spatial",
+                        "condition",
+                        NodeType.PLAYER_NEAR_TARGET_BLOCK_CONDITION,
+                        Map.of(
+                                "outputMode", ConditionOutputMode.PASS_ONLY.name(),
+                                "maxDistance", "5",
+                                "horizontalOnly", "true"
+                        ),
+                        List.of(
+                                conditionMode("靠近时继续", "不靠近时继续", "分开执行"),
+                                number("maxDistance", "最大距离", "格", "0.000001", "30000000", "0.5"),
+                                segmented("horizontalOnly", "只计算水平距离", List.of(option("true", "是"), option("false", "否")))
+                        ),
+                        "按当前玩家是否靠近目标方块继续。",
+                        "condition.player.near_target_block",
+                        List.of(in("input")),
+                        List.of(out("pass"), out("fail")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER, BlockSafetyFlag.REQUIRES_WORLD),
                         List.of()
                 ),
                 block(
@@ -597,12 +678,35 @@ public final class BuiltInBlockCatalog {
         );
     }
 
+    private static List<BlockFormFieldDefinition> yCompareFields(String passLabel, String failLabel, String branchLabel) {
+        return List.of(
+                conditionMode(passLabel, failLabel, branchLabel),
+                select("compareMode", "判断方式", List.of(
+                        option("AT_OR_ABOVE", "不低于"),
+                        option("AT_OR_BELOW", "不高于"),
+                        option("EQUAL", "等于"),
+                        option("BETWEEN", "在范围内")
+                )),
+                conditionalInteger("targetY", "目标 Y", "showWhen:compareMode=AT_OR_ABOVE,AT_OR_BELOW,EQUAL"),
+                conditionalInteger("minY", "最小 Y", "showWhen:compareMode=BETWEEN"),
+                conditionalInteger("maxY", "最大 Y", "showWhen:compareMode=BETWEEN")
+        );
+    }
+
     private static BlockFormFieldDefinition scope(String key, String label) {
         return field(key, "scope", label, "", true, "PLAYER", "", List.of(option("PLAYER", "玩家"), option("GLOBAL", "全局"), option("SESSION", "当前会话")), "", "", "", "", "");
     }
 
     private static BlockFormFieldDefinition integer(String key, String label, String suffix, String min, String max, String step) {
         return field(key, "integer", label, "", true, "", "", List.of(), min, max, step, "", suffix);
+    }
+
+    private static BlockFormFieldDefinition conditionalInteger(String key, String label, String ui) {
+        return field(key, "integer", label, "", false, "", "", List.of(), "-2048", "4096", "1", ui, "");
+    }
+
+    private static BlockFormFieldDefinition number(String key, String label, String suffix, String min, String max, String step) {
+        return field(key, "number", label, "", true, "", "", List.of(), min, max, step, "", suffix);
     }
 
     private static BlockFormFieldDefinition readonly(String key, String label, String defaultValue, String description) {

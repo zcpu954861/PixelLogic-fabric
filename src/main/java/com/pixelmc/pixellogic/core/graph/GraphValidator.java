@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 public final class GraphValidator {
     private static final int MAX_REGION_NAME_LENGTH = 64;
     private static final Pattern NAMESPACED_ID = Pattern.compile("^[a-z0-9_.-]+:[a-z0-9_./-]+$");
+    private static final Set<String> Y_COMPARE_MODES = Set.of("AT_OR_ABOVE", "AT_OR_BELOW", "EQUAL", "BETWEEN");
 
     public List<ValidationIssue> validate(GraphDefinition graph) {
         List<ValidationIssue> issues = new ArrayList<>();
@@ -98,8 +99,10 @@ public final class GraphValidator {
                 case PLAYER_IS_ADMIN_CONDITION -> validateConditionOutputMode(node, issues);
                 case PLAYER_DIMENSION_CONDITION -> validatePlayerDimensionCondition(node, issues);
                 case PLAYER_IN_REGION_CONDITION -> validateRegionCondition(node, issues);
+                case PLAYER_Y_COMPARE_CONDITION, TARGET_BLOCK_Y_COMPARE_CONDITION -> validateYCompareCondition(node, issues);
                 case TARGET_BLOCK_TYPE_CONDITION -> validateTargetBlockTypeCondition(node, issues);
                 case TARGET_BLOCK_IN_REGION_CONDITION -> validateRegionCondition(node, issues);
+                case PLAYER_NEAR_TARGET_BLOCK_CONDITION -> validateNearTargetBlockCondition(node, issues);
                 case PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION -> validatePlayerTagConfig(node, issues);
                 case STATE_SET_ACTION -> validateStateAction(node, issues, true);
                 case STATE_ADD_ACTION -> validateStateAction(node, issues, false);
@@ -222,6 +225,47 @@ public final class GraphValidator {
     private void validateRegionCondition(NodeDefinition node, List<ValidationIssue> issues) {
         validateRegionNameConfig(node, issues);
         validateConditionOutputMode(node, issues);
+    }
+
+    private void validateYCompareCondition(NodeDefinition node, List<ValidationIssue> issues) {
+        String mode = node.config().getOrDefault("compareMode", "");
+        if (!Y_COMPARE_MODES.contains(mode)) {
+            error(issues, "condition_y_compare_mode_invalid", "判断方式不合法：" + node.id());
+        } else if ("BETWEEN".equals(mode)) {
+            Integer min = parseIntegerConfig(node, "minY", "高度范围的最小值无效", issues);
+            Integer max = parseIntegerConfig(node, "maxY", "高度范围的最大值无效", issues);
+            if (min != null && max != null && min > max) {
+                error(issues, "condition_y_range_invalid", "高度范围的最小值不能大于最大值：" + node.id());
+            }
+        } else {
+            parseIntegerConfig(node, "targetY", "目标 Y 必须是整数", issues);
+        }
+        validateConditionOutputMode(node, issues);
+    }
+
+    private void validateNearTargetBlockCondition(NodeDefinition node, List<ValidationIssue> issues) {
+        try {
+            double maxDistance = Double.parseDouble(node.config().getOrDefault("maxDistance", ""));
+            if (maxDistance <= 0) {
+                error(issues, "condition_max_distance_invalid", "最大距离必须大于 0：" + node.id());
+            }
+        } catch (NumberFormatException exception) {
+            error(issues, "condition_max_distance_invalid", "最大距离必须大于 0：" + node.id());
+        }
+        String horizontalOnly = node.config().getOrDefault("horizontalOnly", "");
+        if (!"true".equals(horizontalOnly) && !"false".equals(horizontalOnly)) {
+            error(issues, "condition_horizontal_only_invalid", "只计算水平距离必须是是或否：" + node.id());
+        }
+        validateConditionOutputMode(node, issues);
+    }
+
+    private Integer parseIntegerConfig(NodeDefinition node, String key, String message, List<ValidationIssue> issues) {
+        try {
+            return Integer.parseInt(node.config().getOrDefault(key, ""));
+        } catch (NumberFormatException exception) {
+            error(issues, "condition_y_value_invalid", message + "：" + node.id());
+            return null;
+        }
     }
 
     private void validateNamespacedConfig(

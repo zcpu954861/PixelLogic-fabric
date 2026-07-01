@@ -153,8 +153,11 @@ public final class GraphRuntime {
                  PLAYER_IS_ADMIN_CONDITION,
                  PLAYER_DIMENSION_CONDITION,
                  PLAYER_IN_REGION_CONDITION,
+                 PLAYER_Y_COMPARE_CONDITION,
                  TARGET_BLOCK_TYPE_CONDITION,
                  TARGET_BLOCK_IN_REGION_CONDITION,
+                 TARGET_BLOCK_Y_COMPARE_CONDITION,
+                 PLAYER_NEAR_TARGET_BLOCK_CONDITION,
                  PLAYER_ADD_TAG_ACTION,
                  PLAYER_REMOVE_TAG_ACTION ->
                     throw new IllegalStateException("缺少模拟执行器：" + node.type());

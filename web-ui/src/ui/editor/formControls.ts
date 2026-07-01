@@ -155,6 +155,7 @@ function uniqueCatalogBlockForNodeType(catalog: BlockCatalog, nodeType: string) 
 function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[], simulationTestContext?: SimulationTestContext): EditableField[] {
   return formSchema
     .filter((field) => field.type !== 'hidden')
+    .filter((field) => fieldVisible(field, nodeItem.config))
     .map((field) => {
       const value = nodeItem.config[field.key] ?? field.defaultValue ?? '';
       const options = fieldOptionsForSchema(field, value, simulationTestContext);
@@ -181,6 +182,19 @@ function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[],
         suffix: field.suffix,
       };
     });
+}
+
+function fieldVisible(field: CatalogFormField, config: Record<string, string>): boolean {
+  const showWhen = field.ui.split(/\s+/).find((token) => token.startsWith('showWhen:'));
+  if (!showWhen) {
+    return true;
+  }
+  const condition = showWhen.slice('showWhen:'.length);
+  const [key, rawValues] = condition.split('=');
+  if (!key || !rawValues) {
+    return true;
+  }
+  return rawValues.split(',').includes(config[key] ?? '');
 }
 
 function fieldOptionsForSchema(field: CatalogFormField, currentValue = '', simulationTestContext?: SimulationTestContext): FieldOption[] {

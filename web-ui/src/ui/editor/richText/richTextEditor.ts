@@ -59,9 +59,22 @@ export function renderRichTextEditor(field: EditableField, rows: number): string
           ${Array.from({ length: 10 }, (_, index) => `
             <button type="button" class="rich-recent-color-button" data-rich-recent-color="${index}" title="最近自定义颜色" aria-label="最近自定义颜色 ${index + 1}" aria-pressed="false"></button>
           `).join('')}
-          <div class="rich-color-picker" data-rich-color-picker hidden>
-            <div class="rich-color-ring" data-rich-color-ring></div>
-            <input type="color" data-rich-color-input value="#55ff55" aria-label="选择自定义颜色">
+          <div
+            class="rich-color-picker"
+            data-rich-color-picker
+            data-rich-hue="120"
+            data-rich-saturation="67"
+            data-rich-value="100"
+            data-rich-color="#55ff55"
+            hidden
+          >
+            <div class="rich-color-ring" data-rich-color-ring>
+              <span></span>
+            </div>
+            <div class="rich-color-board" data-rich-color-board>
+              <span></span>
+            </div>
+            <div class="rich-color-value" data-rich-color-value>#55ff55</div>
             <div class="rich-color-picker-actions">
               <button type="button" data-rich-color-apply>使用</button>
               <button type="button" data-rich-color-close>关闭</button>
@@ -226,6 +239,11 @@ function mergeElementStyle(inheritedStyle: RichTextStyle, element: HTMLElement):
     } else {
       delete style.color;
     }
+  } else if (element.style.color) {
+    const normalized = normalizeRichTextColor(cssColorToHex(element.style.color));
+    if (normalized) {
+      style.color = normalized;
+    }
   }
   richTextStyleKeys.forEach((key) => {
     if (element.dataset[`rich${capitalize(key)}`] === 'true') {
@@ -251,6 +269,18 @@ function mergeElementStyle(inheritedStyle: RichTextStyle, element: HTMLElement):
 
 function capitalize(value: string): string {
   return `${value[0].toUpperCase()}${value.slice(1)}`;
+}
+
+function cssColorToHex(value: string): string {
+  const hex = value.match(/^#[0-9a-f]{6}$/i)?.[0];
+  if (hex) {
+    return hex;
+  }
+  const rgb = value.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+  if (!rgb) {
+    return value;
+  }
+  return `#${rgb.slice(1, 4).map((channel) => Number(channel).toString(16).padStart(2, '0')).join('')}`;
 }
 
 function richTextOffsetFromBoundary(root: HTMLElement, container: Node, offset: number): number {

@@ -105,8 +105,11 @@ Known condition config compatibility:
 - Context condition blocks use the same `outputMode` field and store only the check target:
   - `condition.player.dimension_is`: `dimensionId`.
   - `condition.player.in_region`: `regionName`.
+  - `condition.player.y_compare`: `compareMode`, `targetY`, `minY`, `maxY`.
   - `condition.target_block.is_type`: `blockId`.
   - `condition.target_block.in_region`: `regionName`.
+  - `condition.target_block.y_compare`: `compareMode`, `targetY`, `minY`, `maxY`.
+  - `condition.player.near_target_block`: `maxDistance`, `horizontalOnly`.
 - These blocks read per-run `testContext.world` facts during simulation; those facts are not stored in graph JSON.
 
 ## Endpoints

@@ -128,6 +128,18 @@ This checkpoint still does not add a real Minecraft adapter, draft simulation, n
 - The block config stores only the intended check; coordinates, target block position, and region bounds stay in Simulation Test Context facts.
 - This checkpoint does not add negative blocks, actions, world mutation, named scenarios, graph writes, full world simulation, real Minecraft adapter, or Admin Client Bridge implementation.
 
+## Implementation Checkpoint: Catalog Expansion v3 Spatial Conditions
+
+`feature/v1-webui-cleanup-catalog-v3` adds a small spatial condition slice after a WebUI orchestration cleanup:
+
+- `condition.player.y_compare`: checks the simulated player's Y value.
+- `condition.target_block.y_compare`: checks the optional target block Y value; missing target block evaluates false.
+- `condition.player.near_target_block`: checks distance from the simulated player to the optional target block.
+- Height compare modes are `AT_OR_ABOVE`, `AT_OR_BELOW`, `EQUAL`, and inclusive `BETWEEN`.
+- Near-target distance uses X/Z only when `horizontalOnly=true`, or X/Y/Z when `horizontalOnly=false`.
+- Dimension mismatch and missing target block evaluate false with readable trace text.
+- This checkpoint does not add target-block-exists, X/Z coordinate compare blocks, region geometry blocks, actions, selectors, world mutation, named scenarios, persistence, full world simulation, or a real Minecraft adapter.
+
 ## Implementation Checkpoint: Maintainability Cleanup v1
 
 `feature/v1-maintainability-cleanup` keeps the catalog model but removes frontend duplication:

@@ -60,6 +60,17 @@ Still not implemented:
 - The graph still stores only block config such as dimension id, block id, region name, and `outputMode`; it does not store test context facts.
 - No full world simulation, Region old system, world mutation, named scenario, persistence, MC adapter, or Admin Client Bridge implementation is added.
 
+## Implementation Checkpoint: Catalog Expansion v3 Spatial Conditions
+
+`feature/v1-webui-cleanup-catalog-v3` keeps the same boundary and adds only three read-only condition executors:
+
+- player Y compare reads `SimulationActor.position().y()`.
+- target block Y compare reads `SimulationWorld.targetBlock()` and returns false when the target block is disabled.
+- player near target block compares the simulated actor position to the optional target block, with horizontal-only or 3D distance modes.
+- Distance and height conditions reuse `ConditionOutputMode`; they do not introduce a second branch system.
+- The graph stores only config such as `compareMode`, Y values, `maxDistance`, `horizontalOnly`, and `outputMode`.
+- No target-block-exists block, X/Z coordinate compare, region geometry, world map, named scenario, persistence, MC adapter, or Admin Client Bridge implementation is added.
+
 ## Goals
 
 PixelLogic will grow from the current seven demo blocks into many concrete catalog blocks. The simulation backend exists so new blocks can be configured, validated, executed in a controlled test context, traced, and reviewed before every block has a real Minecraft adapter.

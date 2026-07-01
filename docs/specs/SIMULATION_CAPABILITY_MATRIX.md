@@ -78,3 +78,12 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 - `condition.target_block.in_region`: fully simulatable against target block position plus named region facts; missing target block or region evaluates false.
 - These blocks still require a future Minecraft adapter for real server execution; current semantics are WebUI/API simulation facts only.
 - No world mutation, world block map, Region system, inventory/container/entity simulation, named scenario, or persistence is added.
+
+## Catalog Expansion v3 Spatial Conditions Status
+
+- `condition.player.y_compare`: fully simulatable against the per-run player Y coordinate.
+- `condition.target_block.y_compare`: fully simulatable against the optional target block Y coordinate; missing target block evaluates false.
+- `condition.player.near_target_block`: fully simulatable against player and target block positions, with horizontal-only or 3D distance.
+- Dimension mismatch evaluates false for near-target checks.
+- These blocks still require a future Minecraft adapter for real server execution.
+- No target-block-exists block, X/Z coordinate comparisons, region geometry, world map, named scenario, or persistence is added.

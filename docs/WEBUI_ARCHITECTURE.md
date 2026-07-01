@@ -113,9 +113,14 @@ Important user semantics:
 - Context condition blocks also override those labels through catalog schema:
   - `玩家所在维度是否为`: `在该维度时继续` / `不在该维度时继续` / `分开执行`.
   - `玩家是否在区域内`: `在区域内时继续` / `不在区域内时继续` / `分开执行`.
+  - `玩家高度是否满足`: `满足高度时继续` / `不满足高度时继续` / `分开执行`.
   - `目标方块是否为`: `为该方块时继续` / `不为该方块时继续` / `分开执行`.
   - `目标方块是否在区域内`: `在区域内时继续` / `不在区域内时继续` / `分开执行`.
+  - `目标方块高度是否满足`: `满足高度时继续` / `不满足高度时继续` / `分开执行`.
+  - `玩家是否靠近目标方块`: `靠近时继续` / `不靠近时继续` / `分开执行`.
 - These context blocks edit only dimension id, block id, region name, and condition usage. Coordinates and target block facts stay in `编辑测试上下文`.
+- Spatial v3 condition blocks edit only compare mode/Y values or max distance/horizontal-only mode. They still read player/target coordinates from `编辑测试上下文` and do not write test context facts into graph JSON.
+- Y compare fields use the catalog schema with conditional field visibility: non-range modes show `目标 Y`, while `在范围内` shows `最小 Y` and `最大 Y`.
 - Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
 - Card gray type labels and the right-panel selected-block badge show the catalog top-level category, such as `条件判断`, `玩家操作`, or `消息显示`, instead of repeating the concrete block name.
 - Block card titles stay on one line. If the rendered title actually overflows, it scrolls horizontally back and forth instead of wrapping or using a fixed ellipsis.
@@ -175,11 +180,11 @@ Current responsibility boundaries:
 - `model/simulationTestContext.ts`: per-run WebUI test context model, validation, tag normalization, simple world facts, and request payload.
 - `state/`: mutable app state and canvas world dimensions.
 - `ui/app.ts`: orchestration, app shell assembly, event binding, autosave, undo/redo, and API actions.
-- `ui/canvas/`: puzzle block view, slot-flow view-model building, block constants, and drag/insert graph rules.
+- `ui/canvas/`: puzzle block view, slot-flow view-model building, card overflow measurement, active output helpers, block constants, and drag/insert graph rules.
 - `ui/catalog/`: catalog library rendering for category and block lists.
-- `ui/editor/`: editor modal shell and humanized form controls.
+- `ui/editor/`: editor modal shell, custom dropdown binding, and humanized form controls.
 - `ui/sidebar/`: selected-block summary and connection actions.
-- `ui/simulation/`: test-run split dropdown, test-player modal, and simulation result summary.
+- `ui/simulation/`: test-run split dropdown, test-player modal rendering/handlers, and simulation result summary.
 - `ui/trace/`: trace rendering.
 - `ui/humanize/`: labels and trace message humanization.
 - `ui/validation/`: validation/draft status copy.

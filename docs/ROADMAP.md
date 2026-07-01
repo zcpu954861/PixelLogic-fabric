@@ -16,10 +16,12 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Next
 
-1. Move more current demo block behavior toward per-block simulation executors only when it reduces real duplication.
-2. Add more simulation context fields only when a concrete block requires them.
-3. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
-4. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+1. Review the Admin Client Bridge & Authorized Tool Session design before any implementation prompt.
+2. If accepted, start with a tiny client/server handshake/status slice only; do not jump straight to graph editing, tool items, or custom payload multiplexing.
+3. Move more current demo block behavior toward per-block simulation executors only when it reduces real duplication.
+4. Add more simulation context fields only when a concrete block requires them.
+5. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
+6. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
 
 ## Completed Checkpoints
 
@@ -47,6 +49,8 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 - Simulation Test Context MVP lets WebUI test runs send a temporary simulated player display name, tags, and administrator flag; results show initial/final tags without writing the context into graph JSON or saving scenarios.
 - Catalog Expansion v1 adds `玩家是否拥有标签`, `玩家是否为管理员`, `移除玩家标签`, and the title/subtitle/actionbar message blocks; message color and formatting toolbar remains a follow-up.
 - Maintainability Cleanup v1 reduces frontend catalog duplication, extracts slot-flow/catalog rendering helpers from `app.ts`, consolidates self-check support, and removes runtime future-switch naming noise without changing product behavior.
+- Text Component Editor v1 adds the shared rich text component editor for message/title/subtitle/actionbar fields.
+- Admin Client Bridge design audit records the long-term direction: authorized client-hosted WebUI, local bridge transport, server-authoritative capability checks, and capability-gated future tool items.
 
 ## Follow-Ups
 
@@ -58,6 +62,7 @@ P2 before broader runtime use:
 - Pending timers now have a spike-level max pending count plus reset/commit/stop cleanup. Broader runtime still needs a real capacity/backpressure policy.
 - In-memory state now has a spike-level cap and reset/stop cleanup. Broader runtime still needs durable lifecycle and persistence policy before non-spike use.
 - Draft saves return fingerprints but do not yet enforce `expectedFingerprint`; add optimistic conflict handling before multi-user or multi-tab editing.
+- Server HTTP API is still the current dev/local WebUI transport. The long-term recommended admin flow is client-hosted WebUI through an authorized PixelLogic client session.
 
 ## Loader Event Policy
 

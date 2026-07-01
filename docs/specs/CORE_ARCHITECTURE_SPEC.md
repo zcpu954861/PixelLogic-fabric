@@ -74,6 +74,7 @@ Server owns:
 - permissions
 - audit
 - trace retrieval
+- admin session and capability checks for future client-hosted WebUI
 - static WebUI asset serving later
 
 ### Loader Adapter
@@ -96,6 +97,16 @@ WebUI owns the independent frontend:
 Java must not generate WebUI HTML, CSS, or JavaScript.
 
 The current six WebUI library buttons are temporary demo entries. The next architecture step should move to category registry plus concrete block definitions rather than a hardcoded category enum.
+
+### Admin Client Bridge
+
+The long-term admin transport is client-hosted WebUI with an authorized client-local bridge:
+
+```text
+Browser -> client localhost bridge -> Minecraft networking -> PixelLogic server core
+```
+
+This does not change the core rule: the server remains authority for graph, validation, runtime, storage, trace, and permissions. A client mod installing PixelLogic does not grant management power. The server must authorize a session and check capability on every bridge request. The current server HTTP API remains dev/local transport until the bridge reaches parity.
 
 ## No Channel Core Model
 

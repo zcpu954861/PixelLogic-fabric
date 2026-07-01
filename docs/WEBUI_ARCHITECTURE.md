@@ -113,14 +113,14 @@ Important user semantics:
 - Context condition blocks also override those labels through catalog schema:
   - `玩家所在维度是否为`: `在该维度时继续` / `不在该维度时继续` / `分开执行`.
   - `玩家是否在区域内`: `在区域内时继续` / `不在区域内时继续` / `分开执行`.
-  - `玩家高度是否满足`: `满足高度时继续` / `不满足高度时继续` / `分开执行`.
+  - `玩家高度是否满足`: `不低于或不高于` 模式显示 `不低于时继续` / `不高于时继续` / `分开执行`; `等于` 模式显示 `等于时继续` / `不等于时继续` / `分开执行`; `在范围内` 模式显示 `在范围内时继续` / `不在范围内时继续` / `分开执行`.
   - `目标方块是否为`: `为该方块时继续` / `不为该方块时继续` / `分开执行`.
   - `目标方块是否在区域内`: `在区域内时继续` / `不在区域内时继续` / `分开执行`.
-  - `目标方块高度是否满足`: `满足高度时继续` / `不满足高度时继续` / `分开执行`.
+  - `目标方块高度是否满足`: 与玩家高度条件使用同一套判断方式、字段和条件用途文案.
   - `玩家是否靠近目标方块`: `靠近时继续` / `不靠近时继续` / `分开执行`.
 - These context blocks edit only dimension id, block id, region name, and condition usage. Coordinates and target block facts stay in `编辑测试上下文`.
 - Spatial v3 condition blocks edit only compare mode/Y values or max distance/horizontal-only mode. They still read player/target coordinates from `编辑测试上下文` and do not write test context facts into graph JSON.
-- Y compare fields use the catalog schema with conditional field visibility: non-range modes show `目标 Y`, while `在范围内` shows `最小 Y` and `最大 Y`.
+- Y compare fields use the catalog schema with conditional field visibility: non-range modes show `目标 Y`, while `在范围内` shows `最低 Y 值` and `最高 Y 值`.
 - Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
 - Card gray type labels and the right-panel selected-block badge show the catalog top-level category, such as `条件判断`, `玩家操作`, or `消息显示`, instead of repeating the concrete block name.
 - Block card titles stay on one line. If the rendered title actually overflows, it scrolls horizontally back and forth instead of wrapping or using a fixed ellipsis.

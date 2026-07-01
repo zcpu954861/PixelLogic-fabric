@@ -24,7 +24,7 @@ export function renderRichTextEditor(field: EditableField, rows: number): string
   return `
     <div class="rich-text-field">
       <div class="rich-text-toolbar" aria-label="文字格式工具">
-        <div class="rich-text-colors" aria-label="文字颜色">
+        <div class="rich-text-tools" aria-label="文字颜色与样式">
           ${minecraftColors.map((color) => color.value ? `
             <button
               type="button"
@@ -38,8 +38,6 @@ export function renderRichTextEditor(field: EditableField, rows: number): string
           ` : `
             <button type="button" class="rich-color-default" data-rich-color="" title="默认颜色" aria-label="默认颜色" aria-pressed="false">默认</button>
           `).join('')}
-        </div>
-        <div class="rich-text-styles" aria-label="文字样式">
           ${styleButtons.map((button) => `
             <button
               type="button"

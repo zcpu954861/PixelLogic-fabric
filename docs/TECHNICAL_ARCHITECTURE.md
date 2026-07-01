@@ -23,6 +23,8 @@ The v1 API + WebUI test-run checkpoint adds a localhost-only spike API:
 - Vite dev proxy from `/api` to `127.0.0.1:18111`.
 - WebUI renders real status, reset, test run, latest trace, and recent trace responses.
 
+This server HTTP API remains the current development/local/self-check transport. The long-term admin direction is a client-hosted WebUI: an authorized PixelLogic client starts a localhost bridge, and that bridge forwards WebUI operations to the server through Minecraft networking. The server remains authoritative for graph, catalog, validation, runtime, storage, trace, session, and capability checks. This is a future track, not the active near-term implementation roadmap; near-term work remains Simulation Backend, catalog, graph, runtime, and WebUI editor capability.
+
 The v1 graph draft checkpoint adds the first persistent graph loop:
 
 - `server/storage` owns versioned JSON graph documents and world-local graph files.
@@ -78,9 +80,41 @@ These bounds are intentionally small and local to the spike. Before broader runt
 - `server/api`
 - `server/storage`
 - `server/security`
+- `server/admin-session`
+- `client/bridge` later
+- `client/tool` later
 - `loader/fabric`
 - `loader/forge` or `loader/neoforge` later
 - `web-ui`
+
+## Admin Client Bridge Direction
+
+The recommended long-term management mode is:
+
+```text
+Browser
+ -> 127.0.0.1:<randomPort> + one-time token
+ -> PixelLogic Client Local Bridge
+ -> Minecraft networking payload
+ -> PixelLogic Server Core
+```
+
+The client mod defaults to no management functionality. It does not start a local bridge, does not open WebUI, does not enable selectors/overlays, and does not make tool items useful until the server grants an authorized admin session.
+
+Future implementation candidates, when prerequisites are mature and a new prompt scopes the work:
+
+1. handshake/status only;
+2. read-only bridge for catalog, graph, and trace;
+3. graph draft save / validate / commit through the bridge;
+4. simulation run through the bridge;
+5. capability-gated tool item selection;
+6. server HTTP kept as dev/local/self-check transport until bridge parity is proven.
+
+See:
+
+- `docs/specs/ADMIN_CLIENT_BRIDGE_AUTHORIZED_SESSION.md`
+- `docs/specs/CLIENT_HOSTED_WEBUI_PROTOCOL.md`
+- `docs/audits/ADMIN_CLIENT_BRIDGE_DESIGN_AUDIT.md`
 
 ## Simulation Adapter Boundary
 

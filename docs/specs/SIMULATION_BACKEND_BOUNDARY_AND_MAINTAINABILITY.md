@@ -185,6 +185,18 @@ Simulation Executors are the adapter layer for block behavior. The current `Grap
 
 Minecraft Adapter is a future boundary. It should translate real loader/Minecraft inputs into PixelLogic trigger or execution requests and translate PixelLogic action requests into real side effects.
 
+## Admin Client Bridge Relationship
+
+The future Admin Client Bridge is a transport and interaction layer, not a simulation backend and not a runtime replacement.
+
+- Client-hosted WebUI may request simulation runs through a local bridge.
+- The bridge forwards the request to the server; the server still builds `SimulationExecutionRequest`, runs validation/runtime/simulation, and returns bounded results.
+- Authorized tool item selections may provide future simulation inputs such as block/entity/region facts, but server-side capability checks decide whether the request is accepted.
+- Do not put simulation rules or Minecraft behavior in the WebUI or client bridge.
+- Do not let client bridge payloads bypass graph validation, capability checks, runtime limits, trace bounds, or stale graph guards.
+
+This bridge is a long-term transport direction. Current near-term development remains Simulation Backend first: catalog, graph, runtime, WebUI editor, new block simulation semantics, trace/result/debug, and maintainable executor boundaries.
+
 ## Proposed Backend Package Structure
 
 This is a target shape, not an instruction to create every file at once.

@@ -254,7 +254,7 @@ export function preferredMainOutput(nodeItem: GraphNode): GraphSlot | null {
       return slot;
     }
   }
-  return outputs.length === 1 && !['pass', 'fail'].includes(outputs[0].id) ? outputs[0] : null;
+  return outputs.length === 1 ? outputs[0] : null;
 }
 
 export function fallbackPosition(nodeId: string): GraphPosition {

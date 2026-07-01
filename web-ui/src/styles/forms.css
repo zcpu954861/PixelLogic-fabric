@@ -315,7 +315,7 @@ select {
   background: #ffffff;
   color: var(--ink);
   padding: 9px 10px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.42;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -367,12 +367,22 @@ select {
   box-shadow: 0 0 0 2px rgba(20, 148, 71, 0.18);
 }
 
+.rich-style-button > span {
+  display: inline-block;
+}
+
 .rich-style-bold {
   font-weight: 950;
 }
 
 .rich-style-italic {
+  font-family: Georgia, "Times New Roman", serif;
   font-style: italic;
+  font-weight: 950;
+}
+
+.rich-style-italic > span {
+  transform: skewX(-18deg);
 }
 
 .rich-style-underlined {

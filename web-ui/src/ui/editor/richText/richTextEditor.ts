@@ -49,7 +49,7 @@ export function renderRichTextEditor(field: EditableField, rows: number): string
               aria-label="${escapeAttr(button.title)}"
               aria-pressed="false"
             >
-              ${escapeHtml(button.label)}
+              <span>${escapeHtml(button.label)}</span>
             </button>
           `).join('')}
         </div>
@@ -170,7 +170,7 @@ function cssText(style: RichTextStyle): string {
     rules.push(`color:${color.css}`);
   }
   if (style.bold) {
-    rules.push('font-weight:950');
+    rules.push('font-weight:950;text-shadow:.35px 0 0 currentColor,-.35px 0 0 currentColor');
   }
   if (style.italic) {
     rules.push('font-style:italic;font-family:Georgia,"Times New Roman",serif');

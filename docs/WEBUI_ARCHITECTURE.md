@@ -118,8 +118,12 @@ Important user semantics:
 - These context blocks edit only dimension id, block id, region name, and condition usage. Coordinates and target block facts stay in `编辑测试上下文`.
 - Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
 - Card gray type labels and the right-panel selected-block badge show the catalog top-level category, such as `条件判断`, `玩家操作`, or `消息显示`, instead of repeating the concrete block name.
+- Block card titles stay on one line. If the rendered title actually overflows, it scrolls horizontally back and forth instead of wrapping or using a fixed ellipsis.
+- Block card summaries reserve about three lines. If the rendered summary actually overflows, it scrolls vertically back and forth; short summaries and summaries that fit in three lines do not animate.
 - The block editor title uses `未命名(官方积木名)` when the current display name still equals the catalog name, and `自定义名称(官方积木名)` after the user renames it.
 - The editor base-info block type is static metadata in the format `积木类别：官方积木名`; it is not styled as an editable or readonly input.
+- Region-name fields for region condition blocks read current test-context `world.regions[].name` values into a project-styled dropdown when regions exist, preserve an old value that is not in the list, and fall back to text input when no regions exist.
+- Editor select/scope controls use the project custom dropdown style instead of relying on the browser's native blue select popup.
 
 Safety bounds:
 
@@ -137,6 +141,7 @@ The slot-based canvas now supports a minimal direct-manipulation graph editing l
 - Single click selects the block; pointer movement past the drag threshold starts drag; double click opens the existing editor modal.
 - Dragging a block moves that block and all downstream nodes reachable from outgoing typed edges.
 - Dragging a dual-branch Condition moves both pass and fail downstream branches; single-output conditions behave like normal chain blocks.
+- Single-output conditions can be appended, attached, or inserted as a normal chain tail even when the active slot id is `pass` or `fail`; dual-branch conditions still are not treated as a single tail.
 - Inactive condition outputs are hidden and ignored by visual connection, chain dragging, append, attach, and insert candidate detection.
 - Dragging follows only edges whose puzzle mouths are still visually snapped together; visually separated stale edges are ignored.
 - Magnetic snap has a wider hit area, but connected-state detection uses a tight snapped-position tolerance so near-misses are not treated as one chain.

@@ -274,7 +274,7 @@ select {
   background: #f7fbf5;
 }
 
-.rich-text-preview span {
+.rich-text-preview > span {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 900;
@@ -287,4 +287,78 @@ select {
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.rich-text-row {
+  align-content: start;
+}
+
+.rich-text-row > span {
+  color: var(--muted);
+}
+
+.rich-text-toolbar {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #c9d6cc;
+  border-radius: 8px;
+  background: #f7fbf5;
+}
+
+.rich-text-colors,
+.rich-text-styles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.rich-color-button,
+.rich-color-default,
+.rich-text-styles button {
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border: 1px solid #9fb3a5;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #1d2a23;
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rich-color-button {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0) 46%),
+    var(--swatch);
+}
+
+.rich-color-default {
+  width: auto;
+  min-width: 42px;
+  padding: 0 8px;
+  background: #ffffff;
+}
+
+.rich-text-styles button:hover,
+.rich-color-button:hover,
+.rich-color-default:hover {
+  border-color: #2d6f9f;
+  box-shadow: 0 0 0 2px rgba(45, 111, 159, 0.12);
+}
+
+.rich-text-styles button:focus-visible,
+.rich-color-button:focus-visible,
+.rich-color-default:focus-visible {
+  outline: 2px solid #2d6f9f;
+  outline-offset: 2px;
+}
+
+.rich-text-preview p span {
+  white-space: inherit;
 }

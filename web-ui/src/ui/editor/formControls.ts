@@ -3,6 +3,7 @@ import type { BlockCatalog, CatalogFormField, EditableField, EditorSection, Fiel
 import { richTextPlainText } from '../../model/richText';
 import { escapeAttr, escapeHtml } from '../../utils/dom';
 import { booleanLabel, booleanOptions, conditionOutputModeLabel, nodeTypeLabel, nodeTypeMetaLabel, stateScopeOptions, targetLabel, valueTypeOptions } from '../humanize/labels';
+import { renderRichTextEditor } from './richText/richTextEditor';
 
 export function renderNodeEditor(nodeItem: GraphNode, catalog: BlockCatalog): string {
   const section = editorSection(nodeItem, catalog);
@@ -41,6 +42,15 @@ export function renderEditableField(field: EditableField): string {
   }
 
   const describedBy = field.description ? `field-help-${escapeAttr(field.key)}` : '';
+  if (field.control === 'rich_text_component') {
+    return `
+      <div class="field-row rich-text-row${field.full ? ' is-full' : ''}">
+        <span>${escapeHtml(field.label)}</span>
+        ${renderRichTextEditor(field, textareaRows(field))}
+        ${field.description ? `<small id="${describedBy}">${escapeHtml(field.description)}</small>` : ''}
+      </div>
+    `;
+  }
   const control = renderFieldControl(field, describedBy);
   return `
     <label class="field-row${field.full ? ' is-full' : ''}">${escapeHtml(field.label)}
@@ -75,19 +85,6 @@ function renderFieldControl(field: EditableField, describedBy: string): string {
   }
   if (field.control === 'textarea') {
     return `<textarea rows="${textareaRows(field)}" data-config-key="${escapeAttr(field.key)}" placeholder="${escapeAttr(field.placeholder ?? '')}"${field.required ? ' required' : ''}>${escapeHtml(field.value)}</textarea>`;
-  }
-  if (field.control === 'rich_text_component') {
-    const plainText = richTextPlainText(field.value);
-    return `
-      <div class="rich-text-field">
-        <textarea rows="${textareaRows(field)}" data-config-key="${escapeAttr(field.key)}" data-rich-text="true" placeholder="${escapeAttr(field.placeholder ?? '')}"${field.required ? ' required' : ''}>${escapeHtml(plainText)}</textarea>
-        <div class="rich-text-preview">
-          <span>预览</span>
-          <p data-rich-preview>${escapeHtml(plainText || '未填写')}</p>
-        </div>
-        <small>当前为富文本基础模式，保存为 vanilla text component 语义；后续可扩展颜色、格式和变量。</small>
-      </div>
-    `;
   }
 
   const inputType = field.control === 'number' || field.control === 'integer' ? 'number' : 'text';

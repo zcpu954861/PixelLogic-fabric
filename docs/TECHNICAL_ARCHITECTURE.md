@@ -47,8 +47,8 @@ The catalog form schema checkpoint keeps that runtime boundary:
 - `BlockDefinition` exposes `formSchema`, `summaryTemplate`, and `summaryFormatter` metadata.
 - The WebUI editor resolves known `blockId` values through catalog schema first and uses legacy `NodeType` builders only as fallback.
 - The Java built-in catalog and `/api/pixellogic/catalog` are the catalog authority; the frontend fallback catalog is only an API-offline placeholder, not a duplicate registry.
-- Message actions store message config as a rich text component payload while the current string-valued graph config schema is preserved.
-- `GraphRuntime` still extracts plain text and dispatches through the existing `MESSAGE_ACTION` path; no real Minecraft Text adapter is implemented.
+- Message actions store message config as a rich text component payload while the current string-valued graph config schema is preserved. The payload now supports segments with Minecraft named colors and boolean style flags.
+- `GraphRuntime` still extracts plain text and dispatches through the existing `MESSAGE_ACTION` path; no real Minecraft Text adapter is implemented. Simulation message results retain the structured payload for future preview use.
 
 ## Lifecycle / Capacity Safety
 

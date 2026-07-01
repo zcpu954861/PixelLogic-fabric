@@ -7,7 +7,7 @@ import {
   fallbackCatalog,
 } from '../model/blockCatalog';
 import { fallbackGraph, graphId } from '../model/demoGraph';
-import { richTextConfig, richTextPlainText } from '../model/richText';
+import { applyRichTextStyle, updateRichTextPlainText, type RichTextStyle } from '../model/richText';
 import {
   addSimulationTag,
   cloneSimulationTestContext,
@@ -60,6 +60,7 @@ import {
 } from './canvas/dragInsert';
 import { renderCatalogLibrary } from './catalog/catalogLibrary';
 import { renderEditorModal } from './editor/blockEditorModal';
+import { renderRichTextPreview } from './editor/richText/richTextEditor';
 import { renderSimulationTestContextModal, renderSimulationTestResultSummary, renderTestRunControl } from './simulation/simulationTestContextPanel';
 import { renderTrace } from './trace/traceView';
 import { draftStatusText, uncommittedNotice, validationErrorText, validationList, validationSummaryText, validationTitle } from './validation/validationView';
@@ -520,6 +521,7 @@ function bindInteractions(): void {
       }
     });
   });
+  bindRichTextToolbar();
 
   document.querySelectorAll<HTMLElement>('.slot-join').forEach((joinEl) => {
     joinEl.addEventListener('mouseenter', () => markJoinFocus(joinEl));
@@ -1200,15 +1202,61 @@ function updateEditorDraft(inputEl: HTMLInputElement | HTMLSelectElement | HTMLT
     updateEditorDraftValue('displayName', inputEl.value, 'node');
   }
   if (inputEl.dataset.configKey) {
-    const value = inputEl.dataset.richText === 'true' ? richTextConfig(inputEl.value) : inputEl.value;
+    const value = inputEl.dataset.richText === 'true'
+      ? updateRichTextPlainText(state.editorDraftNode?.config[inputEl.dataset.configKey] ?? '', inputEl.value)
+      : inputEl.value;
     updateEditorDraftValue(inputEl.dataset.configKey, value);
     if (inputEl.dataset.richText === 'true') {
-      const preview = document.querySelector<HTMLElement>('[data-rich-preview]');
-      if (preview) {
-        preview.textContent = inputEl.value || '未填写';
-      }
+      updateRichTextPreviewElement(value, inputEl.closest('.rich-text-field'));
     }
   }
+}
+
+function bindRichTextToolbar(): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-style]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => {
+      const key = buttonEl.dataset.richStyle as keyof RichTextStyle | undefined;
+      if (key) {
+        applyRichTextToolbarPatch(buttonEl, { [key]: true } as Partial<RichTextStyle>);
+      }
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-color]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => {
+      const color = buttonEl.dataset.richColor;
+      applyRichTextToolbarPatch(buttonEl, color ? { color: color as RichTextStyle['color'] } : { color: undefined });
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-rich-clear]').forEach((buttonEl) => {
+    buttonEl.addEventListener('pointerdown', (event) => event.preventDefault());
+    buttonEl.addEventListener('click', () => applyRichTextToolbarPatch(buttonEl, {}, { clear: true }));
+  });
+}
+
+function applyRichTextToolbarPatch(
+  controlEl: HTMLElement,
+  patch: Partial<RichTextStyle>,
+  options: { clear?: boolean } = {},
+): void {
+  const fieldEl = controlEl.closest<HTMLElement>('.rich-text-field');
+  const textarea = fieldEl?.querySelector<HTMLTextAreaElement>('textarea[data-rich-text="true"]');
+  const key = textarea?.dataset.configKey;
+  if (!fieldEl || !textarea || !key || !state.editorDraftNode) {
+    return;
+  }
+  const start = textarea.selectionStart ?? 0;
+  const end = textarea.selectionEnd ?? start;
+  if (start === end) {
+    textarea.focus();
+    return;
+  }
+  const next = applyRichTextStyle(state.editorDraftNode.config[key] ?? '', start, end, patch, options);
+  updateEditorDraftValue(key, next);
+  updateRichTextPreviewElement(next, fieldEl);
+  textarea.focus();
+  textarea.setSelectionRange(start, end);
 }
 
 function updateEditorDraftValue(key: string, value: string, target: 'config' | 'node' = 'config'): void {
@@ -1320,7 +1368,7 @@ function refreshEditorDraftIndicators(): void {
     modalSummary.textContent = nodeSummary(draftNode, activeCatalog());
   }
   if (richPreview) {
-    richPreview.textContent = richTextPlainText(draftNode.config.message ?? '') || '未填写';
+    richPreview.innerHTML = renderRichTextPreview(draftNode.config.message ?? '');
   }
   if (modalError) {
     modalError.textContent = state.error || validationSummaryText(state);
@@ -1369,7 +1417,7 @@ function refreshDraftIndicators(): void {
   }
   if (richPreview) {
     const selected = state.editorDraftNode ?? selectedNodeFrom(currentGraph());
-    richPreview.textContent = selected ? richTextPlainText(selected.config.message ?? '') || '未填写' : '未填写';
+    richPreview.innerHTML = selected ? renderRichTextPreview(selected.config.message ?? '') : '未填写';
   }
   if (modalError) {
     modalError.textContent = state.error || validationSummaryText(state);
@@ -1377,6 +1425,13 @@ function refreshDraftIndicators(): void {
   undoButton?.toggleAttribute('disabled', !canUndo());
   redoButton?.toggleAttribute('disabled', !canRedo());
   window.onbeforeunload = state.dirty || state.hasDraft || autoSaveInFlight ? () => '还有修改正在自动保存，确定要离开吗？' : null;
+}
+
+function updateRichTextPreviewElement(raw: string, root: Element | null = null): void {
+  const preview = (root ?? document).querySelector<HTMLElement>('[data-rich-preview]');
+  if (preview) {
+    preview.innerHTML = renderRichTextPreview(raw);
+  }
 }
 
 function scheduleAutoSave(): void {

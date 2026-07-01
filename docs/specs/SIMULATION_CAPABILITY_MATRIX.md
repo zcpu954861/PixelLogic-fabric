@@ -58,4 +58,4 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 
 - `condition.player.is_admin`: approximate simulation against the per-run actor administrator flag.
 - `action.message.title`, `action.message.subtitle`, and `action.message.actionbar`: approximate simulation records message result channels `TITLE`, `SUBTITLE`, and `ACTIONBAR`.
-- The rich text payload remains the same base text component structure; color and formatting controls are still pending.
+- The rich text payload now supports selected-text color and formatting controls in WebUI. Simulation still records readable plain text for trace and preserves the structured payload in message results; real Minecraft Text delivery remains future adapter work.

@@ -139,6 +139,9 @@ public final class GraphValidator {
                     if (RichTextComponentValue.plainText(value).isBlank() && field.required()) {
                         error(issues, "config_rich_text_empty", "富文本消息不能为空：" + node.id() + "." + key);
                     }
+                    for (String validationError : RichTextComponentValue.validationErrors(value)) {
+                        error(issues, "config_rich_text_invalid", validationError + "（" + node.id() + "." + key + "）");
+                    }
                 }
                 case "string", "textarea" -> {
                 }

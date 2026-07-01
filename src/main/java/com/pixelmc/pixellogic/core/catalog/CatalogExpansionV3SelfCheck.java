@@ -64,10 +64,10 @@ public final class CatalogExpansionV3SelfCheck {
         require(block(BuiltInBlockCatalog.CONDITION_PLAYER_NEAR_TARGET_BLOCK).subcategoryId().equals("condition.spatial"),
                 "near target block should be under spatial conditions");
         require(modeLabels(BuiltInBlockCatalog.CONDITION_PLAYER_Y_COMPARE)
-                        .equals(List.of("不低于时继续", "低于时继续", "分开执行")),
+                        .equals(List.of("不低于时继续", "不高于时继续", "分开执行")),
                 "player y compare should expose height-specific mode labels");
         require(modeLabels(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_Y_COMPARE)
-                        .equals(List.of("不低于时继续", "低于时继续", "分开执行")),
+                        .equals(List.of("不低于时继续", "不高于时继续", "分开执行")),
                 "target y compare should expose height-specific mode labels");
         require(modeLabels(BuiltInBlockCatalog.CONDITION_PLAYER_NEAR_TARGET_BLOCK)
                         .equals(List.of("靠近时继续", "不靠近时继续", "分开执行")),

@@ -157,7 +157,7 @@ function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[],
     .filter((field) => field.type !== 'hidden')
     .filter((field) => fieldVisible(field, nodeItem.config, formSchema))
     .map((field) => {
-      const value = nodeItem.config[field.key] ?? field.defaultValue ?? '';
+      const value = schemaFieldValue(field, nodeItem);
       const options = fieldOptionsForSchema(field, value, simulationTestContext, nodeItem);
       const control = field.key === 'regionName' && options.length > 0
         ? 'select'
@@ -182,6 +182,23 @@ function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[],
         suffix: field.suffix,
       };
     });
+}
+
+function schemaFieldValue(field: CatalogFormField, nodeItem: GraphNode): string {
+  const value = nodeItem.config[field.key] ?? field.defaultValue ?? '';
+  if (!isYCompareCondition(nodeItem)) {
+    return value;
+  }
+  if (field.key === 'compareMode' && value === 'AT_OR_BELOW') {
+    return 'AT_OR_ABOVE';
+  }
+  if (field.key === 'outputMode' && ['AT_OR_ABOVE', 'AT_OR_BELOW'].includes(nodeItem.config.compareMode ?? 'AT_OR_ABOVE')) {
+    if (value === 'BRANCH') {
+      return 'BRANCH';
+    }
+    return nodeItem.config.compareMode === 'AT_OR_BELOW' ? 'Y_AT_OR_BELOW' : 'Y_AT_OR_ABOVE';
+  }
+  return value;
 }
 
 function schemaFieldLabel(field: CatalogFormField, nodeItem: GraphNode): string {
@@ -238,16 +255,21 @@ function isYCompareCondition(nodeItem?: GraphNode): boolean {
 }
 
 function yCompareConditionOptions(compareMode = 'AT_OR_ABOVE'): FieldOption[] {
+  if (compareMode === 'AT_OR_ABOVE' || compareMode === 'AT_OR_BELOW') {
+    return [
+      { value: 'Y_AT_OR_ABOVE', label: '不低于时继续' },
+      { value: 'Y_AT_OR_BELOW', label: '不高于时继续' },
+      { value: 'BRANCH', label: '分开执行' },
+    ];
+  }
   const labels = (() => {
     switch (compareMode) {
-      case 'AT_OR_BELOW':
-        return ['不高于时继续', '高于时继续'];
       case 'EQUAL':
         return ['等于时继续', '不等于时继续'];
       case 'BETWEEN':
         return ['在范围内时继续', '不在范围内时继续'];
       default:
-        return ['不低于时继续', '低于时继续'];
+        return ['不低于时继续', '不高于时继续'];
     }
   })();
   return [
@@ -259,8 +281,7 @@ function yCompareConditionOptions(compareMode = 'AT_OR_ABOVE'): FieldOption[] {
 
 function yCompareModeOptions(): FieldOption[] {
   return [
-    { value: 'AT_OR_ABOVE', label: '不低' },
-    { value: 'AT_OR_BELOW', label: '不高' },
+    { value: 'AT_OR_ABOVE', label: '不低于或不高于' },
     { value: 'EQUAL', label: '等于' },
     { value: 'BETWEEN', label: '在范围内' },
   ];

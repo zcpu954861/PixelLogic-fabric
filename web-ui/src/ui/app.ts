@@ -562,7 +562,7 @@ function bindInteractions(): void {
   document.querySelectorAll<HTMLButtonElement>('[data-config-value]').forEach((buttonEl) => {
     buttonEl.addEventListener('click', () => {
       if (buttonEl.dataset.configKey && buttonEl.dataset.configValue) {
-        const shouldRerender = editorDraftKeyNeedsRerender(buttonEl.dataset.configKey);
+        const shouldRerender = editorDraftKeyNeedsRerender(buttonEl.dataset.configKey) || buttonEl.dataset.configValue.startsWith('Y_AT_OR_');
         updateEditorDraftValue(buttonEl.dataset.configKey, buttonEl.dataset.configValue);
         if (shouldRerender) {
           return;
@@ -1566,6 +1566,14 @@ function updateEditorDraftValue(key: string, value: string, target: 'config' | '
     }
     draftNode.displayName = value;
   } else {
+    if (key === conditionOutputModeKey && applyYCompareOutputChoice(draftNode, value)) {
+      state.error = '';
+      hideUnsavedConfirm();
+      confirmedModeSwitchSignature = null;
+      hideModeSwitchConfirm();
+      renderApp();
+      return;
+    }
     if (draftNode.config[key] === value) {
       return;
     }
@@ -1597,6 +1605,30 @@ function updateEditorDraftValue(key: string, value: string, target: 'config' | '
 
 function editorDraftKeyNeedsRerender(key: string): boolean {
   return key === 'valueType' || key === 'compareMode';
+}
+
+function applyYCompareOutputChoice(nodeItem: GraphNode, value: string): boolean {
+  if (!isYCompareNode(nodeItem)) {
+    return false;
+  }
+  if (value === 'Y_AT_OR_ABOVE') {
+    nodeItem.config.compareMode = 'AT_OR_ABOVE';
+    nodeItem.config[conditionOutputModeKey] = 'PASS_ONLY';
+    return true;
+  }
+  if (value === 'Y_AT_OR_BELOW') {
+    nodeItem.config.compareMode = 'AT_OR_BELOW';
+    nodeItem.config[conditionOutputModeKey] = 'PASS_ONLY';
+    return true;
+  }
+  return false;
+}
+
+function isYCompareNode(nodeItem: GraphNode): boolean {
+  return nodeItem.blockId === 'condition.player.y_compare'
+    || nodeItem.blockId === 'condition.target_block.y_compare'
+    || nodeItem.type === 'PLAYER_Y_COMPARE_CONDITION'
+    || nodeItem.type === 'TARGET_BLOCK_Y_COMPARE_CONDITION';
 }
 
 async function saveEditorDraft(): Promise<void> {

@@ -307,7 +307,7 @@ public final class BuiltInBlockCatalog {
                                 "minY", "60",
                                 "maxY", "80"
                         ),
-                        yCompareFields("不低于时继续", "低于时继续", "分开执行"),
+                        yCompareFields("不低于时继续", "不高于时继续", "分开执行"),
                         "按当前玩家高度是否满足条件继续。",
                         "condition.player.y_compare",
                         List.of(in("input")),
@@ -354,7 +354,7 @@ public final class BuiltInBlockCatalog {
                                 "minY", "60",
                                 "maxY", "80"
                         ),
-                        yCompareFields("不低于时继续", "低于时继续", "分开执行"),
+                        yCompareFields("不低于时继续", "不高于时继续", "分开执行"),
                         "按目标方块高度是否满足条件继续。",
                         "condition.target_block.y_compare",
                         List.of(in("input")),
@@ -682,8 +682,8 @@ public final class BuiltInBlockCatalog {
         return List.of(
                 conditionMode(passLabel, failLabel, branchLabel),
                 select("compareMode", "判断方式", List.of(
-                        option("AT_OR_ABOVE", "不低"),
-                        option("AT_OR_BELOW", "不高"),
+                        option("AT_OR_ABOVE", "不低于或不高于"),
+                        option("AT_OR_BELOW", "不低于或不高于"),
                         option("EQUAL", "等于"),
                         option("BETWEEN", "在范围内")
                 )),

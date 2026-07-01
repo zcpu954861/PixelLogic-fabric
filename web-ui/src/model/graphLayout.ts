@@ -1,8 +1,9 @@
 import { fallbackGraph } from './demoGraph';
-import type { BlockKind, BlockMetrics, Branch, GraphDocument, GraphEdge, GraphNode, GraphPosition, GraphSlot, LaneSpan } from './graphTypes';
+import type { BlockKind, BlockMetrics, Branch, GraphDocument, GraphEdge, GraphNode, GraphPosition, LaneSpan } from './graphTypes';
 import { activeOutputSlots, conditionOutputMode, isActiveOutputSlot } from './conditionOutputMode';
 import { blockKind } from '../ui/humanize/labels';
 import { connectedOverlap, conditionBlockWidth, conditionBranchGap, normalBlockHeight, normalBlockWidth, visualConnectXTolerance, visualConnectYTolerance } from '../ui/canvas/blockConstants';
+import { preferredMainOutput } from '../ui/canvas/activeOutput';
 export function blockSize(kind: BlockKind): { width: number; height: number } {
   return kind === 'condition' ? { width: conditionBlockWidth, height: normalBlockHeight * 2 + conditionBranchGap } : { width: normalBlockWidth, height: normalBlockHeight };
 }
@@ -244,17 +245,6 @@ export function inputCenterOffset(graph: GraphDocument, nodeItem: GraphNode): nu
 
 export function outputCenterOffset(graph: GraphDocument, sourceNode: GraphNode, sourceSlotId: string): number {
   return blockMetrics(graph, sourceNode).outputOffsets[sourceSlotId] ?? normalBlockHeight / 2;
-}
-
-export function preferredMainOutput(nodeItem: GraphNode): GraphSlot | null {
-  const outputs = activeOutputSlots(nodeItem);
-  for (const slotId of ['done', 'timer_completed', 'started']) {
-    const slot = outputs.find((item) => item.id === slotId);
-    if (slot) {
-      return slot;
-    }
-  }
-  return outputs.length === 1 ? outputs[0] : null;
 }
 
 export function fallbackPosition(nodeId: string): GraphPosition {

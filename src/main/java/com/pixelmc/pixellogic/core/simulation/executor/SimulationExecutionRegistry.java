@@ -37,8 +37,11 @@ public final class SimulationExecutionRegistry {
                 new PlayerIsAdminExecutor(),
                 new PlayerDimensionExecutor(),
                 new PlayerInRegionExecutor(),
+                new PlayerYCompareExecutor(),
                 new TargetBlockTypeExecutor(),
                 new TargetBlockInRegionExecutor(),
+                new TargetBlockYCompareExecutor(),
+                new PlayerNearTargetBlockExecutor(),
                 new PlayerAddTagExecutor(),
                 new PlayerRemoveTagExecutor()
         ));
@@ -167,6 +170,26 @@ public final class SimulationExecutionRegistry {
         }
     }
 
+    private static final class PlayerYCompareExecutor implements SimulationBlockExecutor {
+        @Override
+        public NodeType nodeType() {
+            return NodeType.PLAYER_Y_COMPARE_CONDITION;
+        }
+
+        @Override
+        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+            int y = context.actorPosition().y();
+            boolean passed = yCompare(y, node);
+            ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
+            return new RuntimeNodeExecutionResult(
+                    mode.outputSlot(passed),
+                    "玩家高度条件" + (passed ? "通过" : "失败") + "：" + context.actor().displayName()
+                            + " 当前 Y=" + y + "，" + yCompareDescription(node) + "。"
+                            + conditionModeTrace(mode, passed, "满足高度", "不满足高度")
+            );
+        }
+    }
+
     private static final class TargetBlockTypeExecutor implements SimulationBlockExecutor {
         @Override
         public NodeType nodeType() {
@@ -220,6 +243,60 @@ public final class SimulationExecutionRegistry {
         }
     }
 
+    private static final class TargetBlockYCompareExecutor implements SimulationBlockExecutor {
+        @Override
+        public NodeType nodeType() {
+            return NodeType.TARGET_BLOCK_Y_COMPARE_CONDITION;
+        }
+
+        @Override
+        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+            SimulationBlockFact target = context.world().targetBlock();
+            boolean passed = target.enabled() && yCompare(target.y(), node);
+            ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
+            String detail = target.enabled()
+                    ? "目标方块当前 Y=" + target.y() + "，" + yCompareDescription(node) + "。"
+                    : "未设置目标方块。";
+            return new RuntimeNodeExecutionResult(
+                    mode.outputSlot(passed),
+                    "目标方块高度条件" + (passed ? "通过" : "失败") + "：" + detail
+                            + conditionModeTrace(mode, passed, "满足高度", "不满足高度")
+            );
+        }
+    }
+
+    private static final class PlayerNearTargetBlockExecutor implements SimulationBlockExecutor {
+        @Override
+        public NodeType nodeType() {
+            return NodeType.PLAYER_NEAR_TARGET_BLOCK_CONDITION;
+        }
+
+        @Override
+        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+            SimulationBlockFact target = context.world().targetBlock();
+            ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
+            boolean horizontalOnly = Boolean.parseBoolean(config(node, "horizontalOnly", "true"));
+            double maxDistance = doubleConfig(node, "maxDistance", 5.0D);
+            boolean sameDimension = target.enabled() && context.actorPosition().dimensionId().equals(target.dimensionId());
+            double distanceSquared = sameDimension ? distanceSquared(context, target, horizontalOnly) : Double.POSITIVE_INFINITY;
+            boolean passed = sameDimension && distanceSquared <= maxDistance * maxDistance;
+            String detail;
+            if (!target.enabled()) {
+                detail = "未设置目标方块。";
+            } else if (!sameDimension) {
+                detail = "玩家与目标方块不在同一维度。";
+            } else {
+                detail = "距离不超过 " + formatDistance(maxDistance) + " 格，"
+                        + (horizontalOnly ? "只计算水平距离。" : "计算三维距离。");
+            }
+            return new RuntimeNodeExecutionResult(
+                    mode.outputSlot(passed),
+                    "玩家靠近目标方块条件" + (passed ? "通过" : "失败") + "：" + detail
+                            + conditionModeTrace(mode, passed, "靠近", "不靠近")
+            );
+        }
+    }
+
     private static final class PlayerAddTagExecutor implements SimulationBlockExecutor {
         @Override
         public NodeType nodeType() {
@@ -267,6 +344,51 @@ public final class SimulationExecutionRegistry {
     private static String config(NodeDefinition node, String key, String fallback) {
         String value = node.config().getOrDefault(key, "").trim();
         return value.isBlank() ? fallback : value;
+    }
+
+    private static double doubleConfig(NodeDefinition node, String key, double fallback) {
+        try {
+            return Double.parseDouble(config(node, key, Double.toString(fallback)));
+        } catch (NumberFormatException exception) {
+            return fallback;
+        }
+    }
+
+    private static int intConfig(NodeDefinition node, String key, int fallback) {
+        try {
+            return Integer.parseInt(config(node, key, Integer.toString(fallback)));
+        } catch (NumberFormatException exception) {
+            return fallback;
+        }
+    }
+
+    private static boolean yCompare(int y, NodeDefinition node) {
+        return switch (config(node, "compareMode", "AT_OR_ABOVE")) {
+            case "AT_OR_BELOW" -> y <= intConfig(node, "targetY", 64);
+            case "EQUAL" -> y == intConfig(node, "targetY", 64);
+            case "BETWEEN" -> y >= intConfig(node, "minY", 60) && y <= intConfig(node, "maxY", 80);
+            default -> y >= intConfig(node, "targetY", 64);
+        };
+    }
+
+    private static String yCompareDescription(NodeDefinition node) {
+        return switch (config(node, "compareMode", "AT_OR_ABOVE")) {
+            case "AT_OR_BELOW" -> "要求不高于 " + intConfig(node, "targetY", 64);
+            case "EQUAL" -> "要求等于 " + intConfig(node, "targetY", 64);
+            case "BETWEEN" -> "要求在 " + intConfig(node, "minY", 60) + " 到 " + intConfig(node, "maxY", 80) + " 之间";
+            default -> "要求不低于 " + intConfig(node, "targetY", 64);
+        };
+    }
+
+    private static double distanceSquared(SimulationContext context, SimulationBlockFact target, boolean horizontalOnly) {
+        long dx = (long) context.actorPosition().x() - target.x();
+        long dz = (long) context.actorPosition().z() - target.z();
+        long dy = horizontalOnly ? 0 : (long) context.actorPosition().y() - target.y();
+        return (double) dx * dx + (double) dy * dy + (double) dz * dz;
+    }
+
+    private static String formatDistance(double value) {
+        return value == Math.rint(value) ? Long.toString(Math.round(value)) : Double.toString(value);
     }
 
     private static String conditionModeTrace(ConditionOutputMode mode, boolean passed, String positive, String negative) {

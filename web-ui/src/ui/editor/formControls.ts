@@ -155,16 +155,17 @@ function uniqueCatalogBlockForNodeType(catalog: BlockCatalog, nodeType: string) 
 function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[], simulationTestContext?: SimulationTestContext): EditableField[] {
   return formSchema
     .filter((field) => field.type !== 'hidden')
+    .filter((field) => fieldVisible(field, nodeItem.config, formSchema))
     .map((field) => {
-      const value = nodeItem.config[field.key] ?? field.defaultValue ?? '';
-      const options = fieldOptionsForSchema(field, value, simulationTestContext);
+      const value = schemaFieldValue(field, nodeItem);
+      const options = fieldOptionsForSchema(field, value, simulationTestContext, nodeItem);
       const control = field.key === 'regionName' && options.length > 0
         ? 'select'
         : field.key === 'value' && nodeItem.config.valueType && nodeItem.config.valueType !== 'BOOLEAN'
         ? nodeItem.config.valueType === 'INTEGER' ? 'integer' : 'string'
         : field.type;
       return {
-        label: field.label,
+        label: schemaFieldLabel(field, nodeItem),
         key: field.key,
         value,
         control,
@@ -183,9 +184,59 @@ function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[],
     });
 }
 
-function fieldOptionsForSchema(field: CatalogFormField, currentValue = '', simulationTestContext?: SimulationTestContext): FieldOption[] {
+function schemaFieldValue(field: CatalogFormField, nodeItem: GraphNode): string {
+  const value = nodeItem.config[field.key] ?? field.defaultValue ?? '';
+  if (!isYCompareCondition(nodeItem)) {
+    return value;
+  }
+  if (field.key === 'compareMode' && value === 'AT_OR_BELOW') {
+    return 'AT_OR_ABOVE';
+  }
+  if (field.key === 'outputMode' && ['AT_OR_ABOVE', 'AT_OR_BELOW'].includes(nodeItem.config.compareMode ?? 'AT_OR_ABOVE')) {
+    if (value === 'BRANCH') {
+      return 'BRANCH';
+    }
+    return nodeItem.config.compareMode === 'AT_OR_BELOW' ? 'Y_AT_OR_BELOW' : 'Y_AT_OR_ABOVE';
+  }
+  return value;
+}
+
+function schemaFieldLabel(field: CatalogFormField, nodeItem: GraphNode): string {
+  if (!isYCompareCondition(nodeItem)) {
+    return field.label;
+  }
+  if (field.key === 'minY') {
+    return '最低 Y 值';
+  }
+  if (field.key === 'maxY') {
+    return '最高 Y 值';
+  }
+  return field.label;
+}
+
+function fieldVisible(field: CatalogFormField, config: Record<string, string>, formSchema: CatalogFormField[]): boolean {
+  const showWhen = field.ui.split(/\s+/).find((token) => token.startsWith('showWhen:'));
+  if (!showWhen) {
+    return true;
+  }
+  const condition = showWhen.slice('showWhen:'.length);
+  const [key, rawValues] = condition.split('=');
+  if (!key || !rawValues) {
+    return true;
+  }
+  const currentValue = config[key] ?? formSchema.find((schemaField) => schemaField.key === key)?.defaultValue ?? '';
+  return rawValues.split(',').includes(currentValue);
+}
+
+function fieldOptionsForSchema(field: CatalogFormField, currentValue = '', simulationTestContext?: SimulationTestContext, nodeItem?: GraphNode): FieldOption[] {
   if (field.key === 'regionName') {
     return regionNameOptions(simulationTestContext, currentValue);
+  }
+  if (field.key === 'compareMode' && isYCompareCondition(nodeItem)) {
+    return yCompareModeOptions();
+  }
+  if (field.key === 'outputMode' && isYCompareCondition(nodeItem)) {
+    return yCompareConditionOptions(nodeItem?.config.compareMode);
   }
   if (field.type === 'boolean' || field.type === 'segmented') {
     return field.options.length > 0 ? field.options : booleanOptions();
@@ -194,6 +245,46 @@ function fieldOptionsForSchema(field: CatalogFormField, currentValue = '', simul
     return field.options.length > 0 ? field.options : stateScopeOptions();
   }
   return field.options;
+}
+
+function isYCompareCondition(nodeItem?: GraphNode): boolean {
+  return nodeItem?.blockId === 'condition.player.y_compare'
+    || nodeItem?.blockId === 'condition.target_block.y_compare'
+    || nodeItem?.type === 'PLAYER_Y_COMPARE_CONDITION'
+    || nodeItem?.type === 'TARGET_BLOCK_Y_COMPARE_CONDITION';
+}
+
+function yCompareConditionOptions(compareMode = 'AT_OR_ABOVE'): FieldOption[] {
+  if (compareMode === 'AT_OR_ABOVE' || compareMode === 'AT_OR_BELOW') {
+    return [
+      { value: 'Y_AT_OR_ABOVE', label: '不低于时继续' },
+      { value: 'Y_AT_OR_BELOW', label: '不高于时继续' },
+      { value: 'BRANCH', label: '分开执行' },
+    ];
+  }
+  const labels = (() => {
+    switch (compareMode) {
+      case 'EQUAL':
+        return ['等于时继续', '不等于时继续'];
+      case 'BETWEEN':
+        return ['在范围内时继续', '不在范围内时继续'];
+      default:
+        return ['不低于时继续', '不高于时继续'];
+    }
+  })();
+  return [
+    { value: 'PASS_ONLY', label: labels[0] },
+    { value: 'FAIL_ONLY', label: labels[1] },
+    { value: 'BRANCH', label: '分开执行' },
+  ];
+}
+
+function yCompareModeOptions(): FieldOption[] {
+  return [
+    { value: 'AT_OR_ABOVE', label: '不低于或不高于' },
+    { value: 'EQUAL', label: '等于' },
+    { value: 'BETWEEN', label: '在范围内' },
+  ];
 }
 
 function regionNameOptions(simulationTestContext: SimulationTestContext | undefined, currentValue: string): FieldOption[] {

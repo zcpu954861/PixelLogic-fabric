@@ -61,6 +61,7 @@ Long-term architecture track:
 - Text Component Editor v1 adds the shared rich text component editor for message/title/subtitle/actionbar fields.
 - Admin Client Bridge design audit records the long-term direction: authorized client-hosted WebUI, local bridge transport, server-authoritative capability checks, and capability-gated future tool items.
 - Catalog Expansion v2 Context Blocks builds on `feature/v1-simulation-context-expansion` and adds read-only conditions for player dimension, player in region, target block type, and target block in region.
+- WebUI Cleanup v2 + Catalog Expansion v3 continues on `feature/v1-webui-cleanup-catalog-v3`: it splits more orchestration helpers out of `web-ui/src/ui/app.ts` and adds the read-only spatial condition blocks for player Y, target-block Y, and player near target block.
 
 ## Follow-Ups
 
@@ -74,6 +75,7 @@ P2 before broader runtime use:
 - Draft saves return fingerprints but do not yet enforce `expectedFingerprint`; add optimistic conflict handling before multi-user or multi-tab editing.
 - Server HTTP API is still the current dev/local/self-check WebUI transport. The long-term recommended admin flow is client-hosted WebUI through an authorized PixelLogic client session, but that track is deferred until a future scoped prompt.
 - Context-aware condition blocks currently consume only per-run Simulation Test Context facts. Real Minecraft adapter behavior, Region old system integration, world mutation, named scenarios, and persisted test contexts remain deferred.
+- Spatial condition blocks remain intentionally small: no target-block-exists block, no X/Z coordinate compare blocks, no area geometry conditions, no world map, and no named scenario persistence.
 
 ## Loader Event Policy
 

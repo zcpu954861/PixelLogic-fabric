@@ -102,6 +102,12 @@ Known condition config compatibility:
 - Unconnected condition outputs are valid and mean that path ends.
 - Unconnected condition inputs are valid during editing; the block is saved but unreachable until connected into a trigger path.
 - The normal WebUI renders this as `条件用途`; catalog blocks may override option labels, for example `拥有标签时继续` / `不拥有标签时继续` / `分开执行` or `是管理员时继续` / `不是管理员时继续` / `分开执行`.
+- Context condition blocks use the same `outputMode` field and store only the check target:
+  - `condition.player.dimension_is`: `dimensionId`.
+  - `condition.player.in_region`: `regionName`.
+  - `condition.target_block.is_type`: `blockId`.
+  - `condition.target_block.in_region`: `regionName`.
+- These blocks read per-run `testContext.world` facts during simulation; those facts are not stored in graph JSON.
 
 ## Endpoints
 
@@ -148,6 +154,7 @@ Error shape:
 - Test run may receive a per-run `testContext.actor` with display name, tags, and administrator flag plus `testContext.world` facts for player position, optional target block, and simple regions. This context is runtime input only and is not stored in graph JSON.
 - Condition runtime follows `outputMode`: `PASS_ONLY` only follows `pass` when true, `FAIL_ONLY` only follows `fail` when false, and `BRANCH` selects `pass` or `fail`.
 - If the selected condition output has no edge, runtime records that no next block is connected and ends successfully.
+- Context condition runtime evaluates missing target block or missing region as false and records a readable trace explanation.
 
 ## WebUI Semantics
 

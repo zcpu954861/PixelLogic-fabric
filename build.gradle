@@ -100,6 +100,12 @@ tasks.register('textComponentEditorSelfCheck', JavaExec) {
 	classpath = sourceSets.main.runtimeClasspath
 }
 
+tasks.register('catalogExpansionV2SelfCheck', JavaExec) {
+	dependsOn classes
+	mainClass = 'com.pixelmc.pixellogic.core.catalog.CatalogExpansionV2SelfCheck'
+	classpath = sourceSets.main.runtimeClasspath
+}
+
 tasks.register('apiWebUiDevServer', JavaExec) {
 	dependsOn classes
 	mainClass = 'com.pixelmc.pixellogic.server.api.ApiWebUiDevServer'
@@ -116,6 +122,7 @@ check.dependsOn tasks.named('simulationTestContextSelfCheck')
 check.dependsOn tasks.named('simulationContextExpansionSelfCheck')
 check.dependsOn tasks.named('catalogExpansionV1SelfCheck')
 check.dependsOn tasks.named('textComponentEditorSelfCheck')
+check.dependsOn tasks.named('catalogExpansionV2SelfCheck')
 
 java {
 	withSourcesJar()

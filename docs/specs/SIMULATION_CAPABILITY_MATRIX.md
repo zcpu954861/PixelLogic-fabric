@@ -69,3 +69,12 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 - `condition.player.is_admin`: approximate simulation against the per-run actor administrator flag.
 - `action.message.title`, `action.message.subtitle`, and `action.message.actionbar`: approximate simulation records message result channels `TITLE`, `SUBTITLE`, and `ACTIONBAR`.
 - The rich text payload now supports selected-text color and formatting controls in WebUI. Simulation still records readable plain text for trace and preserves the structured payload in message results; real Minecraft Text delivery remains future adapter work.
+
+## Catalog Expansion v2 Context Blocks Status
+
+- `condition.player.dimension_is`: fully simulatable against the per-run player position dimension.
+- `condition.player.in_region`: fully simulatable against named test region facts, with inclusive bounds and dimension match.
+- `condition.target_block.is_type`: fully simulatable against the optional target block fact when enabled; missing target block evaluates false.
+- `condition.target_block.in_region`: fully simulatable against target block position plus named region facts; missing target block or region evaluates false.
+- These blocks still require a future Minecraft adapter for real server execution; current semantics are WebUI/API simulation facts only.
+- No world mutation, world block map, Region system, inventory/container/entity simulation, named scenario, or persistence is added.

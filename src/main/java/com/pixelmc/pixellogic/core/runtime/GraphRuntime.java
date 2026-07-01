@@ -149,7 +149,14 @@ public final class GraphRuntime {
             case STATE_ADD_ACTION -> executeStateAdd(node, context);
             case TIMER_START_ACTION -> executeTimer(node, context);
             case DEBUG_LOG_ACTION -> executeDebug(node, context);
-            case PLAYER_HAS_TAG_CONDITION, PLAYER_IS_ADMIN_CONDITION, PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION ->
+            case PLAYER_HAS_TAG_CONDITION,
+                 PLAYER_IS_ADMIN_CONDITION,
+                 PLAYER_DIMENSION_CONDITION,
+                 PLAYER_IN_REGION_CONDITION,
+                 TARGET_BLOCK_TYPE_CONDITION,
+                 TARGET_BLOCK_IN_REGION_CONDITION,
+                 PLAYER_ADD_TAG_ACTION,
+                 PLAYER_REMOVE_TAG_ACTION ->
                     throw new IllegalStateException("缺少模拟执行器：" + node.type());
         };
     }

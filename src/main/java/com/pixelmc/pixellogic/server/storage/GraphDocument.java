@@ -107,6 +107,10 @@ public record GraphDocument(
             case MESSAGE_ACTION -> "发送欢迎语";
             case PLAYER_HAS_TAG_CONDITION -> "判断玩家标签";
             case PLAYER_IS_ADMIN_CONDITION -> "判断管理员";
+            case PLAYER_DIMENSION_CONDITION -> "判断玩家维度";
+            case PLAYER_IN_REGION_CONDITION -> "判断玩家区域";
+            case TARGET_BLOCK_TYPE_CONDITION -> "判断目标方块";
+            case TARGET_BLOCK_IN_REGION_CONDITION -> "判断目标方块区域";
             case PLAYER_ADD_TAG_ACTION -> "添加玩家标签";
             case PLAYER_REMOVE_TAG_ACTION -> "移除玩家标签";
             case STATE_SET_ACTION -> "记录开始状态";

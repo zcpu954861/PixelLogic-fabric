@@ -110,6 +110,12 @@ Important user semantics:
   - `不满足时继续` renders a normal-height single red output condition card.
   - `分成两路` keeps the current dual-branch condition shape.
 - Player condition blocks override those labels through catalog schema, such as `拥有标签时继续` / `不拥有标签时继续` / `分开执行` and `是管理员时继续` / `不是管理员时继续` / `分开执行`.
+- Context condition blocks also override those labels through catalog schema:
+  - `玩家所在维度是否为`: `在该维度时继续` / `不在该维度时继续` / `分开执行`.
+  - `玩家是否在区域内`: `在区域内时继续` / `不在区域内时继续` / `分开执行`.
+  - `目标方块是否为`: `为该方块时继续` / `不为该方块时继续` / `分开执行`.
+  - `目标方块是否在区域内`: `在区域内时继续` / `不在区域内时继续` / `分开执行`.
+- These context blocks edit only dimension id, block id, region name, and condition usage. Coordinates and target block facts stay in `编辑测试上下文`.
 - Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
 - Card gray type labels and the right-panel selected-block badge show the catalog top-level category, such as `条件判断`, `玩家操作`, or `消息显示`, instead of repeating the concrete block name.
 - The block editor title uses `未命名(官方积木名)` when the current display name still equals the catalog name, and `自定义名称(官方积木名)` after the user renames it.

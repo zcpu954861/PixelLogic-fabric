@@ -60,6 +60,7 @@ Long-term architecture track:
 - Maintainability Cleanup v1 reduces frontend catalog duplication, extracts slot-flow/catalog rendering helpers from `app.ts`, consolidates self-check support, and removes runtime future-switch naming noise without changing product behavior.
 - Text Component Editor v1 adds the shared rich text component editor for message/title/subtitle/actionbar fields.
 - Admin Client Bridge design audit records the long-term direction: authorized client-hosted WebUI, local bridge transport, server-authoritative capability checks, and capability-gated future tool items.
+- Catalog Expansion v2 Context Blocks builds on `feature/v1-simulation-context-expansion` and adds read-only conditions for player dimension, player in region, target block type, and target block in region.
 
 ## Follow-Ups
 
@@ -72,6 +73,7 @@ P2 before broader runtime use:
 - In-memory state now has a spike-level cap and reset/stop cleanup. Broader runtime still needs durable lifecycle and persistence policy before non-spike use.
 - Draft saves return fingerprints but do not yet enforce `expectedFingerprint`; add optimistic conflict handling before multi-user or multi-tab editing.
 - Server HTTP API is still the current dev/local/self-check WebUI transport. The long-term recommended admin flow is client-hosted WebUI through an authorized PixelLogic client session, but that track is deferred until a future scoped prompt.
+- Context-aware condition blocks currently consume only per-run Simulation Test Context facts. Real Minecraft adapter behavior, Region old system integration, world mutation, named scenarios, and persisted test contexts remain deferred.
 
 ## Loader Event Policy
 

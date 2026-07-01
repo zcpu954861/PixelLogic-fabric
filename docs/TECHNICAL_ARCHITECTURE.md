@@ -39,7 +39,7 @@ It still does not implement arbitrary graph create/delete editing, Region, old T
 The v1 block catalog skeleton separates Block Catalog definitions from the current demo node families:
 
 - `core/catalog` owns the built-in registry records for categories, subcategories, concrete blocks, form fields, simulation capability, Minecraft capability, and safety flags.
-- Current concrete block ids include the demo set plus the first player/message expansion: `trigger.manual_test`, `condition.state.equals`, `condition.player.has_tag`, `condition.player.is_admin`, `action.player.add_tag`, `action.player.remove_tag`, `action.message.chat`, `action.message.title`, `action.message.subtitle`, `action.message.actionbar`, `state.set`, `state.add`, `timer.wait`, and `debug.log`.
+- Current concrete block ids include the demo set plus the player/message/context expansions: `trigger.manual_test`, `condition.state.equals`, `condition.player.has_tag`, `condition.player.is_admin`, `condition.player.dimension_is`, `condition.player.in_region`, `condition.target_block.is_type`, `condition.target_block.in_region`, `action.player.add_tag`, `action.player.remove_tag`, `action.message.chat`, `action.message.title`, `action.message.subtitle`, `action.message.actionbar`, `state.set`, `state.add`, `timer.wait`, and `debug.log`.
 - Graph JSON keeps legacy `node.type` and adds `blockId`; old graph documents without `blockId` infer it from `node.type`.
 - GraphRuntime still dispatches on `NodeType` in this checkpoint. The catalog is a registry and compatibility layer, not a runtime rewrite.
 - `GET /api/pixellogic/catalog` exposes the readonly catalog to the independent WebUI.
@@ -170,6 +170,15 @@ The Simulation Context Expansion v1 checkpoint keeps the same boundary and adds 
 - `SimulationWorld` carries a default dimension, disabled-by-default target block fact, and up to 8 normalized region facts.
 - `POST /api/pixellogic/test/start` accepts these facts under `testContext.world` and returns them in the simulation result summary.
 - No new blocks, named scenarios, graph writes, full world simulation, inventory/container/entity simulation, real Minecraft adapter, or Admin Client Bridge implementation are added.
+
+Catalog Expansion v2 consumes those facts through read-only condition blocks:
+
+- `condition.player.dimension_is` compares the simulated player dimension.
+- `condition.player.in_region` checks the simulated player position against a named test region.
+- `condition.target_block.is_type` compares the enabled target block's block id.
+- `condition.target_block.in_region` checks the target block position against a named test region.
+- Missing target block or missing region is a false condition result with trace text, not a runtime error.
+- The Simulation Test Context remains per-run input and is not written to graph JSON.
 
 The condition output mode checkpoint keeps the same direct edge runtime and adds only a condition-local config:
 

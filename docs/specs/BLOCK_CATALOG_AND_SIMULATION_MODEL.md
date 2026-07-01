@@ -114,6 +114,20 @@ This checkpoint still does not add a real Minecraft adapter, draft simulation, n
 - The new message blocks reuse `rich_text_component`; color and formatting toolbar remain future work.
 - The title/subtitle/actionbar blocks are separate; there is no combined title+subtitle block.
 
+## Implementation Checkpoint: Catalog Expansion v2 Context Blocks
+
+`feature/v1-catalog-expansion-context-blocks` builds on Simulation Context Expansion v1 and adds the first context-aware condition blocks:
+
+- `condition.player.dimension_is`: checks the simulated player's current dimension id.
+- `condition.player.in_region`: checks whether the simulated player position is inside a named test region.
+- `condition.target_block.is_type`: checks the optional target block fact's block id.
+- `condition.target_block.in_region`: checks whether the optional target block position is inside a named test region.
+- All four blocks live under `条件判断` and use block-specific condition output labels.
+- Region checks use inclusive bounds and require matching dimension id.
+- Missing target block or missing region evaluates false and writes readable trace text instead of throwing.
+- The block config stores only the intended check; coordinates, target block position, and region bounds stay in Simulation Test Context facts.
+- This checkpoint does not add negative blocks, actions, world mutation, named scenarios, graph writes, full world simulation, real Minecraft adapter, or Admin Client Bridge implementation.
+
 ## Implementation Checkpoint: Maintainability Cleanup v1
 
 `feature/v1-maintainability-cleanup` keeps the catalog model but removes frontend duplication:

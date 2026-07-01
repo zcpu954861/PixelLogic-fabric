@@ -20,8 +20,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public final class GraphValidator {
+    private static final int MAX_REGION_NAME_LENGTH = 64;
+    private static final Pattern NAMESPACED_ID = Pattern.compile("^[a-z0-9_.-]+:[a-z0-9_./-]+$");
+
     public List<ValidationIssue> validate(GraphDefinition graph) {
         List<ValidationIssue> issues = new ArrayList<>();
         Map<String, NodeDefinition> nodes = new HashMap<>();
@@ -92,6 +96,10 @@ public final class GraphValidator {
                 case STATE_COMPARE_CONDITION -> validateCondition(node, issues);
                 case PLAYER_HAS_TAG_CONDITION -> validatePlayerTagCondition(node, issues);
                 case PLAYER_IS_ADMIN_CONDITION -> validateConditionOutputMode(node, issues);
+                case PLAYER_DIMENSION_CONDITION -> validatePlayerDimensionCondition(node, issues);
+                case PLAYER_IN_REGION_CONDITION -> validateRegionCondition(node, issues);
+                case TARGET_BLOCK_TYPE_CONDITION -> validateTargetBlockTypeCondition(node, issues);
+                case TARGET_BLOCK_IN_REGION_CONDITION -> validateRegionCondition(node, issues);
                 case PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION -> validatePlayerTagConfig(node, issues);
                 case STATE_SET_ACTION -> validateStateAction(node, issues, true);
                 case STATE_ADD_ACTION -> validateStateAction(node, issues, false);
@@ -199,6 +207,52 @@ public final class GraphValidator {
     private void validatePlayerTagCondition(NodeDefinition node, List<ValidationIssue> issues) {
         validatePlayerTagConfig(node, issues);
         validateConditionOutputMode(node, issues);
+    }
+
+    private void validatePlayerDimensionCondition(NodeDefinition node, List<ValidationIssue> issues) {
+        validateNamespacedConfig(node, "dimensionId", "condition_dimension_id_invalid", "维度 ID 必须类似 minecraft:overworld：", issues);
+        validateConditionOutputMode(node, issues);
+    }
+
+    private void validateTargetBlockTypeCondition(NodeDefinition node, List<ValidationIssue> issues) {
+        validateNamespacedConfig(node, "blockId", "condition_block_id_invalid", "方块 ID 必须类似 minecraft:stone：", issues);
+        validateConditionOutputMode(node, issues);
+    }
+
+    private void validateRegionCondition(NodeDefinition node, List<ValidationIssue> issues) {
+        validateRegionNameConfig(node, issues);
+        validateConditionOutputMode(node, issues);
+    }
+
+    private void validateNamespacedConfig(
+            NodeDefinition node,
+            String key,
+            String code,
+            String messagePrefix,
+            List<ValidationIssue> issues
+    ) {
+        String value = node.config().getOrDefault(key, "").trim();
+        if (value.isEmpty()) {
+            error(issues, code, messagePrefix + node.id());
+            return;
+        }
+        if (!NAMESPACED_ID.matcher(value).matches()) {
+            error(issues, code, messagePrefix + node.id());
+        }
+    }
+
+    private void validateRegionNameConfig(NodeDefinition node, List<ValidationIssue> issues) {
+        String name = node.config().getOrDefault("regionName", "").trim();
+        if (name.isEmpty()) {
+            error(issues, "condition_region_name_missing", "区域名称不能为空：" + node.id());
+            return;
+        }
+        if (name.length() > MAX_REGION_NAME_LENGTH) {
+            error(issues, "condition_region_name_invalid", "区域名称不能超过 64 个字符：" + node.id());
+        }
+        if (name.chars().anyMatch(Character::isISOControl)) {
+            error(issues, "condition_region_name_invalid", "区域名称不能包含换行或控制字符：" + node.id());
+        }
     }
 
     private void validatePlayerTagConfig(NodeDefinition node, List<ValidationIssue> issues) {

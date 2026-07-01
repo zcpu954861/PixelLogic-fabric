@@ -47,6 +47,19 @@ Still not implemented:
 - The WebUI modal is still local draft + save-only writeback and is not a scenario editor.
 - No new blocks, graph writes, persistence, inventory/container/entity model, full world map, MC adapter, or Admin Client Bridge implementation are added.
 
+## Implementation Checkpoint: Catalog Expansion v2 Context Blocks
+
+`feature/v1-catalog-expansion-context-blocks` consumes those per-run facts through four read-only condition executors:
+
+- player dimension condition reads `SimulationActor.position().dimensionId()`.
+- player region condition reads `SimulationActor.position()` and `SimulationWorld.findRegion`.
+- target block type condition reads `SimulationWorld.targetBlock()`.
+- target block region condition combines `SimulationWorld.targetBlock()` with `SimulationWorld.findRegion`.
+- Missing target block or region evaluates false and records a trace explanation.
+- Region checks reuse the existing inclusive bounds helper and dimension match behavior.
+- The graph still stores only block config such as dimension id, block id, region name, and `outputMode`; it does not store test context facts.
+- No full world simulation, Region old system, world mutation, named scenario, persistence, MC adapter, or Admin Client Bridge implementation is added.
+
 ## Goals
 
 PixelLogic will grow from the current seven demo blocks into many concrete catalog blocks. The simulation backend exists so new blocks can be configured, validated, executed in a controlled test context, traced, and reviewed before every block has a real Minecraft adapter.

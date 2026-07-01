@@ -170,10 +170,10 @@ function cssText(style: RichTextStyle): string {
     rules.push(`color:${color.css}`);
   }
   if (style.bold) {
-    rules.push('font-weight:700');
+    rules.push('font-weight:950');
   }
   if (style.italic) {
-    rules.push('font-style:italic');
+    rules.push('font-style:italic;font-family:Georgia,"Times New Roman",serif');
   }
   const decorations = [
     style.underlined ? 'underline' : '',

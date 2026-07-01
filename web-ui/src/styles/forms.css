@@ -315,7 +315,7 @@ select {
   background: #ffffff;
   color: var(--ink);
   padding: 9px 10px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.42;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

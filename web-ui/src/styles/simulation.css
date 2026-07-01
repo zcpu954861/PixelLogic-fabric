@@ -71,6 +71,27 @@
   background: #eef8f0;
 }
 
+.sim-context-dialog {
+  width: min(820px, calc(100vw - 28px));
+}
+
+.sim-section-title,
+.sim-region-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sim-section-title > b,
+.sim-region-head > b {
+  color: var(--ink);
+}
+
+.sim-coordinate input {
+  text-align: center;
+}
+
 .sim-tag-list {
   min-height: 38px;
   display: flex;
@@ -135,6 +156,25 @@
   width: 100%;
 }
 
+.sim-region-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sim-region-item {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #c9d6cc;
+  border-radius: 8px;
+  background: #f7fbf5;
+}
+
+.sim-region-head .ghost-button {
+  min-height: 30px;
+  padding: 0 10px;
+}
+
 .sim-result-card {
   background: #f7fbf5;
 }
@@ -156,7 +196,7 @@
 
 .sim-result div {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 76px minmax(0, 1fr);
   gap: 8px;
   align-items: baseline;
 }

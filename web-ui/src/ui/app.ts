@@ -20,11 +20,17 @@ import {
   addSimulationTag,
   cloneSimulationTestContext,
   defaultSimulationTestContext,
+  addSimulationRegion,
   removeSimulationTag,
+  removeSimulationRegion,
   simulationTestPayload,
   type SimulationTestContext,
   updateSimulationDisplayName,
   updateSimulationOperator,
+  updateSimulationPlayerPosition,
+  updateSimulationRegion,
+  updateSimulationTargetBlock,
+  updateSimulationTargetEnabled,
   validateSimulationTestContext,
 } from '../model/simulationTestContext';
 import { state, world } from '../state/appState';
@@ -1154,6 +1160,62 @@ function bindSimulationDraftFields(): void {
       updateSimulationDraft(updateSimulationOperator(simulationDraft(), buttonEl.dataset.simDraftAdminValue === 'true'));
     });
   });
+
+  document.querySelectorAll<HTMLInputElement>('[data-sim-player-position-field]').forEach((inputEl) => {
+    inputEl.addEventListener('input', () => {
+      updateSimulationDraft(
+        updateSimulationPlayerPosition(simulationDraft(), inputEl.dataset.simPlayerPositionField as 'dimensionId' | 'x' | 'y' | 'z', inputEl.value),
+        false,
+      );
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-sim-target-enabled]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      updateSimulationDraft(updateSimulationTargetEnabled(simulationDraft(), buttonEl.dataset.simTargetEnabled === 'true'));
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('[data-sim-target-field]').forEach((inputEl) => {
+    inputEl.addEventListener('input', () => {
+      updateSimulationDraft(
+        updateSimulationTargetBlock(
+          simulationDraft(),
+          inputEl.dataset.simTargetField as 'dimensionId' | 'x' | 'y' | 'z' | 'blockId' | 'enabled',
+          inputEl.value,
+        ),
+        false,
+      );
+    });
+  });
+
+  document.querySelector('[data-sim-region-action="add"]')?.addEventListener('click', () => {
+    const result = addSimulationRegion(simulationDraft());
+    if (result.error) {
+      state.simulationTestContextError = result.error;
+      renderApp();
+      return;
+    }
+    updateSimulationDraft(result.context);
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-sim-region-action="remove"]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      updateSimulationDraft(removeSimulationRegion(simulationDraft(), Number(buttonEl.dataset.simRegionIndex)));
+    });
+  });
+  document.querySelectorAll<HTMLInputElement>('[data-sim-region-field]').forEach((inputEl) => {
+    inputEl.addEventListener('input', () => {
+      updateSimulationDraft(
+        updateSimulationRegion(
+          simulationDraft(),
+          Number(inputEl.dataset.simRegionIndex),
+          inputEl.dataset.simRegionField as 'name' | 'dimensionId' | 'minX' | 'minY' | 'minZ' | 'maxX' | 'maxY' | 'maxZ',
+          inputEl.value,
+        ),
+        false,
+      );
+    });
+  });
   document.querySelector('[data-sim-draft-action="reset"]')?.addEventListener('click', () => {
     updateSimulationDraft(defaultSimulationTestContext());
   });
@@ -1195,7 +1257,7 @@ function saveSimulationEditorDraft(): void {
   state.simulationTestContext = cloneSimulationTestContext(simulationTestPayload(draft).testContext);
   state.simulationOriginalContext = cloneSimulationTestContext(state.simulationTestContext);
   state.simulationDraftContext = cloneSimulationTestContext(state.simulationTestContext);
-  state.lastAction = '测试玩家已更新';
+  state.lastAction = '测试上下文已更新';
   closeSimulationEditor();
 }
 
@@ -2020,7 +2082,7 @@ async function startTest(): Promise<void> {
     if (contextError) {
       state.simulationTestContextError = contextError;
       state.error = contextError;
-      state.lastAction = '测试玩家信息需要调整';
+      state.lastAction = '测试上下文需要调整';
       return;
     }
     state.simulationTestContextError = '';

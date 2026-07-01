@@ -35,6 +35,18 @@ Still not implemented:
 - `SimulationExecutionResult` returns display name, administrator flag, initial tags, and final tags for the WebUI summary.
 - No named scenarios, persistence, draft simulation, Minecraft adapter, multiplayer, inventory, world, or container simulation are added.
 
+## Implementation Checkpoint: Simulation Context Expansion v1
+
+`feature/v1-simulation-context-expansion` expands the same per-run test context for later position, target-block, and region-aware blocks:
+
+- `SimulationActor` carries a block-position fact: dimension id plus integer x/y/z.
+- `SimulationWorld` carries a default dimension id, optional target block fact, and simple named region facts.
+- Target block facts are disabled by default and contain only enabled flag, dimension, integer position, and block id.
+- Region facts are axis-aligned inclusive boxes, normalized at construction, capped at 8 per request.
+- API validation accepts namespaced ids only, integer coordinates only, x/z within +/-30,000,000, and y from -2048 to 4096.
+- The WebUI modal is still local draft + save-only writeback and is not a scenario editor.
+- No new blocks, graph writes, persistence, inventory/container/entity model, full world map, MC adapter, or Admin Client Bridge implementation are added.
+
 ## Goals
 
 PixelLogic will grow from the current seven demo blocks into many concrete catalog blocks. The simulation backend exists so new blocks can be configured, validated, executed in a controlled test context, traced, and reviewed before every block has a real Minecraft adapter.

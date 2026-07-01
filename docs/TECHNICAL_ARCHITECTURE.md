@@ -164,6 +164,13 @@ The Simulation Test Context MVP adds the first small WebUI simulation input with
 - The context is not stored in graph JSON, not persisted as a scenario, and not shared with the CLI test command.
 - `web-ui/src/ui/app.ts` only orchestrates the panel; the model and panel live under `model/simulationTestContext.ts` and `ui/simulation/`.
 
+The Simulation Context Expansion v1 checkpoint keeps the same boundary and adds only small per-run facts needed by later position/block/region blocks:
+
+- `SimulationActor` now carries an integer block position and dimension, defaulting to `minecraft:overworld (0, 64, 0)`.
+- `SimulationWorld` carries a default dimension, disabled-by-default target block fact, and up to 8 normalized region facts.
+- `POST /api/pixellogic/test/start` accepts these facts under `testContext.world` and returns them in the simulation result summary.
+- No new blocks, named scenarios, graph writes, full world simulation, inventory/container/entity simulation, real Minecraft adapter, or Admin Client Bridge implementation are added.
+
 The condition output mode checkpoint keeps the same direct edge runtime and adds only a condition-local config:
 
 - `outputMode` supports `PASS_ONLY` / 满足时继续, `FAIL_ONLY` / 不满足时继续, and `BRANCH` / 分成两路.

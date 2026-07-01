@@ -19,7 +19,7 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 Near-term track:
 
 1. Move more current demo block behavior toward per-block simulation executors only when it reduces real duplication.
-2. Add more simulation context fields only when a concrete block requires them.
+2. Build the next catalog expansion on the Simulation Context Expansion v1 branch when adding position, target-block, or region-aware blocks.
 3. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
 4. Continue graph/editor/runtime improvements only where they support the current visual editor and simulation loop.
 5. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
@@ -55,6 +55,7 @@ Long-term architecture track:
 - Simulation Backend skeleton branch adds minimal `core/simulation` context/event/runner/result/executor code, routes manual/WebUI test-run through `SimulationRunner`, and registers the first simulation-backed player tag condition/action blocks.
 - Condition output mode branch adds `满足时继续` / `不满足时继续` / `分成两路`, makes unconnected condition outputs end gracefully, allows unconnected condition inputs during editing, moves `condition.player.has_tag` to 条件判断 / 玩家条件, and keeps the demo graph as explicit dual-branch.
 - Simulation Test Context MVP lets WebUI test runs send a temporary simulated player display name, tags, and administrator flag; results show initial/final tags without writing the context into graph JSON or saving scenarios.
+- Simulation Context Expansion v1 extends that temporary test context with player position, optional target block, and simple region facts for future block expansion, still without named scenarios, graph writes, or a real MC adapter.
 - Catalog Expansion v1 adds `玩家是否拥有标签`, `玩家是否为管理员`, `移除玩家标签`, and the title/subtitle/actionbar message blocks; message color and formatting toolbar remains a follow-up.
 - Maintainability Cleanup v1 reduces frontend catalog duplication, extracts slot-flow/catalog rendering helpers from `app.ts`, consolidates self-check support, and removes runtime future-switch naming noise without changing product behavior.
 - Text Component Editor v1 adds the shared rich text component editor for message/title/subtitle/actionbar fields.

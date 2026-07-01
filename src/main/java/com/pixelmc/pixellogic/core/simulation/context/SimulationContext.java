@@ -50,6 +50,10 @@ public final class SimulationContext {
         return actor;
     }
 
+    public SimulationPosition actorPosition() {
+        return actor.position();
+    }
+
     public SimulationWorld world() {
         return world;
     }

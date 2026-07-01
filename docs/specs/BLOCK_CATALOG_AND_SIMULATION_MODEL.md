@@ -77,6 +77,17 @@ This checkpoint still does not add a real Minecraft adapter, draft simulation, n
 - `action.player.add_tag` returns final tags in the run result, but does not persist tags or write them back into the WebUI input.
 - The MVP does not add named scenarios, scenario save/load, multiplayer, inventory, world, container, game mode, or real Minecraft adapter support.
 
+## Implementation Checkpoint: Simulation Context Expansion v1
+
+`feature/v1-simulation-context-expansion` keeps the same per-run test boundary and adds the minimal facts needed before location/block/region catalog blocks:
+
+- WebUI `测试上下文` edits test player, player position, optional target block, and test regions.
+- Backend stores these as `SimulationActor.position()` and `SimulationWorld` facts for the current run.
+- Target block facts only carry enabled flag, block id, dimension, and integer x/y/z.
+- Region facts are simple named axis-aligned boxes; they are not the old Region system and are not graph data.
+- No new condition/action blocks are added in this checkpoint.
+- No named scenario, persistence, full world simulation, real Minecraft adapter, inventory/container/entity model, or Admin Client Bridge work is included.
+
 ## Implementation Checkpoint: Condition Output Modes
 
 `feature/v1-condition-output-modes` makes condition outputs a per-condition config instead of forcing every condition to look and validate like a dual branch:

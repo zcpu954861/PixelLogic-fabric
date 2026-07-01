@@ -1,7 +1,10 @@
 package com.pixelmc.pixellogic.core.simulation.runner;
 
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
+import com.pixelmc.pixellogic.core.simulation.context.SimulationBlockFact;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationContext;
+import com.pixelmc.pixellogic.core.simulation.context.SimulationPosition;
+import com.pixelmc.pixellogic.core.simulation.context.SimulationRegionFact;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationActionResult;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationMessageResult;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationStateChangeResult;
@@ -15,6 +18,9 @@ public record SimulationExecutionResult(
         String message,
         String actorDisplayName,
         boolean actorOperator,
+        SimulationPosition playerPosition,
+        SimulationBlockFact targetBlock,
+        List<SimulationRegionFact> regions,
         Set<String> initialActorTags,
         List<SimulationActionResult> actionResults,
         List<SimulationMessageResult> messageResults,
@@ -30,6 +36,9 @@ public record SimulationExecutionResult(
                 result.message(),
                 context.actor().displayName(),
                 context.actor().operator(),
+                context.actorPosition(),
+                context.world().targetBlock(),
+                context.world().regions(),
                 Set.copyOf(initialActorTags),
                 context.actionResults(),
                 context.messageResults(),

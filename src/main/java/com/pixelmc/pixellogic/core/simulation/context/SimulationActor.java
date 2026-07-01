@@ -11,13 +11,26 @@ public final class SimulationActor {
     private final String displayName;
     private final boolean online;
     private final boolean operator;
+    private final SimulationPosition position;
     private final Set<String> tags = new LinkedHashSet<>();
 
     public SimulationActor(UUID id, String displayName, boolean online, boolean operator, Collection<String> tags) {
+        this(id, displayName, online, operator, tags, SimulationPosition.overworldSpawn());
+    }
+
+    public SimulationActor(
+            UUID id,
+            String displayName,
+            boolean online,
+            boolean operator,
+            Collection<String> tags,
+            SimulationPosition position
+    ) {
         this.id = id;
         this.displayName = displayName == null || displayName.isBlank() ? "模拟玩家" : displayName;
         this.online = online;
         this.operator = operator;
+        this.position = position == null ? SimulationPosition.overworldSpawn() : position;
         if (tags != null) {
             this.tags.addAll(tags.stream().filter(tag -> tag != null && !tag.isBlank()).toList());
         }
@@ -41,6 +54,10 @@ public final class SimulationActor {
 
     public boolean operator() {
         return operator;
+    }
+
+    public SimulationPosition position() {
+        return position;
     }
 
     public boolean hasTag(String tag) {

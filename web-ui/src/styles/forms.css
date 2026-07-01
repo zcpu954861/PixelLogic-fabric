@@ -285,7 +285,7 @@ select {
 .rich-text-tools {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
   align-items: center;
 }
 
@@ -307,10 +307,10 @@ select {
 }
 
 .rich-color-button {
-  min-width: 22px;
-  width: 22px;
-  height: 22px;
-  min-height: 22px;
+  min-width: 18px;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
   border: 1px solid #9fb3a5;
   border-radius: 999px;
   background: var(--swatch);

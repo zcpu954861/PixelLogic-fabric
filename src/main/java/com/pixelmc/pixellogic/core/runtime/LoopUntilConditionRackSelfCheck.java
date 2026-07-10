@@ -101,6 +101,7 @@ public final class LoopUntilConditionRackSelfCheck {
                 .forEach(item -> {
                     actualPredicates.add(item.id());
                     require(!item.predicateSummaryTemplate().isBlank(), "predicate should expose a capsule summary: " + item.id());
+                    require(!item.predicateNegatedSummaryTemplate().isBlank(), "predicate should expose a negated capsule summary: " + item.id());
                 });
         require(actualPredicates.equals(expectedPredicates), "v1 predicate capability set must stay limited to the five scoped blocks");
 

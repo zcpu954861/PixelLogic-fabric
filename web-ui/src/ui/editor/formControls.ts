@@ -6,8 +6,14 @@ import { escapeAttr, escapeHtml } from '../../utils/dom';
 import { booleanLabel, booleanOptions, conditionOutputModeLabel, nodeTypeLabel, nodeTypeMetaLabel, stateScopeOptions, targetLabel, valueTypeOptions } from '../humanize/labels';
 import { renderRichTextEditor } from './richText/richTextEditor';
 
-export function renderNodeEditor(nodeItem: GraphNode, catalog: BlockCatalog, simulationTestContext?: SimulationTestContext): string {
+export function renderNodeEditor(
+  nodeItem: GraphNode,
+  catalog: BlockCatalog,
+  simulationTestContext?: SimulationTestContext,
+  hideOutputMode = false,
+): string {
   const section = editorSection(nodeItem, catalog, simulationTestContext);
+  const fields = hideOutputMode ? section.fields.filter((field) => field.key !== 'outputMode') : section.fields;
 
   return `
     <section class="form-card editor-section">
@@ -19,9 +25,9 @@ export function renderNodeEditor(nodeItem: GraphNode, catalog: BlockCatalog, sim
     </section>
     <section class="form-card editor-section">
       <b>${escapeHtml(section.title)}</b>
-      ${section.fields.length > 0 ? `
+      ${fields.length > 0 ? `
         <div class="field-grid">
-          ${section.fields.map(renderEditableField).join('')}
+          ${fields.map(renderEditableField).join('')}
         </div>
       ` : '<p class="field-hint">这个积木当前只需要修改名称。</p>'}
     </section>
@@ -356,9 +362,14 @@ function legacyNodeTypeEditableFields(nodeItem: GraphNode): EditableField[] {
   }
 }
 
-export function nodeConfigItems(nodeItem: GraphNode, catalog: BlockCatalog): Array<{ label: string; value: string }> {
+export function nodeConfigItems(
+  nodeItem: GraphNode,
+  catalog: BlockCatalog,
+  hideOutputMode = false,
+): Array<{ label: string; value: string }> {
   return editorSection(nodeItem, catalog).fields
     .filter((field) => field.control !== 'hidden')
+    .filter((field) => !hideOutputMode || field.key !== 'outputMode')
     .map((field) => ({ label: field.label, value: displayFieldValue(field) }));
 }
 

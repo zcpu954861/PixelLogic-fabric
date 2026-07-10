@@ -22,6 +22,7 @@ public record BlockDefinition(
         String summaryTemplate,
         String summaryFormatter,
         String predicateSummaryTemplate,
+        String predicateNegatedSummaryTemplate,
         List<String> containerSlots,
         List<SlotDefinition> inputSlots,
         List<SlotDefinition> outputSlots,
@@ -40,6 +41,7 @@ public record BlockDefinition(
         summaryTemplate = summaryTemplate == null ? "" : summaryTemplate;
         summaryFormatter = summaryFormatter == null ? "" : summaryFormatter;
         predicateSummaryTemplate = predicateSummaryTemplate == null ? "" : predicateSummaryTemplate;
+        predicateNegatedSummaryTemplate = predicateNegatedSummaryTemplate == null ? "" : predicateNegatedSummaryTemplate;
         containerSlots = containerSlots == null ? List.of() : List.copyOf(containerSlots);
         inputSlots = inputSlots == null ? List.of() : List.copyOf(inputSlots);
         outputSlots = outputSlots == null ? List.of() : List.copyOf(outputSlots);

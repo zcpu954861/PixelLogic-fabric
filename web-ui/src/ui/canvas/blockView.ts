@@ -172,9 +172,14 @@ function renderConditionRack(block: SlotBlock): string {
         data-condition-container="${escapeAttr(block.id)}"
         style="left:${row.x}px; top:${row.y}px; width:${row.width}px; height:${row.height}px"
       >
-        ${row.capsule
-          ? renderPredicateCapsule(row.capsule, row.capsule.x - block.x - row.x, row.capsule.y - block.y - row.y, null)
-          : '<span class="condition-rack-empty">拖入条件</span>'}
+        <div
+          class="condition-rack-slot${row.capsule ? ' is-filled' : ' is-empty'}"
+          style="left:${row.slotRect.x}px; top:${row.slotRect.y}px; width:${row.slotRect.width}px; height:${row.slotRect.height}px"
+        >
+          ${row.capsule
+            ? renderPredicateCapsule(row.capsule, 0, 0, null)
+            : '<span class="condition-rack-empty">拖入条件</span>'}
+        </div>
         <button
           type="button"
           class="condition-negate${row.negated ? ' is-active' : ''}"
@@ -183,6 +188,7 @@ function renderConditionRack(block: SlotBlock): string {
           aria-label="${row.negated ? '取消取反' : '取反此条件'}"
           aria-pressed="${row.negated}"
           title="${row.negated ? '已取反，点击取消' : '点击取反'}"
+          style="left:${row.toggleRect.x}px; top:${row.toggleRect.y}px; width:${row.toggleRect.width}px; height:${row.toggleRect.height}px"
         ><span aria-hidden="true"></span></button>
       </div>
     `).join('')}

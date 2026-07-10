@@ -49,6 +49,7 @@ public final class ApiWebUiSelfCheck {
             require(catalog.body().contains("\"formSchema\"") && catalog.body().contains("rich_text_component")
                             && catalog.body().contains("\"summaryTemplate\"")
                             && catalog.body().contains("\"predicateSummaryTemplate\"")
+                            && catalog.body().contains("\"predicateNegatedSummaryTemplate\"")
                             && catalog.body().contains("\"capabilities\"")
                             && catalog.body().contains("control.loop.until"),
                     "catalog should expose form, predicate capability, summary metadata, and loop until");

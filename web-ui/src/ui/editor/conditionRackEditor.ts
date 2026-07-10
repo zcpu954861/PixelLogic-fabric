@@ -26,7 +26,7 @@ export function renderConditionRackEditor(nodeItem: GraphNode, graph: GraphDocum
               <div class="condition-rack-editor-label"><b>条件槽 ${index + 1}</b><small>${escapeHtml(slot.slotId)}</small></div>
               ${member ? `
                 <button type="button" class="condition-rack-editor-summary" data-rack-edit-node="${escapeAttr(member.id)}">
-                  ${escapeHtml(predicateNodeSummary(member, catalog))}
+                  ${escapeHtml(predicateNodeSummary(member, catalog, slot.negated))}
                 </button>
               ` : '<span class="condition-rack-editor-placeholder">拖入一个条件积木</span>'}
               <button

@@ -1,6 +1,7 @@
 import { catalogBlock, catalogCategory } from '../../model/blockCatalog';
+import { conditionRackParent, conditionSlots } from '../../model/conditionRack';
 import { conditionOutputMode, conditionOutputModeLabel } from '../../model/conditionOutputMode';
-import type { BlockCatalog, BlockKind, CatalogBlock, FieldOption, GraphNode } from '../../model/graphTypes';
+import type { BlockCatalog, BlockKind, CatalogBlock, FieldOption, GraphDocument, GraphNode } from '../../model/graphTypes';
 import { richTextPlainText, shortRichText } from '../../model/richText';
 
 export function blockKind(type: string): BlockKind {
@@ -66,7 +67,7 @@ export function nodeTypeLabel(type: string): string {
     case 'COMMAND_TRIGGER':
       return '命令触发';
     case 'STATE_COMPARE_CONDITION':
-      return '条件判断';
+      return '条件判断块(胶囊)';
     case 'MESSAGE_ACTION':
       return '发送消息';
     case 'PLAYER_HAS_TAG_CONDITION':
@@ -78,7 +79,7 @@ export function nodeTypeLabel(type: string): string {
     case 'TARGET_BLOCK_IN_REGION_CONDITION':
     case 'TARGET_BLOCK_Y_COMPARE_CONDITION':
     case 'PLAYER_NEAR_TARGET_BLOCK_CONDITION':
-      return '条件判断';
+      return '条件判断块(胶囊)';
     case 'CONTROL_LOOP_COUNT':
     case 'CONTROL_LOOP_FOREVER':
       return '控制流';
@@ -124,10 +125,13 @@ export function nodeSummary(nodeItem: GraphNode, catalog?: BlockCatalog): string
   return legacyNodeTypeSummary(nodeItem);
 }
 
-export function predicateNodeSummary(nodeItem: GraphNode, catalog: BlockCatalog): string {
+export function predicateNodeSummary(nodeItem: GraphNode, catalog: BlockCatalog, negated = false): string {
   const blockItem = catalogBlock(catalog, nodeItem.blockId ?? '')
     ?? catalog.blocks.find((item) => item.nodeType === nodeItem.type);
-  const template = blockItem?.predicateSummaryTemplate ?? '';
+  const positiveTemplate = blockItem?.predicateSummaryTemplate ?? '';
+  const template = negated
+    ? blockItem?.predicateNegatedSummaryTemplate || (positiveTemplate ? `非（${positiveTemplate}）` : '')
+    : positiveTemplate;
   if (template) {
     return template
       .replaceAll('{tag}', nodeItem.config.tag || '标签')
@@ -136,6 +140,14 @@ export function predicateNodeSummary(nodeItem: GraphNode, catalog: BlockCatalog)
       .replaceAll('{blockId}', nodeItem.config.blockId || 'minecraft:stone');
   }
   return nodeSummary(nodeItem, catalog);
+}
+
+export function rackAwareNodeSummary(nodeItem: GraphNode, graph: GraphDocument, catalog: BlockCatalog): string {
+  const parent = conditionRackParent(graph, nodeItem);
+  const slot = parent
+    ? conditionSlots(parent).find((item) => item.slotId === nodeItem.parentSlot)
+    : null;
+  return slot ? predicateNodeSummary(nodeItem, catalog, slot.negated) : nodeSummary(nodeItem, catalog);
 }
 
 function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {

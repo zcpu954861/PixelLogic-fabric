@@ -1,7 +1,8 @@
 import type { BlockCatalog, GraphDocument, GraphNode } from '../../model/graphTypes';
+import { conditionRackParent } from '../../model/conditionRack';
 import type { SimulationTestContext } from '../../model/simulationTestContext';
 import { escapeHtml } from '../../utils/dom';
-import { nodeOfficialLabel, nodeSummary } from '../humanize/labels';
+import { nodeOfficialLabel, rackAwareNodeSummary } from '../humanize/labels';
 import { renderNodeEditor } from './formControls';
 import { renderConditionRackEditor } from './conditionRackEditor';
 
@@ -15,6 +16,7 @@ export function renderEditorModal(
   const titleName = customName && customName !== officialName ? customName : '未命名';
   const title = `${titleName}(${officialName})`;
   const modalIssue = options.modalIssue;
+  const rackCapsule = Boolean(conditionRackParent(options.graph, nodeItem));
 
   return `
     <div class="editor-overlay${options.editorClosing ? ' is-closing' : ''}${options.steady ? ' is-steady' : ''}" data-modal-overlay>
@@ -29,9 +31,9 @@ export function renderEditorModal(
         <div class="editor-body">
           <section class="editor-summary">
             <b>当前摘要</b>
-            <p data-modal-summary>${escapeHtml(nodeSummary(nodeItem, catalog))}</p>
+            <p data-modal-summary>${escapeHtml(rackAwareNodeSummary(nodeItem, options.graph, catalog))}</p>
           </section>
-          ${renderNodeEditor(nodeItem, catalog, options.simulationTestContext)}
+          ${renderNodeEditor(nodeItem, catalog, options.simulationTestContext, rackCapsule)}
           ${renderConditionRackEditor(nodeItem, options.graph, catalog)}
           ${options.error || options.hasValidation ? `
             <section class="editor-issues" role="${options.error ? 'alert' : 'status'}">

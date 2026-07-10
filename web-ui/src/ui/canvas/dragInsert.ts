@@ -51,7 +51,15 @@ export function findInsertCandidate(baseGraph: GraphDocument, drag: BlockDrag, c
   const group = new Set(drag.groupIds);
   const stableGraph = graphWithDragStartPositions(baseGraph, drag);
   const tailAnchor = draggedTailAnchor(graph, drag);
-  const conditionSlotCandidate = findConditionSlotCandidate(stableGraph, drag, dragPointerPosition(drag), catalog);
+  const stableRoot = stableGraph.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
+  const sourceVisualBounds = stableRoot ? blockMetrics(stableGraph, stableRoot).visualBounds : null;
+  const pointer = dragPointerPosition(drag);
+  const conditionSlotCandidate = findConditionSlotCandidate(stableGraph, drag, {
+    x: pointer.x,
+    y: sourceVisualBounds
+      ? rootPosition.y + sourceVisualBounds.y + sourceVisualBounds.height / 2
+      : pointer.y,
+  }, catalog);
   if (conditionSlotCandidate) {
     return conditionSlotCandidate;
   }

@@ -104,6 +104,7 @@ export type CatalogBlock = {
   summaryTemplate: string;
   summaryFormatter: string;
   predicateSummaryTemplate?: string;
+  predicateNegatedSummaryTemplate?: string;
   containerSlots: string[];
   inputSlots: GraphSlot[];
   outputSlots: GraphSlot[];
@@ -270,6 +271,8 @@ export type ConditionRackRowView = {
   y: number;
   width: number;
   height: number;
+  slotRect: { x: number; y: number; width: number; height: number };
+  toggleRect: { x: number; y: number; width: number; height: number };
   capsule?: SlotBlock;
 };
 

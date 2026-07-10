@@ -50,6 +50,7 @@ import type {
 import {
   nodeCategoryLabel,
   nodeSummary,
+  rackAwareNodeSummary,
 } from './humanize/labels';
 import { autoSaveDelayMs, connectedOverlap, doubleClickMs, dragThreshold, historyLimit, normalBlockHeight, normalBlockWidth } from './canvas/blockConstants';
 import { renderBlock, renderSlotJoin } from './canvas/blockView';
@@ -865,14 +866,18 @@ function cancelBlockDrag(viewport: HTMLElement): void {
 }
 
 function pointerToWorld(event: PointerEvent): GraphPosition {
+  return clientToWorld(event.clientX, event.clientY);
+}
+
+function clientToWorld(clientX: number, clientY: number): GraphPosition {
   const viewport = document.querySelector<HTMLElement>('.canvas-viewport');
   if (!viewport) {
     return { x: 0, y: 0 };
   }
   const rect = viewport.getBoundingClientRect();
   return {
-    x: (event.clientX - rect.left - offsetX) / scale,
-    y: (event.clientY - rect.top - offsetY) / scale,
+    x: (clientX - rect.left - offsetX) / scale,
+    y: (clientY - rect.top - offsetY) / scale,
   };
 }
 
@@ -1146,9 +1151,13 @@ function beginCatalogPointer(event: PointerEvent, blockId: string, buttonEl: HTM
     }
     updateCatalogDragGhost(moveEvent.clientX, moveEvent.clientY);
     const point = pointerToWorld(moveEvent);
+    const ghostRect = catalogDragGhostRect();
+    const conditionPoint = ghostRect
+      ? clientToWorld(moveEvent.clientX, ghostRect.top + ghostRect.height / 2)
+      : point;
     const blockItem = catalogBlock(activeCatalog(), blockId);
     const conditionHit = blockItem
-      ? catalogConditionSlotAtPoint(currentGraph(), point, blockItem, activeCatalog())
+      ? catalogConditionSlotAtPoint(currentGraph(), conditionPoint, blockItem, activeCatalog())
       : null;
     if (conditionHit) {
       showCatalogConditionSlotTarget(conditionHit.container.id, conditionHit.slotId);
@@ -1157,10 +1166,21 @@ function beginCatalogPointer(event: PointerEvent, blockId: string, buttonEl: HTM
     }
   };
   const onUp = (upEvent: PointerEvent) => {
+    if (moved) {
+      updateCatalogDragGhost(upEvent.clientX, upEvent.clientY);
+    }
     const ghostRect = catalogDragGhostRect();
+    const conditionPoint = ghostRect
+      ? clientToWorld(upEvent.clientX, ghostRect.top + ghostRect.height / 2)
+      : null;
     cleanup();
     clearCatalogDragGhost();
-    addCatalogBlockAt(blockId, moved ? upEvent : null, ghostRect ? blockRectSnapshot(ghostRect) : null);
+    addCatalogBlockAt(
+      blockId,
+      moved ? upEvent : null,
+      ghostRect ? blockRectSnapshot(ghostRect) : null,
+      conditionPoint,
+    );
   };
   const onCancel = () => {
     cleanup();
@@ -1178,7 +1198,12 @@ function beginCatalogPointer(event: PointerEvent, blockId: string, buttonEl: HTM
   document.addEventListener('keydown', onKeyDown);
 }
 
-function addCatalogBlockAt(blockId: string, event: PointerEvent | null, animationOrigin: BlockRectSnapshot | null = null): void {
+function addCatalogBlockAt(
+  blockId: string,
+  event: PointerEvent | null,
+  animationOrigin: BlockRectSnapshot | null = null,
+  conditionProbePoint: GraphPosition | null = null,
+): void {
   const blockItem = catalogBlock(activeCatalog(), blockId);
   if (!blockItem) {
     state.error = '没有找到这个积木，请重新打开积木库。';
@@ -1189,8 +1214,9 @@ function addCatalogBlockAt(blockId: string, event: PointerEvent | null, animatio
   const kind = blockKindFromCatalogBlock(blockItem);
   const nodeItem = createCatalogNode(blockItem, uniqueNodeId(catalogNodeIdPrefix(blockItem), graph), { x: 0, y: 0 });
   const dropPoint = event ? pointerToWorld(event) : null;
-  const conditionHit = dropPoint
-    ? catalogConditionSlotAtPoint(graph, dropPoint, blockItem, activeCatalog())
+  const conditionDropPoint = conditionProbePoint ?? dropPoint;
+  const conditionHit = conditionDropPoint
+    ? catalogConditionSlotAtPoint(graph, conditionDropPoint, blockItem, activeCatalog())
     : null;
   const selectedContainer = dropPoint
     ? containerAtPoint(graph, dropPoint)
@@ -2102,7 +2128,11 @@ function refreshEditorDraftIndicators(): void {
   const modalSummary = document.querySelector<HTMLElement>('[data-modal-summary]');
   const modalError = document.querySelector<HTMLElement>('[data-modal-error]');
   if (modalSummary) {
-    modalSummary.textContent = nodeSummary(draftNode, activeCatalog());
+    modalSummary.textContent = rackAwareNodeSummary(
+      draftNode,
+      rackEditorSession?.draftGraph ?? currentGraph(),
+      activeCatalog(),
+    );
   }
   if (modalError) {
     modalError.textContent = state.error || validationSummaryText(state);
@@ -2146,7 +2176,9 @@ function refreshDraftIndicators(): void {
   }
   if (modalSummary) {
     const selected = state.editorDraftNode ?? selectedNodeFrom(currentGraph());
-    modalSummary.textContent = selected ? nodeSummary(selected, activeCatalog()) : '';
+    modalSummary.textContent = selected
+      ? rackAwareNodeSummary(selected, rackEditorSession?.draftGraph ?? currentGraph(), activeCatalog())
+      : '';
   }
   if (modalError) {
     modalError.textContent = state.error || validationSummaryText(state);

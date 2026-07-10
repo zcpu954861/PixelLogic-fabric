@@ -46,7 +46,6 @@ try {
     findInsertCandidate,
   } = await server.ssrLoadModule('/src/ui/canvas/dragInsert.ts');
   const {
-    draggedGroupBounds,
     makeContainerBodyGap,
   } = await server.ssrLoadModule('/src/ui/canvas/containerPlacement.ts');
   const {
@@ -57,8 +56,35 @@ try {
   } = await server.ssrLoadModule('/src/ui/canvas/slotFlowViewModel.ts');
   const { renderBlock, renderBlockShape } = await server.ssrLoadModule('/src/ui/canvas/blockView.ts');
   const { renderConditionRackEditor } = await server.ssrLoadModule('/src/ui/editor/conditionRackEditor.ts');
+  const { renderEditorModal } = await server.ssrLoadModule('/src/ui/editor/blockEditorModal.ts');
+  const { predicateNodeSummary } = await server.ssrLoadModule('/src/ui/humanize/labels.ts');
+  const { renderNodeInfo } = await server.ssrLoadModule('/src/ui/sidebar/selectionSummary.ts');
 
-  const catalogBlock = ({ id, nodeType, nodeKind, categoryId, capabilities = [], predicateSummaryTemplate = '' }) => ({
+  const formField = (key, label, type, defaultValue, options = []) => ({
+    key,
+    type,
+    label,
+    description: '',
+    defaultValue,
+    placeholder: '',
+    options,
+    required: false,
+    min: '',
+    max: '',
+    step: '',
+    ui: type === 'segmented' ? 'segmented fullWidth' : '',
+    suffix: '',
+  });
+  const catalogBlock = ({
+    id,
+    nodeType,
+    nodeKind,
+    categoryId,
+    capabilities = [],
+    predicateSummaryTemplate = '',
+    predicateNegatedSummaryTemplate = '',
+    formSchema = [],
+  }) => ({
     id,
     version: 1,
     displayName: id,
@@ -70,10 +96,11 @@ try {
     nodeKind,
     nodeType,
     defaultConfig: {},
-    formSchema: [],
+    formSchema,
     summaryTemplate: id,
     summaryFormatter: id,
     predicateSummaryTemplate,
+    predicateNegatedSummaryTemplate,
     containerSlots: id === 'control.loop.until' ? ['body'] : [],
     inputSlots: nodeKind === 'trigger' ? [] : [input('input')],
     outputSlots: nodeKind === 'control' ? [out('done')] : nodeKind === 'condition' ? [out('pass'), out('fail')] : [out('done')],
@@ -87,13 +114,29 @@ try {
   const catalog = {
     categories: [
       { id: 'control', displayName: '控制流', description: '', order: 1, visibleByDefault: true },
-      { id: 'condition', displayName: '条件判断', description: '', order: 2, visibleByDefault: true },
+      { id: 'condition', displayName: '条件判断块(胶囊)', description: '', order: 2, visibleByDefault: true },
       { id: 'action', displayName: '动作', description: '', order: 3, visibleByDefault: true },
     ],
     subcategories: [],
     blocks: [
       catalogBlock({ id: 'control.loop.until', nodeType: 'CONTROL_LOOP_UNTIL', nodeKind: 'control', categoryId: 'control', capabilities: ['PREDICATE_RACK'] }),
-      catalogBlock({ id: 'condition.player.has_tag', nodeType: 'PLAYER_HAS_TAG_CONDITION', nodeKind: 'condition', categoryId: 'condition', capabilities: ['PREDICATE'], predicateSummaryTemplate: '玩家拥有标签「{tag}」' }),
+      catalogBlock({
+        id: 'condition.player.has_tag',
+        nodeType: 'PLAYER_HAS_TAG_CONDITION',
+        nodeKind: 'condition',
+        categoryId: 'condition',
+        capabilities: ['PREDICATE'],
+        predicateSummaryTemplate: '玩家拥有标签「{tag}」',
+        predicateNegatedSummaryTemplate: '玩家没有标签「{tag}」',
+        formSchema: [
+          formField('outputMode', '条件用途', 'segmented', 'PASS_ONLY', [
+            { value: 'PASS_ONLY', label: '拥有标签时继续' },
+            { value: 'FAIL_ONLY', label: '不拥有标签时继续' },
+            { value: 'BRANCH', label: '分开执行' },
+          ]),
+          formField('tag', '标签', 'string', 'runner'),
+        ],
+      }),
       catalogBlock({ id: 'action.message.chat', nodeType: 'MESSAGE_ACTION', nodeKind: 'action', categoryId: 'action' }),
     ],
   };
@@ -199,21 +242,40 @@ try {
   assert.equal(world.minTop, content.minTop, 'world sizing must retain negative/upward content origin');
   assert.equal(world.contentHeight, content.height, 'fit data must use content height rather than only maxBottom');
 
-  // Predicate capability and pointer-position rack hit testing.
+  // Predicate capability and card-center rack hit testing.
   assert.equal(isPredicateNode(predicate('p', { x: 0, y: 0 }), catalog), true);
   assert.equal(isPredicateNode(action('a', { x: 0, y: 0 }), catalog), false);
   const oneSlotGraph = graph([loop('loop', { x: 400, y: 300 }, [slots[0]]), predicate('dragged', { x: 800, y: 300 })]);
-  const pointerDrag = drag('dragged', { x: 800, y: 300 }, { x: 419, y: 227 }, { startWorld: { x: 805, y: 305 } });
   const pointerRow = conditionSlotRects(oneSlotGraph, oneSlotGraph.nodes[0], 'condition-a').row;
+  const sourcePosition = { x: 800, y: 300 };
+  const sourceHeight = blockMetrics(oneSlotGraph, oneSlotGraph.nodes[1]).visualBounds.height;
+  const centeredPreview = {
+    x: 419,
+    y: pointerRow.y + pointerRow.height / 2 - sourceHeight / 2,
+  };
+  const pointerX = pointerRow.x + 4;
+  const startWorldX = sourcePosition.x + pointerX - centeredPreview.x;
+  const topGrab = drag('dragged', sourcePosition, centeredPreview, {
+    startWorld: { x: startWorldX, y: sourcePosition.y + 10 },
+  });
+  const bottomGrab = drag('dragged', sourcePosition, centeredPreview, {
+    startWorld: { x: startWorldX, y: sourcePosition.y + sourceHeight - 10 },
+  });
+  const topPointerY = topGrab.startWorld.y + centeredPreview.y - sourcePosition.y;
+  const bottomPointerY = bottomGrab.startWorld.y + centeredPreview.y - sourcePosition.y;
+  assert.ok(topPointerY < pointerRow.y && bottomPointerY > pointerRow.y + pointerRow.height, 'fixture must prove both grab points are outside opposite sides of the row');
+  assert.equal(findInsertCandidate(oneSlotGraph, topGrab, catalog)?.slotId, 'condition-a', 'top grab must use the same card-center slot');
+  assert.equal(findInsertCandidate(oneSlotGraph, bottomGrab, catalog)?.slotId, 'condition-a', 'bottom grab must use the same card-center slot');
+
+  const pointerDrag = drag('dragged', sourcePosition, { x: 419, y: 227 }, { startWorld: { x: 805, y: 305 } });
   const derivedPointer = {
     x: pointerDrag.startWorld.x + pointerDrag.previewPositions.get('dragged').x - pointerDrag.startPositions.get('dragged').x,
     y: pointerDrag.startWorld.y + pointerDrag.previewPositions.get('dragged').y - pointerDrag.startPositions.get('dragged').y,
   };
-  const groupBounds = draggedGroupBounds(oneSlotGraph, pointerDrag);
-  const groupCenter = { x: (groupBounds.left + groupBounds.right) / 2, y: (groupBounds.top + groupBounds.bottom) / 2 };
+  const cardCenterY = pointerDrag.previewPositions.get('dragged').y + sourceHeight / 2;
   assert.ok(derivedPointer.y >= pointerRow.y && derivedPointer.y <= pointerRow.y + pointerRow.height, 'derived pointer must be inside the rack row');
-  assert.ok(groupCenter.y > pointerRow.y + pointerRow.height, 'off-center grab fixture must keep group center outside the row');
-  assert.equal(findInsertCandidate(oneSlotGraph, pointerDrag, catalog)?.kind, 'condition-slot', 'rack hit must follow pointer delta, not dragged group center');
+  assert.ok(cardCenterY > pointerRow.y + pointerRow.height, 'off-center grab fixture must keep card center outside the row');
+  assert.notEqual(findInsertCandidate(oneSlotGraph, pointerDrag, catalog)?.kind, 'condition-slot', 'pointer-only overlap must not select a rack slot');
   assert.equal(findConditionSlotCandidate(oneSlotGraph, pointerDrag, derivedPointer, catalog)?.slotId, 'condition-a');
 
   const actionGraph = graph([loop('loop', { x: 400, y: 300 }, [slots[0]]), action('dragged', { x: 800, y: 300 })]);
@@ -255,9 +317,10 @@ try {
     predicate('capsule', { x: 0, y: 0 }, 'loop', 'condition-a'),
   ]);
   const capsuleStart = nodePosition(moveGraph, 'capsule');
-  const moveDrag = drag('capsule', capsuleStart, capsuleStart);
-  const slotB = conditionSlotRects(moveGraph, moveGraph.nodes[0], 'condition-b').row;
-  moveDrag.candidate = findConditionSlotCandidate(moveGraph, moveDrag, { x: slotB.x + 4, y: slotB.y + 4 }, catalog);
+  const slotB = conditionSlotRects(moveGraph, moveGraph.nodes[0], 'condition-b');
+  const moveDrag = drag('capsule', capsuleStart, { x: slotB.capsule.x, y: slotB.capsule.y });
+  moveDrag.candidate = findInsertCandidate(moveGraph, moveDrag, catalog);
+  assert.equal(moveDrag.candidate?.slotId, 'condition-b', 'capsule-to-slot hit must use the source capsule height, not a restored full-card height');
   const movedGraph = computeDragDrop(moveGraph, moveDrag).graph;
   const moved = movedGraph.nodes.find((item) => item.id === 'capsule');
   assert.equal(moved.id, 'capsule');
@@ -361,8 +424,17 @@ try {
   assert.doesNotMatch(capsuleHtml, /slot-join|branch-tab|container-body-zone|data-from=|data-to=/, 'capsule markup must expose no ordinary control anchors');
   assert.match(capsuleHtml, /data-embedded-parent="loop"/, 'capsule must declare its embedded animation parent');
   assert.equal((loopHtml.match(/data-condition-slot=/g) ?? []).length, 3, 'every empty or filled slot must render one row');
+  assert.equal((loopHtml.match(/class="condition-rack-slot/g) ?? []).length, 3, 'every row must render a distinct inner capsule slot');
+  assert.equal((loopHtml.match(/class="condition-rack-slot is-empty"/g) ?? []).length, 2, 'empty rows must keep their own inner capsule');
+  assert.ok(renderedLoop.conditionRack.rows.every((row) => row.slotRect.width < row.width), 'shared geometry must keep the inner slot inside its shell');
+  assert.match(loopHtml, /class="condition-negate"[^>]*style="left:\d+px; top:\d+px; width:\d+px; height:\d+px"/, 'toggle placement must consume shared geometry');
   assert.match(loopHtml, /aria-label="取反此条件"[\s\S]*aria-pressed="false"[\s\S]*title="点击取反"/);
   assert.match(loopHtml, /aria-label="取消取反"[\s\S]*aria-pressed="true"[\s\S]*title="已取反，点击取消"/);
+  assert.match(blockStyles, /\.condition-rack-row\s*\{[\s\S]*?border-radius:\s*6px;/, 'rack shell must use an angular outlined frame');
+  assert.match(blockStyles, /\.condition-rack-slot\s*\{[\s\S]*?border-radius:\s*999px;/, 'inner slot must retain a capsule shape');
+  assert.match(blockStyles, /\.condition-rack-slot\.is-empty\s*\{[\s\S]*?border:\s*2px dashed/, 'empty inner slot must retain a dashed outline');
+  assert.doesNotMatch(blockStyles, /\.condition-rack-row\.is-empty\s*\{[\s\S]*?border-style:\s*dashed/, 'the angular shell must not become the empty capsule');
+  assert.match(blockStyles, /\.condition-rack-row\.condition-slot-target \.condition-rack-slot\.is-empty/, 'drop targeting must highlight the inner slot');
   assert.ok(visualBlocks(renderedBlocks).some((item) => item.id === 'capsule'), 'ghost/animation visual block set must include embedded capsules');
 
   const editorHtml = renderConditionRackEditor(rackGraph.nodes[0], rackGraph, catalog);
@@ -373,11 +445,49 @@ try {
   assert.match(editorHtml, /title="删除槽后，保存时会同时删除其中的条件积木"/);
   assert.equal((editorHtml.match(/data-rack-draft-slot=/g) ?? []).length, 3);
 
+  const negatedGraph = graph([
+    loop('negated-loop', { x: 400, y: 300 }, [{ slotId: 'condition-negated', negated: true }]),
+    predicate('negated-capsule', { x: 0, y: 0 }, 'negated-loop', 'condition-negated'),
+  ]);
+  const negatedLoopBlock = buildBlocks(negatedGraph, catalog, '')[0];
+  assert.equal(negatedLoopBlock.conditionRack.rows[0].capsule.title, '玩家没有标签「ready」', 'NOT must use the catalog negated summary');
+  assert.match(renderConditionRackEditor(negatedGraph.nodes[0], negatedGraph, catalog), /玩家没有标签「ready」/);
+  const modalOptions = {
+    editorClosing: false,
+    error: '',
+    hasValidation: false,
+    modalIssue: '',
+    steady: true,
+    simulationTestContext: undefined,
+    graph: negatedGraph,
+  };
+  const capsuleModalHtml = renderEditorModal(negatedGraph.nodes[1], catalog, modalOptions);
+  assert.match(capsuleModalHtml, /data-modal-summary>玩家没有标签「ready」</, 'capsule modal must keep the rack-aware NOT summary');
+  assert.doesNotMatch(capsuleModalHtml, /条件用途|data-config-key="outputMode"/, 'capsule modal must hide ordinary chain output mode');
+  assert.match(capsuleModalHtml, /data-config-key="tag"/, 'capsule modal must keep predicate fields');
+  const ordinaryGraph = graph([predicate('ordinary-condition', { x: 800, y: 300 })]);
+  const ordinaryModalHtml = renderEditorModal(ordinaryGraph.nodes[0], catalog, { ...modalOptions, graph: ordinaryGraph });
+  assert.match(ordinaryModalHtml, /条件用途[\s\S]*data-config-key="outputMode"/, 'ordinary condition cards must retain output mode');
+  const capsuleSidebarHtml = renderNodeInfo(negatedGraph.nodes[1], negatedGraph, 'negated-capsule', catalog);
+  assert.match(capsuleSidebarHtml, /玩家没有标签「ready」/, 'capsule sidebar must use the rack-aware NOT summary');
+  assert.doesNotMatch(capsuleSidebarHtml, /条件用途/, 'capsule sidebar must hide ordinary chain output mode');
+  const legacyCatalog = {
+    ...catalog,
+    blocks: catalog.blocks.map((item) => {
+      const { predicateNegatedSummaryTemplate, ...legacyItem } = item;
+      return legacyItem;
+    }),
+  };
+  assert.equal(predicateNodeSummary(negatedGraph.nodes[1], legacyCatalog, true), '非（玩家拥有标签「ready」）', 'old catalogs must not show a negated slot as positive');
+
   // Modal edits stay in a cloned graph and delete owned nodes/edges only in the saved draft graph.
   assert.match(appSource, /const draftGraph = cloneGraph\(graph\);[\s\S]*rackEditorSession = \{[\s\S]*draftGraph,[\s\S]*originalGraph: cloneGraph\(graph\)/, 'rack editor must begin with isolated draft and original snapshots');
   assert.match(appSource, /function updateRackEditorDraft[\s\S]*session\.draftGraph\.nodes = session\.draftGraph\.nodes\.filter[\s\S]*session\.draftGraph\.edges = session\.draftGraph\.edges\.filter/, 'filled-slot deletion must remain local to the rack draft');
   assert.match(appSource, /const nextGraph = rackEditorSession[\s\S]*cloneGraph\(rackEditorSession\.draftGraph\)[\s\S]*applyGraphEdit\(nextGraph/s, 'one modal save must apply the complete draft graph once');
   assert.match(appSource, /rackEditorSession = null;[\s\S]*renderApp\(\)/, 'closing/cancelling must discard the rack session without applying it');
+  assert.match(appSource, /clientToWorld\(moveEvent\.clientX, ghostRect\.top \+ ghostRect\.height \/ 2\)[\s\S]*catalogConditionSlotAtPoint\(currentGraph\(\), conditionPoint/, 'catalog hover must probe with the visible card center height');
+  assert.match(appSource, /const onUp[\s\S]*clientToWorld\(upEvent\.clientX, ghostRect\.top \+ ghostRect\.height \/ 2\)[\s\S]*addCatalogBlockAt\([\s\S]*conditionPoint/, 'catalog drop must commit with the same center-height probe as its preview');
+  assert.match(appSource, /const conditionDropPoint = conditionProbePoint \?\? dropPoint;[\s\S]*catalogConditionSlotAtPoint\(graph, conditionDropPoint/, 'catalog drop must consume the center-height probe instead of ignoring it');
 
   // Embedded transforms/ghosts are parent-relative and avoid double-moving a capsule with its parent.
   assert.match(appSource, /embeddedParentId[\s\S]*!drag\.groupIds\.includes\(embeddedParentId\)[\s\S]*style\.transform/, 'live drag transform must skip an embedded capsule when its parent is in the group');

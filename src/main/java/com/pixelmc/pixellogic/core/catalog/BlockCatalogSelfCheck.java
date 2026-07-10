@@ -56,6 +56,10 @@ public final class BlockCatalogSelfCheck {
         catalog.blocks().forEach(block -> actual.add(block.id()));
 
         require(actual.equals(expected), "catalog should contain demo, player, and message concrete block ids");
+        require(catalog.categories().stream()
+                        .anyMatch(category -> category.id().equals("condition")
+                                && category.displayName().equals("条件判断块(胶囊)")),
+                "condition category should explain its capsule form");
         catalog.blocks().forEach(block -> {
             require(catalog.categories().stream().anyMatch(category -> category.id().equals(block.categoryId())),
                     "block category should exist: " + block.id());
@@ -151,6 +155,7 @@ public final class BlockCatalogSelfCheck {
                 .forEach(item -> {
                     predicateBlocks.add(item.id());
                     require(!item.predicateSummaryTemplate().isBlank(), "predicate capsule summary should exist: " + item.id());
+                    require(!item.predicateNegatedSummaryTemplate().isBlank(), "negated predicate capsule summary should exist: " + item.id());
                 });
         require(predicateBlocks.equals(Set.of(
                         BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG,

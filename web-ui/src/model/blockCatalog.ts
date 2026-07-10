@@ -51,6 +51,7 @@ export function createCatalogNode(blockItem: CatalogBlock, id: string, position:
     blockId: blockItem.id,
     displayName: blockItem.displayName,
     config: { ...blockItem.defaultConfig },
+    conditionSlots: [],
     position,
     parentContainerId: '',
     parentSlot: '',

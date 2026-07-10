@@ -4,6 +4,7 @@ import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.EdgeType;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
+import com.pixelmc.pixellogic.core.model.ConditionSlotDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.model.SlotDefinition;
@@ -79,6 +80,7 @@ public record GraphDocument(
                 node.blockId(),
                 node.parentContainerId(),
                 node.parentSlot(),
+                node.conditionSlots(),
                 defaultDisplayName(node),
                 sortedMap(node.config()),
                 defaultPosition(node.id()),
@@ -118,6 +120,7 @@ public record GraphDocument(
             case PLAYER_NEAR_TARGET_BLOCK_CONDITION -> "判断玩家靠近目标方块";
             case CONTROL_LOOP_COUNT -> "循环次数";
             case CONTROL_LOOP_FOREVER -> "无限循环";
+            case CONTROL_LOOP_UNTIL -> "循环直到";
             case PLAYER_ADD_TAG_ACTION -> "添加玩家标签";
             case PLAYER_REMOVE_TAG_ACTION -> "移除玩家标签";
             case STATE_SET_ACTION -> "记录开始状态";
@@ -167,11 +170,30 @@ public record GraphDocument(
             String blockId,
             String parentContainerId,
             String parentSlot,
+            List<ConditionSlotDefinition> conditionSlots,
             String displayName,
             Map<String, String> config,
             Position position,
             List<SlotDocument> slots
     ) {
+        public NodeDocument {
+            conditionSlots = conditionSlots == null ? List.of() : List.copyOf(conditionSlots);
+        }
+
+        public NodeDocument(
+                String id,
+                String type,
+                String blockId,
+                String parentContainerId,
+                String parentSlot,
+                String displayName,
+                Map<String, String> config,
+                Position position,
+                List<SlotDocument> slots
+        ) {
+            this(id, type, blockId, parentContainerId, parentSlot, List.of(), displayName, config, position, slots);
+        }
+
         NodeDefinition toDefinition() {
             requireNonBlank(id, "node id");
             requireNonBlank(type, "node type");
@@ -183,6 +205,7 @@ public record GraphDocument(
                     BuiltInBlockCatalog.resolveBlockId(blockId, nodeType),
                     blankToDefault(parentContainerId, ""),
                     blankToDefault(parentSlot, ""),
+                    conditionSlots,
                     slots.stream().map(SlotDocument::toDefinition).toList(),
                     sortedMap(config)
             );
@@ -196,6 +219,7 @@ public record GraphDocument(
                     BuiltInBlockCatalog.resolveBlockId(blockId, nodeType),
                     blankToDefault(parentContainerId, ""),
                     blankToDefault(parentSlot, ""),
+                    conditionSlots,
                     blankToDefault(displayName, id),
                     sortedMap(config),
                     position == null ? new Position(48, 78) : position,

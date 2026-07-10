@@ -124,6 +124,20 @@ export function nodeSummary(nodeItem: GraphNode, catalog?: BlockCatalog): string
   return legacyNodeTypeSummary(nodeItem);
 }
 
+export function predicateNodeSummary(nodeItem: GraphNode, catalog: BlockCatalog): string {
+  const blockItem = catalogBlock(catalog, nodeItem.blockId ?? '')
+    ?? catalog.blocks.find((item) => item.nodeType === nodeItem.type);
+  const template = blockItem?.predicateSummaryTemplate ?? '';
+  if (template) {
+    return template
+      .replaceAll('{tag}', nodeItem.config.tag || '标签')
+      .replaceAll('{dimensionId}', nodeItem.config.dimensionId || 'minecraft:overworld')
+      .replaceAll('{regionName}', nodeItem.config.regionName || '区域名称')
+      .replaceAll('{blockId}', nodeItem.config.blockId || 'minecraft:stone');
+  }
+  return nodeSummary(nodeItem, catalog);
+}
+
 function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   if (blockItem.id === 'condition.state.equals') {
     return conditionStateSummary(nodeItem);
@@ -160,6 +174,9 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   }
   if (blockItem.id === 'control.loop.forever') {
     return `持续循环内部积木，每轮间隔 ${nodeItem.config.intervalSeconds || '1'} 秒。`;
+  }
+  if (blockItem.id === 'control.loop.until') {
+    return `配置了 ${nodeItem.conditionSlots?.length ?? 0} 个结束条件槽。`;
   }
   const template = blockItem.summaryTemplate;
   if (!template) {
@@ -210,6 +227,8 @@ function legacyNodeTypeSummary(nodeItem: GraphNode): string {
       return `把内部积木循环 ${config.count ?? '3'} 次后继续。`;
     case 'CONTROL_LOOP_FOREVER':
       return `持续循环内部积木，每轮间隔 ${config.intervalSeconds ?? '1'} 秒。`;
+    case 'CONTROL_LOOP_UNTIL':
+      return `配置了 ${nodeItem.conditionSlots?.length ?? 0} 个结束条件槽。`;
     case 'PLAYER_ADD_TAG_ACTION':
       return `给当前玩家添加标签“${config.tag ?? '标签'}”。`;
     case 'PLAYER_REMOVE_TAG_ACTION':

@@ -6,7 +6,7 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 | --- | --- | --- | --- | --- | --- |
 | state | `state.set`, `state.add`, state compare | `FULLY_SIMULATABLE` | yes | no | Core PixelLogic state is already simulated and should remain fully testable. |
 | timer | `timer.wait`, future named timers | `FULLY_SIMULATABLE` | yes | no | Wall-clock waits preserve loop and nested-loop continuation state; output is optional and the WebUI polls the bounded run snapshot until terminal. |
-| control loop | `control.loop.count`, `control.loop.forever` | `FULLY_SIMULATABLE` | yes | yes, for durable server loops | Count/forever bodies resume after waits with cumulative safety caps; persistent cross-restart scheduling still requires Minecraft runtime. |
+| control loop | `control.loop.count`, `control.loop.forever`, `control.loop.until` | `FULLY_SIMULATABLE` | yes | yes, for durable server loops | Count/forever/until bodies resume after waits with cumulative safety caps; until uses predicate pre-check, AND + per-slot NOT, and a 20-round simulation cap. Persistent cross-restart scheduling still requires Minecraft runtime. |
 | trace | debug steps, action summaries, branch path | `FULLY_SIMULATABLE` | yes | no | Trace is a PixelLogic output and must stay bounded. |
 | message/chat component | `action.message.chat`, rich text plain output | `APPROXIMATE_SIMULATION` | yes | yes, for real delivery | Simulation records target and plain text; real adapter later converts to Minecraft Text/tellraw-equivalent. |
 | title/actionbar | title, subtitle, actionbar | `APPROXIMATE_SIMULATION` | yes | yes, for real display | Model visible output and channel summary; do not implement client rendering, timing, fade, or combo blocks yet. |
@@ -96,4 +96,14 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 - Container membership is stored on flat graph nodes and remains editor/runtime metadata.
 - `timer.wait` inside count/forever and nested loop bodies resumes from the saved cursor without replaying earlier body nodes.
 - Forever inter-round intervals use the wall-clock continuation path and the simulation cap remains 20 rounds across resumes.
-- Real persistent server loop scheduling, loop-until, break/continue, for-each, variable counts, and if/else are deferred.
+- Real persistent server loop scheduling, break/continue, for-each, variable counts, and if/else are deferred.
+
+## Loop Until + Condition Rack v1 Status
+
+- `control.loop.until` pre-checks an ordered condition rack before every body iteration.
+- v1 combines all slot results with AND and applies each slot's independent NOT after raw predicate evaluation.
+- The initial predicate capsule set is `condition.player.has_tag`, `condition.player.is_admin`, `condition.player.dimension_is`, `condition.player.in_region`, and `condition.target_block.is_type`.
+- These blocks reuse their existing Simulation Test Context facts and the same raw evaluator used by ordinary condition execution.
+- Zero slots, empty slots, illegal predicate membership/evaluation, and a false condition with an empty body fail closed at runtime; incomplete graph states remain saveable warnings where structurally safe.
+- `timer.wait` in the body reuses the existing continuation cursor/frame and does not reset the 20-round loop-until cap.
+- OR, condition groups, asynchronous predicates, cross-restart continuation, and real Minecraft condition/runtime adapters remain deferred.

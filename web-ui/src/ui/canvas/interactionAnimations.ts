@@ -1,5 +1,6 @@
 import type { SlotBlock } from '../../model/graphTypes';
 import { renderBlock, renderBlockShape } from './blockView';
+import { visualBlocks } from './slotFlowViewModel';
 
 export const interactionAnimationTokens = {
   previewMs: 180,
@@ -13,6 +14,7 @@ export type BlockRectSnapshot = {
   top: number;
   width: number;
   height: number;
+  bodyTop?: number;
 };
 
 export type GraphTransitionSnapshot = Map<string, BlockRectSnapshot>;
@@ -40,7 +42,7 @@ export function captureBlockRects(extra = new Map<string, BlockRectSnapshot>()):
   document.querySelectorAll<HTMLElement>('.flow-world [data-block]').forEach((element) => {
     const nodeId = element.dataset.block;
     if (nodeId) {
-      snapshots.set(nodeId, rectSnapshot(element.getBoundingClientRect()));
+      snapshots.set(nodeId, elementRectSnapshot(element));
     }
   });
   return snapshots;
@@ -53,15 +55,30 @@ export function playGraphTransition(first: GraphTransitionSnapshot): void {
   }
 
   const scale = flowWorldScale();
-  document.querySelectorAll<HTMLElement>('.flow-world [data-block]').forEach((element) => {
+  const elements = Array.from(document.querySelectorAll<HTMLElement>('.flow-world [data-block]'));
+  const afterById = new Map<string, BlockRectSnapshot>();
+  elements.forEach((element) => {
+    const nodeId = element.dataset.block;
+    if (nodeId) {
+      afterById.set(nodeId, elementRectSnapshot(element));
+    }
+  });
+  elements.forEach((element) => {
     const nodeId = element.dataset.block;
     const before = nodeId ? first.get(nodeId) : null;
-    if (!before) {
+    const after = nodeId ? afterById.get(nodeId) : null;
+    if (!before || !after) {
       return;
     }
-    const after = rectSnapshot(element.getBoundingClientRect());
-    const dx = (before.left - after.left) / scale;
-    const dy = (before.top - after.top) / scale;
+    const parentId = element.dataset.embeddedParent;
+    const parentBefore = parentId ? first.get(parentId) : null;
+    const parentAfter = parentId ? afterById.get(parentId) : null;
+    const parentDx = parentBefore && parentAfter ? (parentBefore.left - parentAfter.left) / scale : 0;
+    const parentDy = parentBefore && parentAfter
+      ? ((parentBefore.bodyTop ?? parentBefore.top) - (parentAfter.bodyTop ?? parentAfter.top)) / scale
+      : 0;
+    const dx = (before.left - after.left) / scale - parentDx;
+    const dy = ((before.bodyTop ?? before.top) - (after.bodyTop ?? after.top)) / scale - parentDy;
     if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
       trackAnimations([
         element.animate(
@@ -92,8 +109,8 @@ export function showPlacementPreview(preview: PlacementPreview): void {
   previewLayoutSignature = layoutSignature;
   clearPreviewTransforms();
 
-  const baseById = new Map(preview.baseBlocks.map((block) => [block.id, block]));
-  const placementById = new Map(preview.placementBlocks.map((block) => [block.id, block]));
+  const baseById = new Map(visualBlocks(preview.baseBlocks).map((block) => [block.id, block]));
+  const placementById = new Map(visualBlocks(preview.placementBlocks).map((block) => [block.id, block]));
   if (!prefersReducedMotion()) {
     placementById.forEach((placementBlock, nodeId) => {
       if (preview.draggedNodeIds.has(nodeId)) {
@@ -104,8 +121,16 @@ export function showPlacementPreview(preview: PlacementPreview): void {
       if (!baseBlock || !element) {
         return;
       }
-      const dx = placementBlock.x - baseBlock.x;
-      const dy = placementBlock.y - baseBlock.y;
+      const parentBase = placementBlock.embeddedParentId
+        ? baseById.get(placementBlock.embeddedParentId)
+        : null;
+      const parentPlacement = placementBlock.embeddedParentId
+        ? placementById.get(placementBlock.embeddedParentId)
+        : null;
+      const parentDx = parentBase && parentPlacement ? parentPlacement.x - parentBase.x : 0;
+      const parentDy = parentBase && parentPlacement ? parentPlacement.y - parentBase.y : 0;
+      const dx = placementBlock.x - baseBlock.x - parentDx;
+      const dy = placementBlock.y - baseBlock.y - parentDy;
       if (Math.abs(dx) <= 0.5 && Math.abs(dy) <= 0.5) {
         return;
       }
@@ -206,7 +231,7 @@ function renderPlacementGhosts(
   const template = document.createElement('template');
   draggedNodeIds.forEach((nodeId) => {
     const block = placementById.get(nodeId);
-    if (!block) {
+    if (!block || (block.embeddedParentId && draggedNodeIds.has(block.embeddedParentId))) {
       return;
     }
     template.innerHTML = renderBlock({ ...block, selected: false }, null).trim();
@@ -281,7 +306,7 @@ function placementPreviewSignature(preview: PlacementPreview): string {
 }
 
 function blockLayoutSignature(blocks: SlotBlock[]): string {
-  return blocks
+  return visualBlocks(blocks)
     .map((block) => `${block.id}:${block.kind}:${block.x}:${block.y}:${block.width}:${block.height}`)
     .join('|');
 }
@@ -365,6 +390,13 @@ function flowWorldScale(): number {
 
 function rectSnapshot(rect: DOMRect): BlockRectSnapshot {
   return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+}
+
+function elementRectSnapshot(element: HTMLElement): BlockRectSnapshot {
+  const rect = element.getBoundingClientRect();
+  const scale = flowWorldScale();
+  const bodyOffset = Number.parseFloat(element.style.getPropertyValue('--block-body-offset')) || 0;
+  return { ...rectSnapshot(rect), bodyTop: rect.top + bodyOffset * scale };
 }
 
 function prefersReducedMotion(): boolean {

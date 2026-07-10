@@ -210,6 +210,26 @@ The condition output mode checkpoint keeps the same direct edge runtime and adds
 - `condition.player.has_tag` is categorized as `条件判断 / 玩家条件`; `condition.player.is_admin` uses the same player condition group; `action.player.add_tag` and `action.player.remove_tag` remain `玩家操作 / 标签`.
 - Player conditions may provide block-specific `outputMode` labels so normal UI says `拥有标签时继续` or `是管理员时继续` instead of only generic labels.
 
+## Loop Until + Condition Rack v1
+
+`control.loop.until` extends the existing flat container model rather than introducing nested graph JSON:
+
+- The loop keeps the static `body` slot and stores an ordered typed `conditionSlots` list on the loop node. Each entry has a stable `slotId` and slot-owned `negated` flag.
+- Condition capsules remain normal graph nodes whose `parentContainerId` points to the loop and whose `parentSlot` is that stable dynamic slot id.
+- Old schema-version-1 graphs without `conditionSlots` normalize to an empty list.
+- Catalog `PREDICATE` and `PREDICATE_RACK` capabilities separate boolean-evaluation support from UI category/name metadata; dynamic ids never appear in static `containerSlots`.
+- v1 supports only AND across configured slots plus independent per-slot NOT. The first predicate set is `condition.player.has_tag`, `condition.player.is_admin`, `condition.player.dimension_is`, `condition.player.in_region`, and `condition.target_block.is_type`.
+- Ordinary condition execution and rack capsules share one raw predicate evaluator. `PASS_ONLY`, `FAIL_ONLY`, and `BRANCH` do not affect capsule truth.
+- Runtime checks the rack before every body iteration. All true exits through `done`; otherwise the body runs and natural completion returns to the same loop frame.
+- Missing/empty/illegal conditions and a false pre-check with an empty body fail closed with trace diagnostics. Simulation stops after 20 unsuccessful rounds.
+- A body `timer.wait` reuses the existing execution cursor and continuation frames; no second continuation system is introduced.
+
+The rack grows upward while the loop header, external anchors, and body origin stay fixed. Shared geometry supplies complete rack-aware selection, collision, drag, ghost, insertion, and nested-container bounds. Preview/animation state is not graph state.
+
+Zero or empty condition slots remain saveable warnings so incomplete drafts are editable; duplicate ids, mismatched membership, multiple children in one condition slot, non-predicate children, and capsule control edges are structural validation failures. Runtime repeats these checks and fails closed.
+
+Undo/redo preserves exact stable ids through graph snapshots. There is currently no copy/duplicate/import UI; this stage does not claim one. Any future fragment remapper must update node/edge ids, container membership, dynamic slot ids, and matching condition `parentSlot` atomically.
+
 ## WebUI Rule
 
 Java / Fabric owns mod initialization, runtime, API, permission, storage, validation, audit/debug, and static resource serving.

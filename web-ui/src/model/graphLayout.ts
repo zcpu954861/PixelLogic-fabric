@@ -2,6 +2,7 @@ import { fallbackGraph } from './demoGraph';
 import type { BlockKind, BlockMetrics, Branch, GraphDocument, GraphEdge, GraphNode, GraphPosition, LaneSpan } from './graphTypes';
 import { activeOutputSlots, conditionOutputMode, isActiveOutputSlot } from './conditionOutputMode';
 import {
+  conditionRackFrame,
   containerFrame,
   containerHeightForChildBottom,
   containerMinimumHeight,
@@ -10,6 +11,7 @@ import {
   normalBlockHeight,
   normalBlockWidth,
 } from './containerGeometry';
+import { conditionRackParent, conditionSlots } from './conditionRack';
 import { blockKind } from '../ui/humanize/labels';
 import {
   connectedOverlap,
@@ -32,15 +34,35 @@ export function blockMetrics(graph: GraphDocument, nodeItem: GraphNode, cache = 
     return cached;
   }
 
+  const rackParent = conditionRackParent(graph, nodeItem);
+  if (rackParent) {
+    const parentMetrics = blockMetrics(graph, rackParent, cache, visiting);
+    const row = conditionRackFrame(parentMetrics.width, parentMetrics.height, conditionSlots(rackParent)).rows
+      .find((item) => item.slotId === nodeItem.parentSlot);
+    if (row) {
+      const metrics = {
+        width: row.capsuleRect.width,
+        height: row.capsuleRect.height,
+        inputY: null,
+        outputOffsets: {},
+        visualBounds: { x: 0, y: 0, width: row.capsuleRect.width, height: row.capsuleRect.height },
+      };
+      cache.set(nodeItem.id, metrics);
+      return metrics;
+    }
+  }
+
   const kind = blockKind(nodeItem.type);
   if (kind === 'control') {
     const outerAnchorY = normalBlockHeight / 2;
     if (visiting.has(nodeItem.id)) {
+      const rack = conditionRackFrame(containerMinimumWidth, containerMinimumHeight, conditionSlots(nodeItem));
       return {
         width: containerMinimumWidth,
         height: containerMinimumHeight,
         inputY: outerAnchorY,
         outputOffsets: Object.fromEntries(nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT').map((slot) => [slot.id, outerAnchorY])),
+        visualBounds: rack.fullBounds,
       };
     }
     visiting.add(nodeItem.id);
@@ -48,18 +70,29 @@ export function blockMetrics(graph: GraphDocument, nodeItem: GraphNode, cache = 
     const children = containerChildren(graph, nodeItem.id, 'body');
     let width = containerMinimumWidth;
     let height = containerMinimumHeight;
+    let visualTop = 0;
+    let visualBottom = height;
     children.forEach((child) => {
       const childPosition = nodePosition(graph, child.id);
       const childMetrics = blockMetrics(graph, child, cache, visiting);
       width = Math.max(width, containerWidthForChildRight(childPosition.x + childMetrics.width - position.x));
       height = Math.max(height, containerHeightForChildBottom(childPosition.y + childMetrics.height - position.y));
+      visualTop = Math.min(visualTop, childPosition.y + childMetrics.visualBounds.y - position.y);
+      visualBottom = Math.max(
+        visualBottom,
+        childPosition.y + childMetrics.visualBounds.y + childMetrics.visualBounds.height - position.y,
+      );
     });
     visiting.delete(nodeItem.id);
+    visualBottom = Math.max(visualBottom, height);
+    const rack = conditionRackFrame(width, height, conditionSlots(nodeItem));
+    visualTop = Math.min(visualTop, rack.fullBounds.y);
     const metrics = {
       width,
       height,
       inputY: outerAnchorY,
       outputOffsets: Object.fromEntries(nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT').map((slot) => [slot.id, outerAnchorY])),
+      visualBounds: { x: 0, y: visualTop, width, height: visualBottom - visualTop },
     };
     cache.set(nodeItem.id, metrics);
     return metrics;
@@ -72,6 +105,7 @@ export function blockMetrics(graph: GraphDocument, nodeItem: GraphNode, cache = 
       height: normalBlockHeight,
       inputY: hasInput ? normalBlockHeight / 2 : null,
       outputOffsets: Object.fromEntries(outputs.map((slot) => [slot.id, normalBlockHeight / 2])),
+      visualBounds: { x: 0, y: 0, width: normalBlockWidth, height: normalBlockHeight },
     };
     cache.set(nodeItem.id, metrics);
     return metrics;
@@ -83,6 +117,7 @@ export function blockMetrics(graph: GraphDocument, nodeItem: GraphNode, cache = 
       height: normalBlockHeight * 2 + conditionBranchGap,
       inputY: (normalBlockHeight * 2 + conditionBranchGap) / 2,
       outputOffsets: { pass: normalBlockHeight / 2, fail: normalBlockHeight + conditionBranchGap + normalBlockHeight / 2 },
+      visualBounds: { x: 0, y: 0, width: conditionBlockWidth, height: normalBlockHeight * 2 + conditionBranchGap },
     };
   }
 
@@ -99,6 +134,7 @@ export function blockMetrics(graph: GraphDocument, nodeItem: GraphNode, cache = 
     height,
     inputY: (passY + failY) / 2,
     outputOffsets: { pass: passY, fail: failY },
+    visualBounds: { x: 0, y: 0, width: conditionBlockWidth, height },
   };
   cache.set(nodeItem.id, metrics);
   return metrics;
@@ -126,8 +162,8 @@ export function subtreeLaneSpan(graph: GraphDocument, nodeId: string, cache: Map
 
   const metrics = blockMetrics(graph, nodeItem, cache, visiting);
   const inputY = metrics.inputY ?? metrics.height / 2;
-  let above = inputY;
-  let below = metrics.height - inputY;
+  let above = inputY - metrics.visualBounds.y;
+  let below = metrics.visualBounds.y + metrics.visualBounds.height - inputY;
   const outputSlot = preferredMainOutput(nodeItem);
   const nextEdge = outputSlot
     ? graph.edges.find((graphEdge) => graphEdge.sourceNodeId === nodeId && graphEdge.sourceSlotId === outputSlot.id)
@@ -144,7 +180,35 @@ export function subtreeLaneSpan(graph: GraphDocument, nodeId: string, cache: Map
 }
 
 export function nodePosition(graph: GraphDocument, nodeId: string): GraphPosition {
-  return graph.nodes.find((nodeItem) => nodeItem.id === nodeId)?.position ?? fallbackPosition(nodeId);
+  const nodeItem = graph.nodes.find((item) => item.id === nodeId);
+  if (!nodeItem) {
+    return fallbackPosition(nodeId);
+  }
+  const parent = conditionRackParent(graph, nodeItem);
+  if (parent) {
+    const parentPosition = nodePosition(graph, parent.id);
+    const parentMetrics = blockMetrics(graph, parent);
+    const row = conditionRackFrame(parentMetrics.width, parentMetrics.height, conditionSlots(parent)).rows
+      .find((item) => item.slotId === nodeItem.parentSlot);
+    if (row) {
+      return {
+        x: parentPosition.x + row.capsuleRect.x,
+        y: parentPosition.y + row.capsuleRect.y,
+      };
+    }
+  }
+  return nodeItem.position ?? fallbackPosition(nodeId);
+}
+
+export function blockVisualRect(graph: GraphDocument, nodeItem: GraphNode): { x: number; y: number; width: number; height: number } {
+  const position = nodePosition(graph, nodeItem.id);
+  const metrics = blockMetrics(graph, nodeItem);
+  return {
+    x: position.x + metrics.visualBounds.x,
+    y: position.y + metrics.visualBounds.y,
+    width: metrics.visualBounds.width,
+    height: metrics.visualBounds.height,
+  };
 }
 
 export function downstreamNodeIds(graph: GraphDocument, rootId: string): string[] {
@@ -187,7 +251,7 @@ export function containerDescendantNodeIds(graph: GraphDocument, containerNodeId
   const result: string[] = [];
   const visited = new Set<string>();
   const visit = (parentId: string) => {
-    containerChildren(graph, parentId).forEach((child) => {
+    graph.nodes.filter((nodeItem) => nodeItem.parentContainerId === parentId).forEach((child) => {
       if (visited.has(child.id)) {
         return;
       }
@@ -224,6 +288,31 @@ export function containerBodyEntryAnchor(graph: GraphDocument, containerNode: Gr
   const metrics = blockMetrics(graph, containerNode);
   const anchor = containerFrame(metrics.width, metrics.height).bodyEntryAnchor;
   return { x: position.x + anchor.x, y: position.y + anchor.y };
+}
+
+export function conditionSlotRects(
+  graph: GraphDocument,
+  containerNode: GraphNode,
+  slotId: string,
+): { row: { x: number; y: number; width: number; height: number }; capsule: { x: number; y: number; width: number; height: number } } | null {
+  const position = nodePosition(graph, containerNode.id);
+  const metrics = blockMetrics(graph, containerNode);
+  const row = conditionRackFrame(metrics.width, metrics.height, conditionSlots(containerNode)).rows
+    .find((item) => item.slotId === slotId);
+  return row ? {
+    row: {
+      x: position.x + row.dropZone.x,
+      y: position.y + row.dropZone.y,
+      width: row.dropZone.width,
+      height: row.dropZone.height,
+    },
+    capsule: {
+      x: position.x + row.capsuleRect.x,
+      y: position.y + row.capsuleRect.y,
+      width: row.capsuleRect.width,
+      height: row.capsuleRect.height,
+    },
+  } : null;
 }
 
 export function connectedComponentNodeIds(graph: GraphDocument, rootId: string, omittedEdgeId: string): string[] {
@@ -358,6 +447,7 @@ export function cloneGraph(graph: GraphDocument): GraphDocument {
     nodes: graph.nodes.map((nodeItem) => ({
       ...nodeItem,
       config: { ...nodeItem.config },
+      conditionSlots: conditionSlots(nodeItem).map((slot) => ({ ...slot })),
       position: nodeItem.position ? { ...nodeItem.position } : undefined,
       parentContainerId: nodeItem.parentContainerId ?? '',
       parentSlot: nodeItem.parentSlot ?? '',

@@ -47,6 +47,7 @@ export function puzzlePath(block: SlotBlock): string {
 
 function controlOuterFillPath(block: SlotBlock): string {
   const tab = puzzleTabDepth;
+  const bodyOffset = block.bodyOffsetY ?? 0;
   const inputY = block.inputY ?? normalBlockHeight / 2;
   const inputTop = inputY - puzzleMouthHalfHeight - containerGeometry.innerGap;
   const inputBottom = inputY + puzzleMouthHalfHeight + containerGeometry.innerGap;
@@ -54,17 +55,18 @@ function controlOuterFillPath(block: SlotBlock): string {
   const outputPath = outputY === undefined
     ? `V${block.height}`
     : `V${outputY - puzzleMouthHalfHeight} H${block.width} V${outputY + puzzleMouthHalfHeight} H${block.width - tab} V${block.height}`;
-  return `M0 0 H${block.width - tab} ${outputPath} H0 V${inputBottom} H${tab} V${inputTop} H0 Z`;
+  return `M0 ${bodyOffset} H${block.width - tab} ${outputPath} H0 V${inputBottom} H${tab} V${inputTop} H0 Z`;
 }
 
 function containerBodyPath(block: SlotBlock): string {
   const tab = puzzleTabDepth;
-  const frame = containerFrame(block.width, block.height);
+  const bodyOffset = block.bodyOffsetY ?? 0;
+  const frame = containerFrame(block.width, block.height - bodyOffset);
   const innerLeft = frame.bodyRect.x;
   const innerRight = frame.bodyRect.x + frame.bodyRect.width;
-  const innerTop = frame.bodyRect.y;
-  const innerBottom = frame.bodyRect.y + frame.bodyRect.height;
-  const bodyInputY = frame.laneY;
+  const innerTop = frame.bodyRect.y + bodyOffset;
+  const innerBottom = frame.bodyRect.y + frame.bodyRect.height + bodyOffset;
+  const bodyInputY = frame.laneY + bodyOffset;
   const tabTop = bodyInputY - puzzleMouthHalfHeight - containerGeometry.innerGap;
   const tabBottom = bodyInputY + puzzleMouthHalfHeight + containerGeometry.innerGap;
   const notchTop = bodyInputY - puzzleMouthHalfHeight;
@@ -98,6 +100,13 @@ export function renderShape(path: string, width: number, height: number, extraPa
 }
 
 export function renderBlockShape(block: SlotBlock): string {
+  if (block.presentation === 'predicate-capsule') {
+    return `
+      <svg class="puzzle-shape" viewBox="0 0 ${block.width} ${block.height}" preserveAspectRatio="none" aria-hidden="true">
+        <rect class="block-body" x="2" y="2" width="${Math.max(0, block.width - 4)}" height="${Math.max(0, block.height - 4)}" rx="${Math.min(20, block.height / 2)}" />
+      </svg>
+    `;
+  }
   const branchTabs = block.kind === 'condition' ? conditionBranchTabs(block) : '';
   return renderShape(puzzlePath(block), block.width, block.height, branchTabs);
 }
@@ -118,14 +127,18 @@ export function renderSlotJoin(join: SlotJoin): string {
 }
 
 export function renderBlock(block: SlotBlock, recentNodeId: string | null): string {
+  if (block.presentation === 'predicate-capsule') {
+    return renderPredicateCapsule(block, block.x, block.y, recentNodeId);
+  }
   const conditionClass = block.kind === 'condition' && !('pass' in block.outputOffsets && 'fail' in block.outputOffsets) ? ' condition-single' : '';
   const zIndex = Math.max(10, (block.kind === 'control' ? 900 : 3000) - block.x) + (block.selected ? 1000 : 0);
   const bodyZone = block.kind === 'control' && !block.hasChildren
     ? '<div class="container-body-zone"><span>拖入积木到这里</span></div>'
     : '';
-  const frame = block.kind === 'control' ? containerFrame(block.width, block.height) : null;
+  const bodyOffset = block.bodyOffsetY ?? 0;
+  const frame = block.kind === 'control' ? containerFrame(block.width, block.height - bodyOffset) : null;
   const containerStyle = frame
-    ? `; --container-body-left:${frame.bodyRect.x}px; --container-body-top:${frame.bodyRect.y}px; --container-body-right:${block.width - frame.bodyRect.x - frame.bodyRect.width}px; --container-body-bottom:${block.height - frame.bodyRect.y - frame.bodyRect.height}px`
+    ? `; --block-body-offset:${bodyOffset}px; --container-body-left:${frame.bodyRect.x}px; --container-body-top:${frame.bodyRect.y + bodyOffset}px; --container-body-right:${block.width - frame.bodyRect.x - frame.bodyRect.width}px; --container-body-bottom:${block.height - bodyOffset - frame.bodyRect.y - frame.bodyRect.height}px`
     : '';
 
   return `
@@ -136,12 +149,57 @@ export function renderBlock(block: SlotBlock, recentNodeId: string | null): stri
       style="left:${block.x}px; top:${block.y}px; width:${block.width}px; height:${block.height}px; --condition-content-top:${Math.max(18, (block.inputY ?? 202) - 57)}px; z-index:${zIndex}${containerStyle}"
     >
       ${renderBlockShape(block)}
+      ${renderConditionRack(block)}
       ${bodyZone}
       <div class="block-topline">
         <span>${escapeHtml(block.type)}</span>
       </div>
       <h3><span class="block-title-text">${escapeHtml(block.title)}</span></h3>
       <p><span class="block-summary-text">${escapeHtml(block.summary)}</span></p>
+    </article>
+  `;
+}
+
+function renderConditionRack(block: SlotBlock): string {
+  if (!block.conditionRack) {
+    return '';
+  }
+  return `<div class="condition-rack" aria-label="结束条件架">
+    ${block.conditionRack.rows.map((row) => `
+      <div
+        class="condition-rack-row${row.capsule ? ' is-filled' : ' is-empty'}"
+        data-condition-slot="${escapeAttr(row.slotId)}"
+        data-condition-container="${escapeAttr(block.id)}"
+        style="left:${row.x}px; top:${row.y}px; width:${row.width}px; height:${row.height}px"
+      >
+        ${row.capsule
+          ? renderPredicateCapsule(row.capsule, row.capsule.x - block.x - row.x, row.capsule.y - block.y - row.y, null)
+          : '<span class="condition-rack-empty">拖入条件</span>'}
+        <button
+          type="button"
+          class="condition-negate${row.negated ? ' is-active' : ''}"
+          data-condition-negate="${escapeAttr(block.id)}"
+          data-condition-slot-id="${escapeAttr(row.slotId)}"
+          aria-label="${row.negated ? '取消取反' : '取反此条件'}"
+          aria-pressed="${row.negated}"
+          title="${row.negated ? '已取反，点击取消' : '点击取反'}"
+        ><span aria-hidden="true"></span></button>
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+function renderPredicateCapsule(block: SlotBlock, left: number, top: number, recentNodeId: string | null): string {
+  return `
+    <article
+      class="logic-block condition predicate-capsule${block.selected ? ' selected' : ''}${recentNodeId === block.id ? ' newly-added' : ''}"
+      data-block="${escapeAttr(block.id)}"
+      data-embedded-parent="${escapeAttr(block.embeddedParentId ?? '')}"
+      style="left:${left}px; top:${top}px; width:${block.width}px; height:${block.height}px"
+      title="双击编辑条件"
+    >
+      ${renderBlockShape(block)}
+      <span class="predicate-capsule-summary">${escapeHtml(block.title)}</span>
     </article>
   `;
 }

@@ -4,6 +4,7 @@ import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.runtime.RuntimeNodeExecutionResult;
+import com.pixelmc.pixellogic.core.runtime.RuntimePredicateResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
 import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
@@ -52,6 +53,18 @@ public final class SimulationExecutionRegistry {
                 .map(executor -> executor.execute(node, context, services));
     }
 
+    public Optional<RuntimePredicateResult> evaluatePredicate(
+            NodeDefinition node,
+            SimulationContext context,
+            RuntimeServices services
+    ) {
+        SimulationBlockExecutor executor = executors.get(node.type());
+        if (executor instanceof SimulationPredicateEvaluator predicate) {
+            return Optional.of(predicate.evaluatePredicate(node, context, services));
+        }
+        return Optional.empty();
+    }
+
     private static final class MessageExecutor implements SimulationBlockExecutor {
         @Override
         public NodeType nodeType() {
@@ -87,86 +100,98 @@ public final class SimulationExecutionRegistry {
         }
     }
 
-    private static final class PlayerHasTagExecutor implements SimulationBlockExecutor {
+    private static final class PlayerHasTagExecutor implements SimulationPredicateEvaluator {
         @Override
         public NodeType nodeType() {
             return NodeType.PLAYER_HAS_TAG_CONDITION;
         }
 
         @Override
-        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+        public RuntimePredicateResult evaluatePredicate(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             String tag = tag(node);
             boolean passed = context.actor().hasTag(tag);
-            ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
-            return new RuntimeNodeExecutionResult(
-                    mode.outputSlot(passed),
+            return new RuntimePredicateResult(
+                    passed,
                     "玩家标签条件" + (passed ? "通过" : "失败") + "：" + context.actor().displayName() + " "
                             + (passed ? "拥有" : "不拥有") + "标签 " + tag + "。"
-                            + playerTagModeTrace(mode, passed)
             );
+        }
+
+        @Override
+        public String outputModeTrace(ConditionOutputMode mode, boolean value) {
+            return playerTagModeTrace(mode, value);
         }
     }
 
-    private static final class PlayerIsAdminExecutor implements SimulationBlockExecutor {
+    private static final class PlayerIsAdminExecutor implements SimulationPredicateEvaluator {
         @Override
         public NodeType nodeType() {
             return NodeType.PLAYER_IS_ADMIN_CONDITION;
         }
 
         @Override
-        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+        public RuntimePredicateResult evaluatePredicate(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             boolean passed = context.actor().operator();
-            ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
-            return new RuntimeNodeExecutionResult(
-                    mode.outputSlot(passed),
+            return new RuntimePredicateResult(
+                    passed,
                     "管理员条件" + (passed ? "通过" : "失败") + "：" + context.actor().displayName()
                             + (passed ? " 是管理员。" : " 不是管理员。")
-                            + adminModeTrace(mode, passed)
             );
+        }
+
+        @Override
+        public String outputModeTrace(ConditionOutputMode mode, boolean value) {
+            return adminModeTrace(mode, value);
         }
     }
 
-    private static final class PlayerDimensionExecutor implements SimulationBlockExecutor {
+    private static final class PlayerDimensionExecutor implements SimulationPredicateEvaluator {
         @Override
         public NodeType nodeType() {
             return NodeType.PLAYER_DIMENSION_CONDITION;
         }
 
         @Override
-        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+        public RuntimePredicateResult evaluatePredicate(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             String expected = config(node, "dimensionId", "minecraft:overworld");
             String actual = context.actorPosition().dimensionId();
             boolean passed = actual.equals(expected);
-            ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
-            return new RuntimeNodeExecutionResult(
-                    mode.outputSlot(passed),
+            return new RuntimePredicateResult(
+                    passed,
                     "玩家维度条件" + (passed ? "通过" : "失败") + "：" + context.actor().displayName()
                             + " 位于「" + actual + "」，目标维度「" + expected + "」。"
-                            + conditionModeTrace(mode, passed, "在该维度", "不在该维度")
             );
+        }
+
+        @Override
+        public String outputModeTrace(ConditionOutputMode mode, boolean value) {
+            return conditionModeTrace(mode, value, "在该维度", "不在该维度");
         }
     }
 
-    private static final class PlayerInRegionExecutor implements SimulationBlockExecutor {
+    private static final class PlayerInRegionExecutor implements SimulationPredicateEvaluator {
         @Override
         public NodeType nodeType() {
             return NodeType.PLAYER_IN_REGION_CONDITION;
         }
 
         @Override
-        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+        public RuntimePredicateResult evaluatePredicate(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             String regionName = config(node, "regionName", "");
             Optional<SimulationRegionFact> region = context.world().findRegion(regionName);
             boolean passed = region.isPresent() && context.world().isPositionInsideRegion(context.actorPosition(), region.get());
-            ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
             String detail = region.isEmpty()
                     ? "未找到测试区域「" + regionName + "」。"
                     : context.actor().displayName() + (passed ? " 在" : " 不在") + "测试区域「" + regionName + "」内。";
-            return new RuntimeNodeExecutionResult(
-                    mode.outputSlot(passed),
+            return new RuntimePredicateResult(
+                    passed,
                     "玩家区域条件" + (passed ? "通过" : "失败") + "：" + detail
-                            + conditionModeTrace(mode, passed, "在区域内", "不在区域内")
             );
+        }
+
+        @Override
+        public String outputModeTrace(ConditionOutputMode mode, boolean value) {
+            return conditionModeTrace(mode, value, "在区域内", "不在区域内");
         }
     }
 
@@ -190,26 +215,29 @@ public final class SimulationExecutionRegistry {
         }
     }
 
-    private static final class TargetBlockTypeExecutor implements SimulationBlockExecutor {
+    private static final class TargetBlockTypeExecutor implements SimulationPredicateEvaluator {
         @Override
         public NodeType nodeType() {
             return NodeType.TARGET_BLOCK_TYPE_CONDITION;
         }
 
         @Override
-        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
+        public RuntimePredicateResult evaluatePredicate(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             String expected = config(node, "blockId", "minecraft:stone");
             SimulationBlockFact target = context.world().targetBlock();
             boolean passed = target.enabled() && target.blockId().equals(expected);
-            ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
             String detail = target.enabled()
                     ? "目标方块为「" + target.blockId() + "」，期望「" + expected + "」。"
                     : "未设置目标方块。";
-            return new RuntimeNodeExecutionResult(
-                    mode.outputSlot(passed),
+            return new RuntimePredicateResult(
+                    passed,
                     "目标方块类型条件" + (passed ? "通过" : "失败") + "：" + detail
-                            + conditionModeTrace(mode, passed, "为该方块", "不为该方块")
             );
+        }
+
+        @Override
+        public String outputModeTrace(ConditionOutputMode mode, boolean value) {
+            return conditionModeTrace(mode, value, "为该方块", "不为该方块");
         }
     }
 
@@ -414,4 +442,5 @@ public final class SimulationExecutionRegistry {
             case BRANCH -> passed ? "走是管理员分支。" : "走不是管理员分支。";
         };
     }
+
 }

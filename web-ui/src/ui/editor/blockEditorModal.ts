@@ -1,13 +1,14 @@
-import type { BlockCatalog, GraphNode } from '../../model/graphTypes';
+import type { BlockCatalog, GraphDocument, GraphNode } from '../../model/graphTypes';
 import type { SimulationTestContext } from '../../model/simulationTestContext';
 import { escapeHtml } from '../../utils/dom';
 import { nodeOfficialLabel, nodeSummary } from '../humanize/labels';
 import { renderNodeEditor } from './formControls';
+import { renderConditionRackEditor } from './conditionRackEditor';
 
 export function renderEditorModal(
   nodeItem: GraphNode,
   catalog: BlockCatalog,
-  options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string; steady: boolean; simulationTestContext: SimulationTestContext },
+  options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string; steady: boolean; simulationTestContext: SimulationTestContext; graph: GraphDocument; rackChildEditing?: boolean },
 ): string {
   const officialName = nodeOfficialLabel(nodeItem, catalog);
   const customName = nodeItem.displayName.trim();
@@ -31,6 +32,7 @@ export function renderEditorModal(
             <p data-modal-summary>${escapeHtml(nodeSummary(nodeItem, catalog))}</p>
           </section>
           ${renderNodeEditor(nodeItem, catalog, options.simulationTestContext)}
+          ${renderConditionRackEditor(nodeItem, options.graph, catalog)}
           ${options.error || options.hasValidation ? `
             <section class="editor-issues" role="${options.error ? 'alert' : 'status'}">
               <b>${options.error ? '保存提示' : '检查结果'}</b>
@@ -39,8 +41,8 @@ export function renderEditorModal(
           ` : ''}
         </div>
         <footer class="editor-actions">
-          <button type="button" class="ghost-button" data-modal-action="cancel">关闭</button>
-          <button type="button" class="run-button" data-modal-action="save">保存</button>
+          <button type="button" class="ghost-button" data-modal-action="cancel">${options.rackChildEditing ? '返回条件架' : '关闭'}</button>
+          <button type="button" class="run-button" data-modal-action="save">${options.rackChildEditing ? '保存条件并返回' : '保存'}</button>
         </footer>
         <div class="unsaved-confirm" data-unsaved-confirm hidden>
           <section role="alertdialog" aria-modal="true" aria-labelledby="unsaved-confirm-title">

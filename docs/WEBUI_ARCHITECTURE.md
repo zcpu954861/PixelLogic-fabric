@@ -167,6 +167,24 @@ The slot-based canvas now supports a minimal direct-manipulation graph editing l
 - The right panel remains informational, but now also shows selected-block connections plus minimal `断开输入` and `删除积木` controls.
 - Trace text is humanized in the WebUI display layer only; runtime trace payloads remain unchanged.
 
+## Loop Until Condition Rack
+
+The `control.loop.until` condition rack is part of the graph model, not DOM-only decoration:
+
+- `conditionSlots` is an ordered list of stable `{ slotId, negated }` records on the loop node; capsules use normal `parentContainerId` / `parentSlot` membership.
+- Catalog `PREDICATE` capability controls which existing condition nodes can enter a rack. The UI does not hard-code the five Chinese block names or infer support from `nodeKind`.
+- The rack grows upward. Adding rows leaves the loop header, external input/done anchors, and body origin unchanged.
+- One shared geometry source supplies row, capsule, empty-slot, NOT-toggle, rack-offset, and complete-bounds measurements used by rendering, hit testing, selection, drag groups, ghost/placeholder preview, insertion spacing, and nesting.
+- A rack-local empty-slot candidate accepts one predicate node. It does not accept normal actions, replace a filled slot, or steal a body candidate.
+- A capsule renders the catalog predicate summary without ordinary pass/fail anchors. Dragging it out restores the full condition card while keeping its fields and output mode; old control edges are not recreated.
+- The per-slot NOT control has a visible state, hover feedback, tooltip/`aria-label`, and does not open the condition editor.
+
+The loop editor keeps slot edits in a modal-local draft. Add/remove/NOT operations do not mutate the graph until save. Saving a removed filled slot deletes the slot and owned condition node in one graph/history/save operation; cancelling leaves both intact. Graph and node cloning deep-copy condition-slot records so undo snapshots and editor drafts cannot alias live state.
+
+Undo/redo restores stable slot and node identities exactly. The current WebUI has no copy, duplicate, or graph-import command; no such UI is claimed here. A future fragment operation must use one identity remapper for nodes, edges, container membership, dynamic slot ids, and capsule `parentSlot` references.
+
+Static WebUI checks cover pure geometry, complete bounds, predicate-only drop rules, deep cloning, accessible NOT markup, rack-aware drag/ghost grouping, and reduced-motion structure. They are not browser E2E tests.
+
 ## Frontend Structure
 
 The WebUI remains Vanilla TypeScript. `main.ts` is a bootstrap entry that imports `styles/index.css` and starts `ui/app.ts`.

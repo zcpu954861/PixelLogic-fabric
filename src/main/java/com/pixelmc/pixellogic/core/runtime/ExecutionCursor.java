@@ -22,7 +22,8 @@ public record ExecutionCursor(
 
     public enum LoopKind {
         COUNT,
-        FOREVER
+        FOREVER,
+        UNTIL
     }
 
     public record LoopFrame(

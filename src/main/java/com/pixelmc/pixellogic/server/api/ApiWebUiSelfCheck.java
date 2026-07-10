@@ -47,8 +47,11 @@ public final class ApiWebUiSelfCheck {
             require(catalog.body().contains("trigger.manual_test") && catalog.body().contains("condition.state.equals"),
                     "catalog should include demo block ids");
             require(catalog.body().contains("\"formSchema\"") && catalog.body().contains("rich_text_component")
-                            && catalog.body().contains("\"summaryTemplate\""),
-                    "catalog should expose form schema, rich text field type, and summary metadata");
+                            && catalog.body().contains("\"summaryTemplate\"")
+                            && catalog.body().contains("\"predicateSummaryTemplate\"")
+                            && catalog.body().contains("\"capabilities\"")
+                            && catalog.body().contains("control.loop.until"),
+                    "catalog should expose form, predicate capability, summary metadata, and loop until");
 
             CheckedResponse graphResponse = send(client, "GET", base + "/api/pixellogic/graphs/demo-start-flow");
             requireJson(graphResponse, "graph should be JSON");
@@ -56,6 +59,8 @@ public final class ApiWebUiSelfCheck {
                     "graph endpoint should return graph, fingerprint, and validation");
             require(graphResponse.body().contains("\"blockId\"") && graphResponse.body().contains("trigger.manual_test"),
                     "graph endpoint should return blockId for catalog migration");
+            require(graphResponse.body().contains("\"conditionSlots\""),
+                    "graph endpoint should expose additive typed condition slot data");
 
             JsonObject graph = JsonParser.parseString(graphResponse.body()).getAsJsonObject().getAsJsonObject("graph");
             setNodeConfig(graph, "welcome-message", "message", "API self-check welcome");

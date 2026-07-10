@@ -470,6 +470,29 @@ Simulation Model 是 PixelLogic 的抽象测试环境，不是 Minecraft 克隆�
 
 模拟结果不等于真实 Minecraft 执行结果。模拟必须足够验证 graph 逻辑、配置合法性、trace、状态变化和分支走向，但不承诺模拟完整红石、实体 AI、碰撞/物理、区块加载或完整物品 NBT 行为。
 
+## Loop Until Predicate Capabilities
+
+Loop Until + Condition Rack v1 adds two catalog-level capabilities:
+
+- `PREDICATE`: the block has a registered synchronous, side-effect-free boolean evaluator and compact predicate summary.
+- `PREDICATE_RACK`: the block owns an ordered dynamic rack whose stable slot ids live on each graph-node instance.
+
+`control.loop.until` declares `PREDICATE_RACK` and keeps `containerSlots=["body"]`; dynamic condition ids are not static catalog slots. Its node stores typed ordered `conditionSlots`, each containing `slotId` and `negated`. Capsule nodes remain flat graph nodes and point back through `parentContainerId` / `parentSlot`.
+
+The first `PREDICATE` set is deliberately exact:
+
+- `condition.player.has_tag`
+- `condition.player.is_admin`
+- `condition.player.dimension_is`
+- `condition.player.in_region`
+- `condition.target_block.is_type`
+
+Each block retains its ordinary form schema and condition output mode. Ordinary execution evaluates the shared predicate and maps the raw result through `PASS_ONLY` / `FAIL_ONLY` / `BRANCH`; rack execution evaluates the same raw predicate, applies the slot-local NOT, then contributes to AND. Predicate summary metadata supplies capsule text without exposing block ids, enum values, or raw JSON.
+
+The loop uses pre-check semantics and a 20-round simulation cap. Incomplete zero/empty-slot and empty-body states remain saveable warnings, while execution fails closed for missing/empty/illegal predicates or a false pre-check with an empty body. A body wait reuses the existing continuation frame.
+
+Schema version remains 1 because the typed condition-slot list is additive and old missing fields normalize to empty. Undo/redo preserves ids. There is no current copy/import UI; any future fragment clone/import must remap dynamic slot ids together with capsule membership rather than relying on array indexes.
+
 ## Simulation vs Minecraft Adapter
 
 同一个 block id 应有共享定义和可替换执行器：

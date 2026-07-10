@@ -53,11 +53,16 @@ public final class CompiledGraph {
     }
 
     public Optional<NodeDefinition> bodyEntry(String containerNodeId, String parentSlot) {
+        return childrenInSlot(containerNodeId, parentSlot).stream()
+                .filter(node -> incomingWithinParent(node.id(), containerNodeId, parentSlot).isEmpty())
+                .findFirst();
+    }
+
+    public List<NodeDefinition> childrenInSlot(String containerNodeId, String parentSlot) {
         return nodesById.values().stream()
                 .filter(node -> node.parentContainerId().equals(containerNodeId))
                 .filter(node -> node.parentSlot().equals(parentSlot))
-                .filter(node -> incomingWithinParent(node.id(), containerNodeId, parentSlot).isEmpty())
-                .findFirst();
+                .toList();
     }
 
     public boolean isInBody(NodeDefinition node, String containerNodeId, String parentSlot) {

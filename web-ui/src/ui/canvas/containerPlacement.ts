@@ -3,6 +3,7 @@ import {
   activeGraphEdges,
   blockMetrics,
   containerBodyRect,
+  conditionSlotRects,
   containerDescendantNodeIds,
   downstreamNodeIds,
   fallbackPosition,
@@ -51,7 +52,11 @@ export function makeContainerBodyGap(graph: GraphDocument, drag: BlockDrag, cont
   const dx = Math.round((bounds?.width ?? normalBlockWidth) - connectedOverlap + containerGeometry.childGap);
   const shifted = new Set<string>();
   graph.nodes
-    .filter((nodeItem) => nodeItem.parentContainerId === containerNodeId && !group.has(nodeItem.id))
+    .filter((nodeItem) =>
+      nodeItem.parentContainerId === containerNodeId
+      && (nodeItem.parentSlot || 'body') === 'body'
+      && !group.has(nodeItem.id),
+    )
     .forEach((nodeItem) => {
       shifted.add(nodeItem.id);
       containerDescendantNodeIds(graph, nodeItem.id).forEach((nodeId) => shifted.add(nodeId));
@@ -110,9 +115,12 @@ export function syncDraggedContainerMembership(graph: GraphDocument, drag: Block
     }
     const parentId = nodeItem.parentContainerId;
     const parent = parentId ? containerGraph.nodes.find((item) => item.id === parentId) : null;
-    const rect = nodeRect(graph, nodeItem);
+    const rect = nodeRect(graph, nodeItem, drag.previewPositions.get(nodeItem.id));
     const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-    if (!parent || !pointInsideRect(center, containerBodyRect(containerGraph, parent))) {
+    const membershipRect = parent && (nodeItem.parentSlot || 'body') !== 'body'
+      ? conditionSlotRects(containerGraph, parent, nodeItem.parentSlot || '')?.row ?? null
+      : parent ? containerBodyRect(containerGraph, parent) : null;
+    if (!membershipRect || !pointInsideRect(center, membershipRect)) {
       parentIdsToClear.add(parentId ?? '');
     }
   });
@@ -144,12 +152,16 @@ export function draggedGroupBounds(
     if (!nodeItem) {
       return bounds;
     }
-    const position = nodePosition(previewGraph, nodeId);
+    const position = drag.previewPositions.get(nodeId) ?? nodePosition(previewGraph, nodeId);
     const size = blockMetrics(previewGraph, nodeItem);
-    const left = bounds ? Math.min(bounds.left, position.x) : position.x;
-    const right = bounds ? Math.max(bounds.right, position.x + size.width) : position.x + size.width;
-    const top = bounds ? Math.min(bounds.top, position.y) : position.y;
-    const bottom = bounds ? Math.max(bounds.bottom, position.y + size.height) : position.y + size.height;
+    const nodeLeft = position.x + size.visualBounds.x;
+    const nodeRight = nodeLeft + size.visualBounds.width;
+    const nodeTop = position.y + size.visualBounds.y;
+    const nodeBottom = nodeTop + size.visualBounds.height;
+    const left = bounds ? Math.min(bounds.left, nodeLeft) : nodeLeft;
+    const right = bounds ? Math.max(bounds.right, nodeRight) : nodeRight;
+    const top = bounds ? Math.min(bounds.top, nodeTop) : nodeTop;
+    const bottom = bounds ? Math.max(bounds.bottom, nodeBottom) : nodeBottom;
     return { left, right, top, bottom, width: right - left, height: bottom - top };
   }, null);
 }
@@ -168,10 +180,15 @@ function shouldCheckDraggedContainerMembership(nodeItem: GraphNode, group: Set<s
   return group.has(nodeItem.id) && Boolean(nodeItem.parentContainerId) && !group.has(nodeItem.parentContainerId ?? '');
 }
 
-function nodeRect(graph: GraphDocument, nodeItem: GraphNode): { x: number; y: number; width: number; height: number } {
-  const position = nodePosition(graph, nodeItem.id);
+function nodeRect(graph: GraphDocument, nodeItem: GraphNode, previewPosition?: { x: number; y: number }): { x: number; y: number; width: number; height: number } {
+  const position = previewPosition ?? nodePosition(graph, nodeItem.id);
   const size = blockMetrics(graph, nodeItem);
-  return { x: position.x, y: position.y, width: size.width, height: size.height };
+  return {
+    x: position.x + size.visualBounds.x,
+    y: position.y + size.visualBounds.y,
+    width: size.visualBounds.width,
+    height: size.visualBounds.height,
+  };
 }
 
 function pointInsideRect(point: { x: number; y: number }, rect: { x: number; y: number; width: number; height: number }): boolean {

@@ -43,6 +43,7 @@ import type {
   GraphHistoryEntry,
   GraphNode,
   GraphPosition,
+  SlotBlock,
 } from '../model/graphTypes';
 import {
   nodeCategoryLabel,
@@ -58,6 +59,21 @@ import {
 } from './canvas/dragInsert';
 import { renderCatalogLibrary } from './catalog/catalogLibrary';
 import { updateBlockOverflowMotion } from './canvas/cardOverflow';
+import {
+  catalogDragGhostRect,
+  clearCatalogDragGhost,
+  showCatalogContainerTarget,
+  showCatalogDragGhost,
+  updateCatalogDragGhost,
+} from './canvas/dragGhostView';
+import {
+  type BlockRectSnapshot,
+  cancelInteractionAnimations,
+  captureBlockRects,
+  clearPlacementPreview,
+  playGraphTransition,
+  showPlacementPreview,
+} from './canvas/interactionAnimations';
 import { renderEditorModal } from './editor/blockEditorModal';
 import { bindCustomSelectControls } from './editor/customDropdown';
 import {
@@ -147,6 +163,10 @@ function renderApp(): void {
   if (!app) {
     return;
   }
+
+  cancelInteractionAnimations();
+  clearPlacementPreview(false);
+  clearCatalogDragGhost();
 
   const editorWasOpen = Boolean(document.querySelector('[data-modal-overlay]'));
   const simulationEditorWasOpen = Boolean(document.querySelector('[data-sim-modal-overlay]'));
@@ -608,6 +628,9 @@ function bindInteractions(): void {
 }
 
 function beginBlockPointerDown(event: PointerEvent, nodeId: string, viewport: HTMLElement): void {
+  cancelInteractionAnimations();
+  clearPlacementPreview(false);
+  clearCatalogDragGhost();
   const graph = currentGraph();
   if (!graph.nodes.some((nodeItem) => nodeItem.id === nodeId)) {
     return;
@@ -694,7 +717,6 @@ function endBlockDrag(event: PointerEvent, viewport: HTMLElement): void {
     moveBlockDrag(event);
   }
   activeBlockDrag = null;
-  clearInsertPreview();
   setDragHint('', '');
   viewport.classList.remove('is-block-dragging');
   if (viewport.hasPointerCapture(event.pointerId)) {
@@ -702,6 +724,7 @@ function endBlockDrag(event: PointerEvent, viewport: HTMLElement): void {
   }
 
   if (!drag.started) {
+    clearInsertPreview();
     selectOrOpenBlock(drag.rootId);
     return;
   }
@@ -817,8 +840,17 @@ function clearPendingAutoSaveTimer(): void {
 function applyGraphEdit(
   graph: GraphDocument,
   lastAction: string,
-  options: { selectedNodeId?: string; recentNodeId?: string | null; refreshOnly?: boolean } = {},
+  options: {
+    selectedNodeId?: string;
+    recentNodeId?: string | null;
+    refreshOnly?: boolean;
+    animationOrigin?: { nodeId: string; rect: BlockRectSnapshot };
+  } = {},
 ): void {
+  const animationOrigins = options.animationOrigin
+    ? new Map([[options.animationOrigin.nodeId, options.animationOrigin.rect]])
+    : new Map<string, BlockRectSnapshot>();
+  const firstRects = options.refreshOnly ? null : captureBlockRects(animationOrigins);
   const nextGraph = normalizeConditionBranchLayout(graph);
   rememberGraphState();
   graphVersion += 1;
@@ -838,10 +870,14 @@ function applyGraphEdit(
     refreshDraftIndicators();
   } else {
     renderApp();
+    if (firstRects) {
+      playGraphTransition(firstRects);
+    }
   }
 }
 
 function restoreGraphHistory(entry: GraphHistoryEntry, lastAction: string): void {
+  const firstRects = captureBlockRects();
   graphVersion += 1;
   state.graph = normalizeConditionBranchLayout(entry.graph);
   state.selectedNodeId = entry.selectedNodeId;
@@ -853,6 +889,7 @@ function restoreGraphHistory(entry: GraphHistoryEntry, lastAction: string): void
   state.lastAction = lastAction;
   scheduleAutoSave();
   renderApp();
+  playGraphTransition(firstRects);
 }
 
 function undoGraphEdit(): void {
@@ -917,8 +954,9 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 function renderInsertPreview(drag: BlockDrag): void {
   const candidate = drag.candidate;
-  clearInsertPreview();
+  clearInsertDecorations();
   if (!candidate) {
+    clearPlacementPreview();
     setDragHint('靠近两个积木之间会自动吸附插入。', 'active');
     return;
   }
@@ -929,36 +967,30 @@ function renderInsertPreview(drag: BlockDrag): void {
   } else if (candidate.kind === 'container' && candidate.valid) {
     document.querySelector<HTMLElement>(`[data-block="${candidate.containerNodeId}"]`)?.classList.add('container-target');
   }
-  renderDropPlaceholder(drag);
+  if (candidate.valid) {
+    const graph = currentGraph();
+    const placement = computeDragDrop(graph, drag).graph;
+    showPlacementPreview({
+      key: `${drag.rootId}:${candidate.kind}:${candidate.join.id}`,
+      baseBlocks: buildBlocks(graph, activeCatalog(), state.selectedNodeId),
+      placementBlocks: buildBlocks(placement, activeCatalog(), state.selectedNodeId),
+      draggedNodeIds: new Set(drag.groupIds),
+      rootNodeId: drag.rootId,
+    });
+  } else {
+    clearPlacementPreview();
+  }
   document.querySelector<HTMLElement>(`[data-block="${candidate.join.from}"]`)?.classList.add('is-related');
   document.querySelector<HTMLElement>(`[data-block="${candidate.join.to}"]`)?.classList.add('is-related');
   setDragHint(candidate.message, candidate.valid ? 'valid' : 'invalid');
 }
 
-function renderDropPlaceholder(drag: BlockDrag): void {
-  if (!drag.candidate?.valid) {
-    return;
-  }
-  const placement = computeDragDrop(currentGraph(), drag).graph;
-  const root = placement.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
-  const worldEl = document.querySelector<HTMLElement>('.flow-world');
-  if (!root || !worldEl) {
-    return;
-  }
-  const position = root.position ?? fallbackPosition(root.id);
-  const metrics = blockMetrics(placement, root);
-  const placeholder = document.createElement('div');
-  placeholder.className = 'drop-placeholder';
-  placeholder.setAttribute('aria-hidden', 'true');
-  placeholder.style.left = `${position.x}px`;
-  placeholder.style.top = `${position.y}px`;
-  placeholder.style.width = `${metrics.width}px`;
-  placeholder.style.height = `${metrics.height}px`;
-  worldEl.append(placeholder);
+function clearInsertPreview(): void {
+  clearInsertDecorations();
+  clearPlacementPreview();
 }
 
-function clearInsertPreview(): void {
-  document.querySelectorAll('.drop-placeholder').forEach((item) => item.remove());
+function clearInsertDecorations(): void {
   document.querySelectorAll('.slot-join.insert-target, .slot-join.insert-invalid').forEach((item) => {
     item.classList.remove('insert-target', 'insert-invalid');
   });
@@ -989,33 +1021,58 @@ function beginCatalogPointer(event: PointerEvent, blockId: string, buttonEl: HTM
   if (event.button !== 0) {
     return;
   }
+  event.preventDefault();
   const start = { x: event.clientX, y: event.clientY };
   let moved = false;
+  const ghostBlock = catalogGhostBlock(blockId);
+  cancelInteractionAnimations();
+  clearPlacementPreview(false);
   buttonEl.setPointerCapture(event.pointerId);
   const cleanup = () => {
     buttonEl.removeEventListener('pointermove', onMove);
     buttonEl.removeEventListener('pointerup', onUp);
     buttonEl.removeEventListener('pointercancel', onCancel);
+    document.removeEventListener('keydown', onKeyDown);
     if (buttonEl.hasPointerCapture(event.pointerId)) {
       buttonEl.releasePointerCapture(event.pointerId);
     }
   };
   const onMove = (moveEvent: PointerEvent) => {
     if (Math.hypot(moveEvent.clientX - start.x, moveEvent.clientY - start.y) >= dragThreshold) {
+      if (!moved && ghostBlock) {
+        showCatalogDragGhost(ghostBlock, moveEvent.clientX, moveEvent.clientY, scale);
+      }
       moved = true;
     }
+    if (!moved) {
+      return;
+    }
+    updateCatalogDragGhost(moveEvent.clientX, moveEvent.clientY);
+    showCatalogContainerTarget(containerAtPoint(currentGraph(), pointerToWorld(moveEvent))?.id ?? null);
   };
   const onUp = (upEvent: PointerEvent) => {
+    const ghostRect = catalogDragGhostRect();
     cleanup();
-    addCatalogBlockAt(blockId, moved ? upEvent : null);
+    clearCatalogDragGhost();
+    addCatalogBlockAt(blockId, moved ? upEvent : null, ghostRect ? blockRectSnapshot(ghostRect) : null);
   };
-  const onCancel = () => cleanup();
+  const onCancel = () => {
+    cleanup();
+    clearCatalogDragGhost();
+  };
+  const onKeyDown = (keyEvent: KeyboardEvent) => {
+    if (keyEvent.key === 'Escape') {
+      keyEvent.preventDefault();
+      onCancel();
+    }
+  };
   buttonEl.addEventListener('pointermove', onMove);
   buttonEl.addEventListener('pointerup', onUp);
   buttonEl.addEventListener('pointercancel', onCancel);
+  document.addEventListener('keydown', onKeyDown);
 }
 
-function addCatalogBlockAt(blockId: string, event: PointerEvent | null): void {
+function addCatalogBlockAt(blockId: string, event: PointerEvent | null, animationOrigin: BlockRectSnapshot | null = null): void {
   const blockItem = catalogBlock(activeCatalog(), blockId);
   if (!blockItem) {
     state.error = '没有找到这个积木，请重新打开积木库。';
@@ -1052,7 +1109,24 @@ function addCatalogBlockAt(blockId: string, event: PointerEvent | null): void {
   applyGraphEdit(graph, `已新增“${blockItem.displayName}”，正在自动保存。`, {
     selectedNodeId: nodeItem.id,
     recentNodeId: nodeItem.id,
+    animationOrigin: animationOrigin ? { nodeId: nodeItem.id, rect: animationOrigin } : undefined,
   });
+}
+
+function catalogGhostBlock(blockId: string): SlotBlock | null {
+  const blockItem = catalogBlock(activeCatalog(), blockId);
+  if (!blockItem) {
+    return null;
+  }
+  const graph = cloneGraph(currentGraph());
+  const nodeItem = createCatalogNode(blockItem, uniqueNodeId('catalog-drag-ghost', graph), { x: 0, y: 0 });
+  graph.nodes.push(nodeItem);
+  return buildBlocks(graph, activeCatalog(), '')
+    .find((block) => block.id === nodeItem.id) ?? null;
+}
+
+function blockRectSnapshot(rect: DOMRect): BlockRectSnapshot {
+  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
 }
 
 function containerAtPoint(graph: GraphDocument, point: GraphPosition): GraphNode | null {

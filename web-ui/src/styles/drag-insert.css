@@ -75,7 +75,6 @@
     0 0 0 9px rgba(22, 163, 74, 0.09),
     0 0 34px rgba(22, 163, 74, 0.32),
     0 0 72px rgba(22, 163, 74, 0.24);
-  animation: slot-pulse 760ms ease-in-out infinite alternate;
 }
 
 .slot-join.insert-invalid {
@@ -146,19 +145,6 @@
   border-color: rgba(220, 38, 38, 0.48);
   background: #fff1f1;
   color: #991b1b;
-}
-
-@keyframes slot-pulse {
-  from {
-    box-shadow:
-      0 0 0 4px rgba(22, 163, 74, 0.14),
-      0 12px 28px rgba(23, 33, 29, 0.16);
-  }
-  to {
-    box-shadow:
-      0 0 0 9px rgba(22, 163, 74, 0.22),
-      0 16px 34px rgba(23, 33, 29, 0.2);
-  }
 }
 
 @keyframes new-block-pop {

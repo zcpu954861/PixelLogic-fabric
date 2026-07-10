@@ -118,6 +118,12 @@ tasks.register('containerControlFlowSelfCheck', JavaExec) {
 	classpath = sourceSets.main.runtimeClasspath
 }
 
+tasks.register('controlFlowContinuationSelfCheck', JavaExec) {
+	dependsOn classes
+	mainClass = 'com.pixelmc.pixellogic.core.runtime.ControlFlowContinuationSelfCheck'
+	classpath = sourceSets.main.runtimeClasspath
+}
+
 tasks.register('apiWebUiDevServer', JavaExec) {
 	dependsOn classes
 	mainClass = 'com.pixelmc.pixellogic.server.api.ApiWebUiDevServer'
@@ -137,6 +143,7 @@ check.dependsOn tasks.named('textComponentEditorSelfCheck')
 check.dependsOn tasks.named('catalogExpansionV2SelfCheck')
 check.dependsOn tasks.named('catalogExpansionV3SelfCheck')
 check.dependsOn tasks.named('containerControlFlowSelfCheck')
+check.dependsOn tasks.named('controlFlowContinuationSelfCheck')
 
 java {
 	withSourcesJar()

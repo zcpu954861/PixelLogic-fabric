@@ -143,6 +143,8 @@ public final class PixelLogicSpikeService implements AutoCloseable {
                     : "Committed graph validation failed: " + validationIssues.getFirst().message();
             return new RuntimeResult(false, "", message);
         }
+        cancelRuntime();
+        timerScheduler.clearPendingTimers();
         SimulationExecutionResult result = currentRunner.run(SimulationExecutionRequest.manual(
                 graph.id(),
                 DemoGraphFactory.TRIGGER_TYPE,
@@ -241,6 +243,7 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
+            cancelRuntime();
             runtimeGeneration.incrementAndGet();
             timerScheduler.close();
             stateStore.clear();
@@ -248,6 +251,7 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     }
 
     private void installCommittedGraph(GraphDocument document) {
+        cancelRuntime();
         long generation = runtimeGeneration.incrementAndGet();
         timerScheduler.clearPendingTimers();
         GraphDefinition graph = document.toGraphDefinition();
@@ -271,10 +275,18 @@ public final class PixelLogicSpikeService implements AutoCloseable {
                     RuntimeLimits.spikeDefaults(),
                     generation
             );
+            cancelRuntime();
             runtime = nextRuntime;
             return nextRuntime;
         }, services, SimulationExecutionRegistry.playerTags());
         validationIssues = issues;
         committedGraph = document;
+    }
+
+    private void cancelRuntime() {
+        GraphRuntime current = runtime;
+        if (current != null) {
+            current.cancelPendingContinuations();
+        }
     }
 }

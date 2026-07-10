@@ -305,11 +305,15 @@ v1 needs:
 - continuation graph id
 - continuation node/slot reference
 - trace correlation id
+- immutable execution cursor and control-frame stack
+- single-consumption continuation identity
 - max continuation depth/budget
 
 Timer scheduling must not scan every timer every tick when avoidable. Prefer a due queue, min heap, or indexed next-due structure.
 
 The manual simulation spike uses JDK wall-clock scheduling instead of tick scanning. It is in-memory and intentionally does not recover timers across server restart.
+
+Control Flow Continuation v1 keeps cumulative steps, count/forever iteration state, and nested loop return frames in the cursor snapshot so a timer resumes after the waiting node instead of restarting or completing the containing loop.
 
 ### ExecutionContext
 

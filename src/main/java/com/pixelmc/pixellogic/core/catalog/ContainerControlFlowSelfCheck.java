@@ -23,6 +23,7 @@ import com.pixelmc.pixellogic.server.storage.GraphDocument;
 import com.pixelmc.pixellogic.selfcheck.SelfCheckSupport;
 
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -75,16 +76,21 @@ public final class ContainerControlFlowSelfCheck {
             require(traces.get(countResult.traceId()).map(trace -> trace.containsMessage("第 3 次循环结束")).orElse(false),
                     "loop count trace should include iteration");
 
-            BoundedTraceBuffer foreverTraces = new BoundedTraceBuffer(2, 80);
+            BoundedTraceBuffer foreverTraces = new BoundedTraceBuffer(2, 160);
+            ArrayDeque<com.pixelmc.pixellogic.core.timer.TimerContinuation> foreverTimers = new ArrayDeque<>();
             GraphRuntime foreverRuntime = new GraphRuntime(
                     new GraphCompiler().compile(foreverGraph(1)),
                     new InMemoryStateStore(),
                     foreverTraces,
-                    services(),
+                    services(foreverTimers),
                     new RuntimeLimits(256, 8)
             );
             RuntimeResult foreverResult = foreverRuntime.start(new TriggerEvent("manual", "/pixellogic test start", PLAYER_ID, "self-check"));
             require(foreverResult.success(), "forever loop simulation should stop safely");
+            for (int resume = 0; resume < 32 && !foreverTimers.isEmpty(); resume += 1) {
+                foreverRuntime.resumeTimer(foreverTimers.removeFirst());
+            }
+            require(foreverTimers.isEmpty(), "forever continuation queue should stop within the simulation cap");
             require(foreverTraces.get(foreverResult.traceId()).map(trace -> trace.containsMessage("已达到测试模拟循环上限")).orElse(false),
                     "forever loop should stop at simulation cap");
 
@@ -99,6 +105,10 @@ public final class ContainerControlFlowSelfCheck {
     }
 
     private static RuntimeServices services() {
+        return services(new ArrayDeque<>());
+    }
+
+    private static RuntimeServices services(ArrayDeque<com.pixelmc.pixellogic.core.timer.TimerContinuation> timers) {
         return new RuntimeServices() {
             @Override
             public void sendPlayerMessage(UUID playerId, String message) {
@@ -110,6 +120,7 @@ public final class ContainerControlFlowSelfCheck {
 
             @Override
             public void scheduleTimer(Duration delay, com.pixelmc.pixellogic.core.timer.TimerContinuation continuation) {
+                timers.addLast(continuation);
             }
         };
     }

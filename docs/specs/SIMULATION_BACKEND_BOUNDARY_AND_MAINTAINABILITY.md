@@ -78,7 +78,9 @@ Still not implemented:
 - Loop container membership is graph metadata, not a nested JSON runtime model.
 - Loop count reuses normal node execution for body chains and then continues the outer `done` slot.
 - Forever loop is simulation-first and capped; it does not use `while(true)` or a same-call infinite loop.
-- Timer continuation inside loop bodies remains a later scoped runtime problem.
+- Control Flow Continuation v1 adds immutable execution cursors and loop-frame snapshots so timer waits resume the current count/forever iteration and nested return path.
+- Cumulative steps and the 20-round forever simulation cap survive timer resumes; forever `intervalSeconds` uses the same wall-clock continuation path between rounds.
+- Continuations remain in-memory and do not survive server restart.
 - No real MC adapter, persistent server loop scheduler, Channel, SignalBridge, Relay, break/continue, or if/else is added.
 
 ## Goals

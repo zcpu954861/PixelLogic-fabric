@@ -449,7 +449,7 @@ public final class GraphValidator {
         } catch (NumberFormatException exception) {
             error(issues, "timer_duration_invalid", "计时器时间无效：" + node.id());
         }
-        if (!hasOutgoing(graph, node.id(), "timer_completed")) {
+        if (!hasOutgoing(graph, node.id(), "timer_completed") && node.parentContainerId().isBlank()) {
             error(issues, "timer_missing_completed", "计时器缺少完成后的连接：" + node.id());
         }
     }

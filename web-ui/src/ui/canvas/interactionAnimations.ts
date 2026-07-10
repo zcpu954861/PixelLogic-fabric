@@ -1,6 +1,5 @@
-import { containerGeometry } from '../../model/containerGeometry';
 import type { SlotBlock } from '../../model/graphTypes';
-import { renderBlockShape } from './blockView';
+import { renderBlock, renderBlockShape } from './blockView';
 
 export const interactionAnimationTokens = {
   previewMs: 180,
@@ -23,15 +22,16 @@ type PlacementPreview = {
   baseBlocks: SlotBlock[];
   placementBlocks: SlotBlock[];
   draggedNodeIds: Set<string>;
-  rootNodeId: string;
 };
 
 const activeAnimations = new Set<Animation>();
 const activeCleanups = new Set<() => void>();
 const previewElements = new Set<HTMLElement>();
+const placementGhosts = new Map<string, HTMLElement>();
 const previewShells = new Map<string, HTMLElement>();
+const previewShellTargets = new Map<string, HTMLElement>();
 let previewKey = '';
-let placeholderEl: HTMLElement | null = null;
+let previewLayoutSignature = '';
 
 installAnimationTokens();
 
@@ -73,10 +73,6 @@ export function playGraphTransition(first: GraphTransitionSnapshot): void {
         ),
       ]);
     }
-    if (element.classList.contains('control')
-      && (Math.abs(before.height - after.height) > 1 || Math.abs(before.width - after.width) > 1)) {
-      animateContainerResize(element, before, after, scale);
-    }
   });
 }
 
@@ -85,10 +81,15 @@ export function showPlacementPreview(preview: PlacementPreview): void {
   if (!worldEl) {
     return;
   }
+  const layoutSignature = placementPreviewSignature(preview);
+  if (preview.key === previewKey && layoutSignature === previewLayoutSignature) {
+    return;
+  }
   if (preview.key !== previewKey) {
     clearPlacementPreview(false);
     previewKey = preview.key;
   }
+  previewLayoutSignature = layoutSignature;
   clearPreviewTransforms();
 
   const baseById = new Map(preview.baseBlocks.map((block) => [block.id, block]));
@@ -115,16 +116,7 @@ export function showPlacementPreview(preview: PlacementPreview): void {
     });
   }
 
-  const rootBlock = placementById.get(preview.rootNodeId);
-  if (rootBlock) {
-    placeholderEl = updateShapeArtifact(
-      placeholderEl,
-      worldEl,
-      'drop-placeholder',
-      rootBlock,
-      rootBlock.kind === 'control',
-    );
-  }
+  renderPlacementGhosts(worldEl, placementById, preview.draggedNodeIds);
 
   const activeShellIds = new Set<string>();
   placementById.forEach((placementBlock, nodeId) => {
@@ -134,14 +126,19 @@ export function showPlacementPreview(preview: PlacementPreview): void {
       return;
     }
     activeShellIds.add(nodeId);
-    const shell = updateShapeArtifact(
+    const shell = updateContainerShell(
       previewShells.get(nodeId) ?? null,
       worldEl,
-      'container-preview-shell',
       placementBlock,
-      true,
     );
+    placeShellBehindContainer(shell, nodeId);
+    animateArtifactResize(shell, baseBlock, placementBlock);
     previewShells.set(nodeId, shell);
+    const target = blockElement(nodeId);
+    if (target) {
+      target.classList.add('is-container-previewed');
+      previewShellTargets.set(nodeId, target);
+    }
   });
   previewShells.forEach((shell, nodeId) => {
     if (!activeShellIds.has(nodeId)) {
@@ -149,10 +146,17 @@ export function showPlacementPreview(preview: PlacementPreview): void {
       previewShells.delete(nodeId);
     }
   });
+  previewShellTargets.forEach((target, nodeId) => {
+    if (!activeShellIds.has(nodeId)) {
+      target.classList.remove('is-container-previewed');
+      previewShellTargets.delete(nodeId);
+    }
+  });
 }
 
 export function clearPlacementPreview(animate = true): void {
   previewKey = '';
+  previewLayoutSignature = '';
   previewElements.forEach((element) => {
     const from = getComputedStyle(element).transform;
     cancelElementAnimations(element);
@@ -168,10 +172,12 @@ export function clearPlacementPreview(animate = true): void {
     }
   });
   previewElements.clear();
-  removeArtifact(placeholderEl, animate);
-  placeholderEl = null;
+  placementGhosts.forEach((ghost) => removeArtifact(ghost, animate));
+  placementGhosts.clear();
   previewShells.forEach((shell) => removeArtifact(shell, animate));
   previewShells.clear();
+  previewShellTargets.forEach((target) => target.classList.remove('is-container-previewed'));
+  previewShellTargets.clear();
 }
 
 export function cancelInteractionAnimations(): void {
@@ -190,21 +196,49 @@ function clearPreviewTransforms(): void {
   previewElements.clear();
 }
 
-function updateShapeArtifact(
+function renderPlacementGhosts(
+  worldEl: HTMLElement,
+  placementById: Map<string, SlotBlock>,
+  draggedNodeIds: Set<string>,
+): void {
+  placementGhosts.forEach((ghost) => ghost.remove());
+  placementGhosts.clear();
+  const template = document.createElement('template');
+  draggedNodeIds.forEach((nodeId) => {
+    const block = placementById.get(nodeId);
+    if (!block) {
+      return;
+    }
+    template.innerHTML = renderBlock({ ...block, selected: false }, null).trim();
+    const ghost = template.content.firstElementChild;
+    if (!(ghost instanceof HTMLElement)) {
+      return;
+    }
+    ghost.removeAttribute('data-block');
+    ghost.classList.add('placement-ghost-block');
+    ghost.setAttribute('aria-hidden', 'true');
+    worldEl.append(ghost);
+    placementGhosts.set(nodeId, ghost);
+  });
+}
+
+function updateContainerShell(
   existing: HTMLElement | null,
   worldEl: HTMLElement,
-  className: string,
   block: SlotBlock,
-  renderShape: boolean,
 ): HTMLElement {
   const element = existing ?? document.createElement('div');
-  element.className = `${className}${block.kind === 'control' ? ' control' : ''}`;
+  element.className = 'container-preview-shell control';
   element.setAttribute('aria-hidden', 'true');
   element.style.left = `${block.x}px`;
   element.style.top = `${block.y}px`;
   element.style.width = `${block.width}px`;
   element.style.height = `${block.height}px`;
-  element.innerHTML = renderShape ? renderBlockShape(block) : '';
+  const shapeSignature = blockShapeSignature(block);
+  if (element.dataset.shapeSignature !== shapeSignature) {
+    element.innerHTML = renderBlockShape(block);
+    element.dataset.shapeSignature = shapeSignature;
+  }
   if (!existing) {
     worldEl.append(element);
     if (!prefersReducedMotion()) {
@@ -214,6 +248,50 @@ function updateShapeArtifact(
     }
   }
   return element;
+}
+
+function animateArtifactResize(element: HTMLElement, from: SlotBlock, to: SlotBlock): void {
+  if (prefersReducedMotion()) {
+    return;
+  }
+  trackAnimations([
+    element.animate(
+      [
+        { left: `${from.x}px`, top: `${from.y}px`, width: `${from.width}px`, height: `${from.height}px` },
+        { left: `${to.x}px`, top: `${to.y}px`, width: `${to.width}px`, height: `${to.height}px` },
+      ],
+      animationOptions(interactionAnimationTokens.containerMs),
+    ),
+  ]);
+}
+
+function placeShellBehindContainer(shell: HTMLElement, nodeId: string): void {
+  const targetZIndex = Number.parseInt(blockElement(nodeId)?.style.zIndex ?? '', 10);
+  if (Number.isFinite(targetZIndex)) {
+    shell.style.zIndex = `${Math.max(1, targetZIndex - 1)}`;
+  }
+}
+
+function placementPreviewSignature(preview: PlacementPreview): string {
+  return [
+    preview.key,
+    blockLayoutSignature(preview.baseBlocks),
+    blockLayoutSignature(preview.placementBlocks),
+  ].join(';');
+}
+
+function blockLayoutSignature(blocks: SlotBlock[]): string {
+  return blocks
+    .map((block) => `${block.id}:${block.kind}:${block.x}:${block.y}:${block.width}:${block.height}`)
+    .join('|');
+}
+
+function blockShapeSignature(block: SlotBlock): string {
+  const outputs = Object.entries(block.outputOffsets)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([slotId, offset]) => `${slotId}:${offset}`)
+    .join(',');
+  return `${block.kind}:${block.width}:${block.height}:${block.inputY ?? ''}:${outputs}`;
 }
 
 function removeArtifact(element: HTMLElement | null, animate: boolean): void {
@@ -231,50 +309,6 @@ function removeArtifact(element: HTMLElement | null, animate: boolean): void {
     animationOptions(interactionAnimationTokens.previewMs),
   );
   trackAnimations([animation], () => element.remove());
-}
-
-function animateContainerResize(
-  element: HTMLElement,
-  before: BlockRectSnapshot,
-  after: BlockRectSnapshot,
-  scale: number,
-): void {
-  const startWidth = before.width / scale;
-  const startHeight = before.height / scale;
-  const endWidth = after.width / scale;
-  const endHeight = after.height / scale;
-  const guide = document.createElement('div');
-  guide.className = 'container-resize-guide';
-  guide.setAttribute('aria-hidden', 'true');
-  guide.style.setProperty('--container-guide-header', `${containerGeometry.headerHeight}px`);
-  guide.style.setProperty('--container-guide-rail-width', `${containerGeometry.leftRailWidth}px`);
-  guide.style.setProperty('--container-guide-bottom-height', `${containerGeometry.bottomRailHeight}px`);
-  guide.innerHTML = '<i class="container-resize-guide__rail"></i><i class="container-resize-guide__bottom"></i>';
-  element.append(guide);
-
-  const rail = guide.querySelector<HTMLElement>('.container-resize-guide__rail');
-  const bottom = guide.querySelector<HTMLElement>('.container-resize-guide__bottom');
-  if (!rail || !bottom) {
-    guide.remove();
-    return;
-  }
-  const railStart = Math.max(0, startHeight - containerGeometry.headerHeight);
-  const railEnd = Math.max(0, endHeight - containerGeometry.headerHeight);
-  const deltaY = startHeight - endHeight;
-  const animations = [
-    rail.animate(
-      [{ height: `${railStart}px` }, { height: `${railEnd}px` }],
-      animationOptions(interactionAnimationTokens.containerMs),
-    ),
-    bottom.animate(
-      [
-        { width: `${startWidth}px`, transform: `translate3d(0, ${deltaY}px, 0)` },
-        { width: `${endWidth}px`, transform: 'translate3d(0, 0, 0)' },
-      ],
-      animationOptions(interactionAnimationTokens.containerMs),
-    ),
-  ];
-  trackAnimations(animations, () => guide.remove());
 }
 
 function trackAnimations(animations: Animation[], cleanup?: () => void): void {

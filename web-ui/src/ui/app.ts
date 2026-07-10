@@ -110,6 +110,7 @@ let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let panOffset = { x: 0, y: 0 };
 let activeBlockDrag: BlockDrag | null = null;
+let activeInsertDecorationKey = '';
 let lastBlockClick: { nodeId: string; time: number } | null = null;
 let graphVersion = 0;
 let autoSaveTimer: number | null = null;
@@ -167,6 +168,7 @@ function renderApp(): void {
   cancelInteractionAnimations();
   clearPlacementPreview(false);
   clearCatalogDragGhost();
+  activeInsertDecorationKey = '';
 
   const editorWasOpen = Boolean(document.querySelector('[data-modal-overlay]'));
   const simulationEditorWasOpen = Boolean(document.querySelector('[data-sim-modal-overlay]'));
@@ -954,18 +956,24 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 function renderInsertPreview(drag: BlockDrag): void {
   const candidate = drag.candidate;
-  clearInsertDecorations();
+  const decorationKey = candidate
+    ? `${drag.rootId}:${candidate.kind}:${candidate.join.id}:${candidate.valid ? 'valid' : 'invalid'}`
+    : '';
+  const decorationChanged = decorationKey !== activeInsertDecorationKey;
+  if (decorationChanged) {
+    clearInsertDecorations();
+    activeInsertDecorationKey = decorationKey;
+    if (candidate?.kind === 'insert') {
+      const joinEl = document.querySelector<HTMLElement>(`[data-join="${candidate.join.id}"]`);
+      joinEl?.classList.add(candidate.valid ? 'insert-target' : 'insert-invalid');
+    } else if (candidate?.kind === 'container' && candidate.valid) {
+      document.querySelector<HTMLElement>(`[data-block="${candidate.containerNodeId}"]`)?.classList.add('container-target');
+    }
+  }
   if (!candidate) {
     clearPlacementPreview();
     setDragHint('靠近两个积木之间会自动吸附插入。', 'active');
     return;
-  }
-
-  if (candidate.kind === 'insert') {
-    const joinEl = document.querySelector<HTMLElement>(`[data-join="${candidate.join.id}"]`);
-    joinEl?.classList.add(candidate.valid ? 'insert-target' : 'insert-invalid');
-  } else if (candidate.kind === 'container' && candidate.valid) {
-    document.querySelector<HTMLElement>(`[data-block="${candidate.containerNodeId}"]`)?.classList.add('container-target');
   }
   if (candidate.valid) {
     const graph = currentGraph();
@@ -975,7 +983,6 @@ function renderInsertPreview(drag: BlockDrag): void {
       baseBlocks: buildBlocks(graph, activeCatalog(), state.selectedNodeId),
       placementBlocks: buildBlocks(placement, activeCatalog(), state.selectedNodeId),
       draggedNodeIds: new Set(drag.groupIds),
-      rootNodeId: drag.rootId,
     });
   } else {
     clearPlacementPreview();
@@ -991,6 +998,7 @@ function clearInsertPreview(): void {
 }
 
 function clearInsertDecorations(): void {
+  activeInsertDecorationKey = '';
   document.querySelectorAll('.slot-join.insert-target, .slot-join.insert-invalid').forEach((item) => {
     item.classList.remove('insert-target', 'insert-invalid');
   });

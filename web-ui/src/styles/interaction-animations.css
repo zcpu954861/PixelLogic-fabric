@@ -3,33 +3,42 @@
   transition: transform var(--interaction-preview-duration) var(--interaction-easing);
 }
 
-.drop-placeholder,
-.container-preview-shell {
+.container-preview-shell,
+.placement-ghost-block {
   position: absolute;
   z-index: 7350;
   pointer-events: none;
   animation: interaction-preview-in var(--interaction-preview-duration) var(--interaction-easing) both;
 }
 
-.drop-placeholder {
-  z-index: 7600;
+.placement-ghost-block {
+  --interaction-preview-opacity: 0.46;
+  opacity: var(--interaction-preview-opacity);
+  pointer-events: none !important;
 }
 
-.drop-placeholder.control,
+.placement-ghost-block * {
+  pointer-events: none !important;
+}
+
 .container-preview-shell {
+  --block-outline: #0f766e;
+  --fill: #f8fffc;
   border: 0;
   border-radius: 0;
   background: transparent;
-  box-shadow: none;
-  color: #16a34a;
-  filter: drop-shadow(0 0 12px rgba(22, 163, 74, 0.22));
+  color: #0f766e;
+  filter: drop-shadow(7px 7px 0 rgba(23, 33, 29, 0.14));
 }
 
-.drop-placeholder.control .puzzle-shape .block-body,
 .container-preview-shell .puzzle-shape .block-body {
-  fill: rgba(220, 252, 231, 0.22);
-  stroke: rgba(22, 163, 74, 0.72);
-  stroke-dasharray: 10 8;
+  fill: var(--fill);
+  stroke: var(--block-outline);
+  stroke-dasharray: none;
+}
+
+.logic-block.control.is-container-previewed > .puzzle-shape > .block-body {
+  opacity: 0;
 }
 
 .logic-block.control.container-target::after,
@@ -61,37 +70,6 @@
 .logic-block.control.catalog-container-target .block-body {
   stroke: #16a34a;
   filter: drop-shadow(0 0 8px rgba(22, 163, 74, 0.42));
-}
-
-.container-resize-guide {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  overflow: visible;
-  color: var(--accent);
-  pointer-events: none;
-}
-
-.container-resize-guide__rail,
-.container-resize-guide__bottom {
-  position: absolute;
-  display: block;
-  border-color: currentColor;
-  filter: drop-shadow(0 0 8px rgba(15, 118, 110, 0.26));
-}
-
-.container-resize-guide__rail {
-  top: var(--container-guide-header);
-  left: 1px;
-  width: var(--container-guide-rail-width);
-  border-left: 4px solid;
-}
-
-.container-resize-guide__bottom {
-  right: 0;
-  bottom: 1px;
-  height: var(--container-guide-bottom-height);
-  border-bottom: 4px solid;
 }
 
 .catalog-drag-ghost {
@@ -129,7 +107,7 @@
     opacity: 0;
   }
   to {
-    opacity: 1;
+    opacity: var(--interaction-preview-opacity, 1);
   }
 }
 
@@ -147,7 +125,7 @@
 @media (prefers-reduced-motion: reduce) {
   .logic-block,
   .logic-block.is-placement-preview,
-  .drop-placeholder,
+  .placement-ghost-block,
   .container-preview-shell,
   .catalog-drag-ghost,
   .slot-join.insert-target,

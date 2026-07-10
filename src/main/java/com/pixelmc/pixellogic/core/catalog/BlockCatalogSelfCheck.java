@@ -47,6 +47,10 @@ public final class BlockCatalogSelfCheck {
                 BuiltInBlockCatalog.CONTROL_LOOP_COUNT,
                 BuiltInBlockCatalog.CONTROL_LOOP_FOREVER,
                 BuiltInBlockCatalog.CONTROL_LOOP_UNTIL,
+                BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS,
+                BuiltInBlockCatalog.CONDITION_CONTEXT_ENTITY_HAS_TAG,
+                BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG,
+                BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_REMOVE_TAG,
                 BuiltInBlockCatalog.STATE_SET,
                 BuiltInBlockCatalog.STATE_ADD,
                 BuiltInBlockCatalog.TIMER_WAIT,
@@ -60,6 +64,10 @@ public final class BlockCatalogSelfCheck {
                         .anyMatch(category -> category.id().equals("condition")
                                 && category.displayName().equals("条件判断块(胶囊)")),
                 "condition category should explain its capsule form");
+        require(catalog.categories().stream()
+                        .anyMatch(category -> category.id().equals("context")
+                                && category.displayName().equals("执行上下文")),
+                "context category should be user-visible");
         catalog.blocks().forEach(block -> {
             require(catalog.categories().stream().anyMatch(category -> category.id().equals(block.categoryId())),
                     "block category should exist: " + block.id());
@@ -161,9 +169,10 @@ public final class BlockCatalogSelfCheck {
                         BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG,
                         BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN,
                         BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS,
-                        BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION,
-                        BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE
-                )), "predicate capability should stay scoped to the first five conditions");
+                BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION,
+                        BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE,
+                        BuiltInBlockCatalog.CONDITION_CONTEXT_ENTITY_HAS_TAG
+                )), "predicate capability should include the contextual entity tag condition");
         });
     }
 

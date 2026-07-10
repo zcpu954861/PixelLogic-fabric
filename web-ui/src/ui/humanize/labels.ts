@@ -20,7 +20,7 @@ export function blockKind(type: string): BlockKind {
   if (type === 'DEBUG_LOG_ACTION') {
     return 'debug';
   }
-  if (type.startsWith('CONTROL_LOOP_')) {
+  if (type.startsWith('CONTROL_LOOP_') || type === 'CONTEXT_ENTITY_EXECUTE_AS') {
     return 'control';
   }
   return 'action';
@@ -79,10 +79,17 @@ export function nodeTypeLabel(type: string): string {
     case 'TARGET_BLOCK_IN_REGION_CONDITION':
     case 'TARGET_BLOCK_Y_COMPARE_CONDITION':
     case 'PLAYER_NEAR_TARGET_BLOCK_CONDITION':
+    case 'CONTEXT_ENTITY_HAS_TAG_CONDITION':
       return '条件判断块(胶囊)';
     case 'CONTROL_LOOP_COUNT':
     case 'CONTROL_LOOP_FOREVER':
       return '控制流';
+    case 'CONTEXT_ENTITY_EXECUTE_AS':
+      return '执行上下文';
+    case 'CONTEXT_ENTITY_ADD_TAG_ACTION':
+      return '为上下文实体添加标签';
+    case 'CONTEXT_ENTITY_REMOVE_TAG_ACTION':
+      return '移除上下文实体标签';
     case 'PLAYER_ADD_TAG_ACTION':
       return '添加玩家标签';
     case 'PLAYER_REMOVE_TAG_ACTION':
@@ -190,6 +197,9 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   if (blockItem.id === 'control.loop.until') {
     return `配置了 ${nodeItem.conditionSlots?.length ?? 0} 个结束条件槽。`;
   }
+  if (blockItem.id === 'context.entity.execute_as') {
+    return `以「${entitySourceLabel(nodeItem.config.entitySource)}」为上下文执行。`;
+  }
   const template = blockItem.summaryTemplate;
   if (!template) {
     return legacyNodeTypeSummary(nodeItem);
@@ -205,6 +215,7 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
     .replaceAll('{target}', targetLabel(nodeItem.config.target ?? 'CURRENT_PLAYER'))
     .replaceAll('{message.plainText}', shortRichText(nodeItem.config.message ?? ''))
     .replaceAll('{message}', shortRichText(nodeItem.config.message ?? ''))
+    .replaceAll('{entitySource}', entitySourceLabel(nodeItem.config.entitySource))
     .replaceAll('{tag}', nodeItem.config.tag ?? '标签');
 }
 
@@ -241,6 +252,14 @@ function legacyNodeTypeSummary(nodeItem: GraphNode): string {
       return `持续循环内部积木，每轮间隔 ${config.intervalSeconds ?? '1'} 秒。`;
     case 'CONTROL_LOOP_UNTIL':
       return `配置了 ${nodeItem.conditionSlots?.length ?? 0} 个结束条件槽。`;
+    case 'CONTEXT_ENTITY_EXECUTE_AS':
+      return `以「${entitySourceLabel(config.entitySource)}」为上下文执行。`;
+    case 'CONTEXT_ENTITY_HAS_TAG_CONDITION':
+      return `按上下文实体是否拥有标签「${config.tag ?? '标签'}」继续。`;
+    case 'CONTEXT_ENTITY_ADD_TAG_ACTION':
+      return `为上下文实体添加标签「${config.tag ?? '标签'}」。`;
+    case 'CONTEXT_ENTITY_REMOVE_TAG_ACTION':
+      return `移除上下文实体标签「${config.tag ?? '标签'}」。`;
     case 'PLAYER_ADD_TAG_ACTION':
       return `给当前玩家添加标签“${config.tag ?? '标签'}”。`;
     case 'PLAYER_REMOVE_TAG_ACTION':
@@ -268,6 +287,17 @@ export function valueTypeLabel(value = 'BOOLEAN'): string {
 
 export function booleanLabel(value = 'false'): string {
   return booleanOptions().find((option) => option.value === value)?.label ?? value;
+}
+
+export function entitySourceLabel(value = 'CONDITION_SUBJECT'): string {
+  switch (value) {
+    case 'RUN_ENTITY':
+      return '运行实体';
+    case 'TARGET_ENTITY':
+      return '目标实体';
+    default:
+      return '当前条件对象';
+  }
 }
 
 export { conditionOutputModeLabel };

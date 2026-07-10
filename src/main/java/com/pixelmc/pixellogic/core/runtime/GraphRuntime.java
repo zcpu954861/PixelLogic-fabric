@@ -2,10 +2,12 @@ package com.pixelmc.pixellogic.core.runtime;
 
 import com.pixelmc.pixellogic.core.graph.CompiledGraph;
 import com.pixelmc.pixellogic.core.model.ConditionSlotDefinition;
+import com.pixelmc.pixellogic.core.model.EntitySource;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.runtime.ExecutionCursor.LoopFrame;
 import com.pixelmc.pixellogic.core.runtime.ExecutionCursor.LoopKind;
+import com.pixelmc.pixellogic.core.runtime.ExecutionCursor.EntityContextFrame;
 import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
 import com.pixelmc.pixellogic.core.trace.BoundedTraceBuffer;
@@ -14,7 +16,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -28,6 +29,7 @@ public final class GraphRuntime {
     private final BoundedTraceBuffer traces;
     private final RuntimeServices services;
     private final RuntimeNodeExecutor nodeExecutor;
+    private final ExecutionScopes scopes;
     private final RuntimeLimits limits;
     private final long generation;
     private final Set<String> pendingContinuationIds = new HashSet<>();
@@ -56,6 +58,7 @@ public final class GraphRuntime {
         this.services = services;
         this.nodeExecutor = new RuntimeNodeExecutor(stateStore, traces, services);
         this.limits = limits;
+        this.scopes = new ExecutionScopes(graph, services, limits);
         this.generation = generation;
     }
 
@@ -74,6 +77,8 @@ public final class GraphRuntime {
             return recordResult(new RuntimeResult(false, traceId, "找不到触发入口。"));
         }
 
+        RuntimeSubjectReference runEntity = services.runEntity(event.playerId(), event.sessionId()).orElse(null);
+        RuntimeSubjectReference targetEntity = services.targetEntity(event.playerId(), event.sessionId()).orElse(null);
         return recordResult(runExecution(new ExecutionCursor(
                 traceId,
                 traceId,
@@ -81,6 +86,11 @@ public final class GraphRuntime {
                 event.sessionId(),
                 0,
                 entry.get().id(),
+                List.of(),
+                runEntity,
+                targetEntity,
+                runEntity,
+                null,
                 List.of()
         )));
     }
@@ -108,7 +118,7 @@ public final class GraphRuntime {
         }
 
         ExecutionCursor cursor = continuation.cursor();
-        String cursorError = validateCursor(continuation, cursor);
+        String cursorError = scopes.validateContinuation(continuation, cursor);
         if (cursorError != null) {
             traces.add(continuation.traceId(), continuation.sourceNodeId(), "执行失败：" + cursorError);
             return recordResult(new RuntimeResult(false, continuation.traceId(), cursorError));
@@ -143,7 +153,20 @@ public final class GraphRuntime {
         int steps = initial.steps();
         String nodeId = initial.nodeId();
         ArrayList<LoopFrame> frames = new ArrayList<>(initial.loopFrames());
-        ExecutionContext context = new ExecutionContext(traceId, initial.playerId(), initial.sessionId());
+        ArrayList<EntityContextFrame> entityFrames = new ArrayList<>(initial.entityContextFrames());
+        RuntimeSubjectReference runEntity = initial.runEntity() != null
+                ? initial.runEntity()
+                : services.runEntity(initial.playerId(), initial.sessionId()).orElse(null);
+        RuntimeSubjectReference currentEntity = initial.currentEntity() != null ? initial.currentEntity() : runEntity;
+        ExecutionContext context = new ExecutionContext(
+                traceId,
+                initial.playerId(),
+                initial.sessionId(),
+                runEntity,
+                initial.targetEntity(),
+                currentEntity,
+                initial.currentCondition()
+        );
 
         int transitionBudget = Math.max(16, (limits.maxStepsPerExecution() + 1) * 4);
         for (int transition = 0; transition < transitionBudget; transition += 1) {
@@ -152,9 +175,18 @@ public final class GraphRuntime {
                 return new RuntimeResult(false, traceId, "运行已取消。");
             }
             if (nodeId.isBlank()) {
-                if (frames.isEmpty()) {
+                if (frames.isEmpty() && entityFrames.isEmpty()) {
                     traces.add(traceId, "", "执行完成。");
                     return new RuntimeResult(true, traceId, "执行完成。");
+                }
+
+                if (!entityFrames.isEmpty() && entityFrames.getLast().loopDepth() == frames.size()) {
+                    EntityContextFrame frame = entityFrames.removeLast();
+                    context.currentEntity(frame.previousEntity());
+                    traces.add(traceId, frame.containerNodeId(), "退出实体执行上下文，恢复"
+                            + entityLabel(frame.previousEntity()) + "。");
+                    nodeId = scopes.withinCurrent(frame.completionNodeId(), frames, entityFrames);
+                    continue;
                 }
 
                 LoopFrame frame = frames.getLast();
@@ -168,7 +200,7 @@ public final class GraphRuntime {
                     } else {
                         traces.add(traceId, frame.containerNodeId(), "循环完成，继续外部链。");
                         frames.removeLast();
-                        nodeId = nodeWithinCurrentBody(frame.completionNodeId(), frames);
+                        nodeId = scopes.withinCurrent(frame.completionNodeId(), frames, entityFrames);
                     }
                     continue;
                 }
@@ -195,6 +227,7 @@ public final class GraphRuntime {
                             steps,
                             nextFrame.bodyEntryNodeId(),
                             frames,
+                            entityFrames,
                             frame.containerNodeId(),
                             Duration.ofSeconds(frame.intervalSeconds()),
                             TimerContinuation.Reason.LOOP_INTERVAL
@@ -223,7 +256,7 @@ public final class GraphRuntime {
                     traces.add(traceId, node.id(), "进入循环次数：共 " + count + " 次。");
                     if (bodyEntry.isEmpty()) {
                         traces.add(traceId, node.id(), "循环内部为空，直接继续外部流程。");
-                        nodeId = nodeWithinCurrentBody(targetId(node.id(), "done"), frames);
+                        nodeId = scopes.withinCurrent(scopes.targetId(node.id(), "done"), frames, entityFrames);
                         continue;
                     }
                     LoopFrame frame = new LoopFrame(
@@ -232,7 +265,7 @@ public final class GraphRuntime {
                             1,
                             count,
                             bodyEntry.get().id(),
-                            targetId(node.id(), "done"),
+                            scopes.targetId(node.id(), "done"),
                             0
                     );
                     frames.add(frame);
@@ -289,7 +322,7 @@ public final class GraphRuntime {
                         if (recheck) {
                             frames.removeLast();
                         }
-                        nodeId = nodeWithinCurrentBody(targetId(node.id(), "done"), frames);
+                        nodeId = scopes.withinCurrent(scopes.targetId(node.id(), "done"), frames, entityFrames);
                         continue;
                     }
 
@@ -316,7 +349,7 @@ public final class GraphRuntime {
                             1,
                             SIMULATION_LOOP_ITERATION_CAP,
                             bodyEntry.get().id(),
-                            targetId(node.id(), "done"),
+                            scopes.targetId(node.id(), "done"),
                             0
                     );
                     frames.add(frame);
@@ -328,11 +361,46 @@ public final class GraphRuntime {
                 }
             }
 
+            if (node.type() == NodeType.CONTEXT_ENTITY_EXECUTE_AS) {
+                try {
+                    RuntimeSubjectReference selected = resolveContextEntity(node, context);
+                    Optional<NodeDefinition> bodyEntry = graph.bodyEntry(node.id(), "body");
+                    String completion = scopes.targetId(node.id(), "done");
+                    RuntimeSubjectReference previous = context.currentEntity();
+                    context.currentEntity(selected);
+                    traces.add(traceId, node.id(), "使用" + entitySourceLabel(node) + " "
+                            + selected.displayName() + " 进入实体执行上下文。");
+                    if (bodyEntry.isEmpty()) {
+                        context.currentEntity(previous);
+                        traces.add(traceId, node.id(), "实体执行上下文内部为空，恢复"
+                                + entityLabel(previous) + "并继续外部流程。");
+                        nodeId = scopes.withinCurrent(completion, frames, entityFrames);
+                        continue;
+                    }
+                    entityFrames.add(new EntityContextFrame(
+                            node.id(),
+                            bodyEntry.get().id(),
+                            completion,
+                            previous,
+                            selected,
+                            frames.size()
+                    ));
+                    nodeId = bodyEntry.get().id();
+                    continue;
+                } catch (RuntimeException exception) {
+                    return fail(traceId, node.id(), exception, "实体执行上下文解析失败。");
+                }
+            }
+
             if (node.type() == NodeType.TIMER_START_ACTION) {
                 try {
                     int seconds = parsePositiveInt(node.config().getOrDefault("durationSeconds", "30"), "等待时间");
                     Optional<NodeDefinition> target = graph.firstTarget(node.id(), "timer_completed");
-                    String resumeNodeId = nodeWithinCurrentBody(target.map(NodeDefinition::id).orElse(""), frames);
+                    String resumeNodeId = scopes.withinCurrent(
+                            target.map(NodeDefinition::id).orElse(""),
+                            frames,
+                            entityFrames
+                    );
                     traces.add(traceId, node.id(), "计时器启动：" + seconds + " 秒");
                     services.recordActionResult(node.id(), "timer", "计时器启动：" + seconds + " 秒");
                     return suspend(
@@ -342,6 +410,7 @@ public final class GraphRuntime {
                             steps,
                             resumeNodeId,
                             frames,
+                            entityFrames,
                             node.id(),
                             Duration.ofSeconds(seconds),
                             TimerContinuation.Reason.DELAY
@@ -351,12 +420,16 @@ public final class GraphRuntime {
                 }
             }
 
-            String outputSlot;
+            RuntimeNodeExecutionResult execution;
             try {
-                outputSlot = nodeExecutor.execute(node, context);
+                execution = nodeExecutor.execute(node, context);
             } catch (RuntimeException exception) {
                 return fail(traceId, node.id(), exception, "运行时错误。");
             }
+            if (node.type().name().contains("CONDITION")) {
+                context.currentCondition(execution.conditionResult());
+            }
+            String outputSlot = execution.outputSlot();
             if (outputSlot == null) {
                 nodeId = "";
                 continue;
@@ -364,10 +437,10 @@ public final class GraphRuntime {
 
             try {
                 Optional<NodeDefinition> next = graph.firstTarget(node.id(), outputSlot);
-                if (next.isEmpty() && frames.isEmpty()) {
+                if (next.isEmpty() && frames.isEmpty() && entityFrames.isEmpty()) {
                     traces.add(traceId, node.id(), "未连接后续积木，流程在此结束。");
                 }
-                nodeId = nodeWithinCurrentBody(next.map(NodeDefinition::id).orElse(""), frames);
+                nodeId = scopes.withinCurrent(next.map(NodeDefinition::id).orElse(""), frames, entityFrames);
             } catch (RuntimeException exception) {
                 return fail(traceId, node.id(), exception, "连接解析失败。");
             }
@@ -383,11 +456,12 @@ public final class GraphRuntime {
             int steps,
             String resumeNodeId,
             List<LoopFrame> frames,
+            List<EntityContextFrame> entityFrames,
             String sourceNodeId,
             Duration delay,
             TimerContinuation.Reason reason
     ) {
-        int depth = frames.size() + 1;
+        int depth = frames.size() + entityFrames.size() + 1;
         if (depth > limits.maxContinuationDepth()) {
             throw new IllegalStateException("计时器 continuation 深度超限。");
         }
@@ -400,7 +474,12 @@ public final class GraphRuntime {
                 context.sessionId(),
                 steps,
                 resumeNodeId,
-                frames
+                frames,
+                context.runEntity(),
+                context.targetEntity(),
+                context.currentEntity(),
+                context.currentCondition(),
+                entityFrames
         );
         TimerContinuation continuation = new TimerContinuation(
                 graph.graphId(),
@@ -427,97 +506,6 @@ public final class GraphRuntime {
         }
         traces.add(traceId, sourceNodeId, "等待已调度，执行暂停。");
         return new RuntimeResult(true, traceId, "执行已暂停，等待计时器。", true);
-    }
-
-    private String validateCursor(TimerContinuation continuation, ExecutionCursor cursor) {
-        if (cursor == null) {
-            return "continuation 缺少恢复快照。";
-        }
-        if (continuation.reason() == null || continuation.sourceNodeId().isBlank()) {
-            return "continuation 等待来源无效。";
-        }
-        if (cursor.runId().isBlank() || cursor.steps() < 0 || cursor.steps() > limits.maxStepsPerExecution()) {
-            return "continuation 运行预算快照无效。";
-        }
-        if (!cursor.traceId().equals(continuation.traceId())
-                || !Objects.equals(cursor.playerId(), continuation.playerId())
-                || !cursor.sessionId().equals(continuation.sessionId())
-                || !cursor.nodeId().equals(continuation.targetNodeId())) {
-            return "continuation 恢复快照不一致。";
-        }
-        List<LoopFrame> frames = cursor.loopFrames();
-        for (int index = 0; index < frames.size(); index += 1) {
-            LoopFrame frame = frames.get(index);
-            if (frame.kind() == null) {
-                return "循环 frame 类型无效。";
-            }
-            Optional<NodeDefinition> container = graph.node(frame.containerNodeId());
-            Optional<NodeDefinition> bodyEntry = graph.node(frame.bodyEntryNodeId());
-            NodeType expected = switch (frame.kind()) {
-                case COUNT -> NodeType.CONTROL_LOOP_COUNT;
-                case FOREVER -> NodeType.CONTROL_LOOP_FOREVER;
-                case UNTIL -> NodeType.CONTROL_LOOP_UNTIL;
-            };
-            if (container.isEmpty() || container.get().type() != expected) {
-                return "循环容器不存在或类型已变化。";
-            }
-            if (bodyEntry.isEmpty() || !graph.isInBody(bodyEntry.get(), frame.containerNodeId(), "body")) {
-                return "循环 body membership 已失效。";
-            }
-            if (frame.iteration() < 1 || frame.iteration() > frame.iterationLimit()) {
-                return "循环迭代快照无效。";
-            }
-            if (frame.kind() == LoopKind.COUNT || frame.kind() == LoopKind.UNTIL) {
-                String completion;
-                try {
-                    completion = targetId(frame.containerNodeId(), "done");
-                } catch (RuntimeException exception) {
-                    return "循环 done 输出已失效。";
-                }
-                if (!completion.equals(frame.completionNodeId())) {
-                    return "循环返回位置已失效。";
-                }
-                if (frame.intervalSeconds() != 0) {
-                    return "循环间隔快照无效。";
-                }
-            } else if (!frame.completionNodeId().isBlank() || frame.intervalSeconds() <= 0) {
-                return "无限循环间隔快照无效。";
-            }
-            if (index > 0 && !graph.isInBody(container.get(), frames.get(index - 1).containerNodeId(), "body")) {
-                return "嵌套循环返回路径已失效。";
-            }
-            if (index > 0 && !frame.completionNodeId().isBlank()) {
-                Optional<NodeDefinition> completion = graph.node(frame.completionNodeId());
-                if (completion.isEmpty()
-                        || !graph.isInBody(completion.get(), frames.get(index - 1).containerNodeId(), "body")) {
-                    return "嵌套循环完成位置已失效。";
-                }
-            }
-        }
-        if (!cursor.nodeId().isBlank()) {
-            Optional<NodeDefinition> target = graph.node(cursor.nodeId());
-            if (target.isEmpty()) {
-                return "resume node 不存在。";
-            }
-            if (!frames.isEmpty() && !graph.isInBody(target.get(), frames.getLast().containerNodeId(), "body")) {
-                return "resume node 不属于当前循环 body。";
-            }
-        }
-        Optional<NodeDefinition> source = graph.node(continuation.sourceNodeId());
-        if (source.isEmpty()) {
-            return "等待节点不存在。";
-        }
-        if (continuation.reason() == TimerContinuation.Reason.DELAY
-                && source.get().type() != NodeType.TIMER_START_ACTION) {
-            return "等待节点类型已变化。";
-        }
-        if (continuation.reason() == TimerContinuation.Reason.LOOP_INTERVAL
-                && (frames.isEmpty()
-                || frames.getLast().kind() != LoopKind.FOREVER
-                || !frames.getLast().containerNodeId().equals(source.get().id()))) {
-            return "循环间隔 frame 已失效。";
-        }
-        return null;
     }
 
     private boolean registerContinuation(String continuationId) {
@@ -571,11 +559,7 @@ public final class GraphRuntime {
             }
 
             NodeDefinition condition = conditions.getFirst();
-            Optional<RuntimePredicateResult> evaluated = services.evaluatePredicate(
-                    condition,
-                    context.playerId(),
-                    context.sessionId()
-            );
+            Optional<RuntimePredicateResult> evaluated = services.evaluatePredicate(condition, context.snapshot());
             if (evaluated.isEmpty()) {
                 throw new IllegalStateException("结束条件 " + (index + 1) + " 不支持布尔求值。");
             }
@@ -589,21 +573,53 @@ public final class GraphRuntime {
         return allMatched;
     }
 
-    private String targetId(String nodeId, String outputSlot) {
-        return graph.firstTarget(nodeId, outputSlot).map(NodeDefinition::id).orElse("");
+    private RuntimeSubjectReference resolveContextEntity(NodeDefinition node, ExecutionContext context) {
+        EntitySource source;
+        try {
+            source = EntitySource.valueOf(node.config().getOrDefault("entitySource", "CONDITION_SUBJECT"));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("实体来源无效。");
+        }
+        RuntimeSubjectReference selected = switch (source) {
+            case RUN_ENTITY -> context.runEntity();
+            case TARGET_ENTITY -> context.targetEntity();
+            case CONDITION_SUBJECT -> {
+                RuntimeConditionResult result = context.currentCondition();
+                if (result == null || result.subject() == null) {
+                    throw new IllegalStateException("当前路径没有可用的条件对象，无法进入实体执行上下文。");
+                }
+                if (!result.subject().isEntity()) {
+                    throw new IllegalStateException("当前条件对象不是实体，无法作为实体上下文。");
+                }
+                yield result.subject();
+            }
+        };
+        if (selected == null) {
+            throw new IllegalStateException(switch (source) {
+                case RUN_ENTITY -> "运行实体缺失，无法进入实体执行上下文。";
+                case TARGET_ENTITY -> "目标实体缺失，无法进入实体执行上下文。";
+                case CONDITION_SUBJECT -> "当前路径没有可用的条件对象，无法进入实体执行上下文。";
+            });
+        }
+        if (!selected.isEntity()) {
+            throw new IllegalStateException("所选对象不是实体，无法进入实体执行上下文。");
+        }
+        if (!services.entityResolvable(selected, context.playerId(), context.sessionId())) {
+            throw new IllegalStateException("所选实体无法解析，无法进入实体执行上下文。");
+        }
+        return selected;
     }
 
-    private String nodeWithinCurrentBody(String targetNodeId, List<LoopFrame> frames) {
-        if (targetNodeId == null || targetNodeId.isBlank()) {
-            return "";
-        }
-        if (frames.isEmpty()) {
-            return targetNodeId;
-        }
-        Optional<NodeDefinition> target = graph.node(targetNodeId);
-        return target.filter(node -> graph.isInBody(node, frames.getLast().containerNodeId(), "body"))
-                .map(NodeDefinition::id)
-                .orElse("");
+    private String entitySourceLabel(NodeDefinition node) {
+        return switch (node.config().getOrDefault("entitySource", "CONDITION_SUBJECT")) {
+            case "RUN_ENTITY" -> "运行实体";
+            case "TARGET_ENTITY" -> "目标实体";
+            default -> "条件对象";
+        };
+    }
+
+    private String entityLabel(RuntimeSubjectReference entity) {
+        return entity == null || entity.displayName().isBlank() ? "外层实体上下文" : "实体 " + entity.displayName();
     }
 
     private RuntimeResult fail(String traceId, String nodeId, RuntimeException exception, String fallback) {

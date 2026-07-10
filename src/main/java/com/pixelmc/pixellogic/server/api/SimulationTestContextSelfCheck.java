@@ -56,7 +56,7 @@ public final class SimulationTestContextSelfCheck {
                     "default actor should start with no tags");
             require(tags(defaultSimulation, "actorTags").contains("ready"),
                     "action.player.add_tag should add ready during the run");
-            require(trace(defaultRun).contains("玩家标签条件失败"),
+            require(trace(defaultRun).contains("玩家 WebUI 模拟玩家 没有标签「runner」"),
                     "empty default tags should fail the runner condition");
 
             JsonObject taggedRun = postJson(client, base + "/api/pixellogic/test/start", """
@@ -71,7 +71,7 @@ public final class SimulationTestContextSelfCheck {
                     "initial tags should include request tags");
             require(!tags(taggedSimulation, "actorTags").contains("ready"),
                     "pass branch should not run add_tag action");
-            require(trace(taggedRun).contains("测试逃生者 拥有标签 runner"),
+            require(trace(taggedRun).contains("玩家 测试逃生者 拥有标签「runner」"),
                     "trace should use the configured displayName");
 
             JsonObject secondEmptyRun = postJson(client, base + "/api/pixellogic/test/start", """
@@ -82,7 +82,7 @@ public final class SimulationTestContextSelfCheck {
                     "previous action tags should not persist into the next run");
             require(tags(secondEmptySimulation, "actorTags").contains("ready"),
                     "empty-tag run should add ready again");
-            require(trace(secondEmptyRun).contains("玩家标签条件失败"),
+            require(trace(secondEmptyRun).contains("玩家 无标签玩家 没有标签「runner」"),
                     "empty request tags should fail the condition");
 
             JsonObject duplicateRun = postJson(client, base + "/api/pixellogic/test/start", """

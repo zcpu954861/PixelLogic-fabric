@@ -10,6 +10,7 @@ import {
   nodePosition,
 } from '../../model/graphLayout';
 import type { BlockDrag, GraphDocument, GraphNode } from '../../model/graphTypes';
+import { isBodyContainerNode } from '../../model/containerNodes';
 import { connectedOverlap } from './blockConstants';
 
 const maxContainerDepth = 4;
@@ -43,7 +44,7 @@ export function canAssignContainerMembership(
       parentId = parents.get(parentId) ?? '';
     }
   }
-  return { valid: true, message: '松手即可放入循环内部。' };
+  return { valid: true, message: '松手即可放入容器内部。' };
 }
 
 export function makeContainerBodyGap(graph: GraphDocument, drag: BlockDrag, containerNodeId: string): void {
@@ -77,7 +78,7 @@ export function makeContainerBodyStartGap(graph: GraphDocument, drag: BlockDrag,
 
 export function shiftForContainerSizeChanges(beforeGraph: GraphDocument, graph: GraphDocument, locked: Set<string>): void {
   beforeGraph.nodes
-    .filter(isControlLoopNode)
+    .filter(isBodyContainerNode)
     .sort((left, right) => containerDepth(beforeGraph, right.id) - containerDepth(beforeGraph, left.id))
     .forEach((beforeContainer) => {
       if (locked.has(beforeContainer.id)) {
@@ -218,8 +219,4 @@ function containerDepth(graph: GraphDocument, nodeId: string): number {
     parentId = graph.nodes.find((nodeItem) => nodeItem.id === parentId)?.parentContainerId;
   }
   return depth;
-}
-
-function isControlLoopNode(nodeItem: GraphNode): boolean {
-  return Boolean(nodeItem.blockId?.startsWith('control.loop.') || nodeItem.type.startsWith('CONTROL_LOOP_'));
 }

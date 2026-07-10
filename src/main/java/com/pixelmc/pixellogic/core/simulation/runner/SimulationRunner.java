@@ -5,9 +5,14 @@ import com.pixelmc.pixellogic.core.runtime.GraphRuntime;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimeNodeExecutionResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimePredicateResult;
+import com.pixelmc.pixellogic.core.runtime.RuntimeExecutionContext;
+import com.pixelmc.pixellogic.core.runtime.RuntimeSubjectReference;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
 import com.pixelmc.pixellogic.core.runtime.TriggerEvent;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationContext;
+import com.pixelmc.pixellogic.core.simulation.context.SimulationActor;
+import com.pixelmc.pixellogic.core.simulation.context.SimulationEntity;
+import com.pixelmc.pixellogic.core.simulation.context.SimulationWorld;
 import com.pixelmc.pixellogic.core.simulation.executor.SimulationExecutionRegistry;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationActionResult;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationMessageResult;
@@ -45,12 +50,17 @@ public final class SimulationRunner {
             SimulationExecutionRequest request,
             Consumer<SimulationExecutionResult> resultObserver
     ) {
-        Set<String> initialActorTags = request.actor().tags();
+        SimulationActor actor = copyActor(request.actor());
+        SimulationWorld world = copyWorld(request.world());
+        Set<String> initialActorTags = actor.tags();
+        Set<String> initialTargetEntityTags = world.targetEntity() == null
+                ? Set.of()
+                : world.targetEntity().tags();
         SimulationContext context = new SimulationContext(
                 UUID.randomUUID().toString(),
                 request.generation(),
-                request.actor(),
-                request.world(),
+                actor,
+                world,
                 request.event(),
                 request.options()
         );
@@ -59,6 +69,7 @@ public final class SimulationRunner {
                 registry,
                 context,
                 initialActorTags,
+                initialTargetEntityTags,
                 resultObserver
         ));
         RuntimeResult result = runtime.start(new TriggerEvent(
@@ -67,7 +78,26 @@ public final class SimulationRunner {
                 request.actor().id(),
                 request.event().sessionId()
         ));
-        return SimulationExecutionResult.from(result, context, initialActorTags);
+        return SimulationExecutionResult.from(result, context, initialActorTags, initialTargetEntityTags);
+    }
+
+    private static SimulationActor copyActor(SimulationActor actor) {
+        return new SimulationActor(
+                actor.id(),
+                actor.displayName(),
+                actor.online(),
+                actor.operator(),
+                actor.tags(),
+                actor.position()
+        );
+    }
+
+    private static SimulationWorld copyWorld(SimulationWorld world) {
+        SimulationEntity target = world.targetEntity();
+        SimulationEntity targetCopy = target == null
+                ? null
+                : new SimulationEntity(target.id(), target.entityTypeId(), target.displayName(), target.tags());
+        return new SimulationWorld(world.defaultDimensionId(), world.targetBlock(), world.regions(), targetCopy);
     }
 
     public interface RuntimeFactory {
@@ -79,6 +109,7 @@ public final class SimulationRunner {
         private final SimulationExecutionRegistry registry;
         private final SimulationContext context;
         private final Set<String> initialActorTags;
+        private final Set<String> initialTargetEntityTags;
         private final Consumer<SimulationExecutionResult> resultObserver;
 
         private SimulationRuntimeServices(
@@ -86,23 +117,46 @@ public final class SimulationRunner {
                 SimulationExecutionRegistry registry,
                 SimulationContext context,
                 Set<String> initialActorTags,
+                Set<String> initialTargetEntityTags,
                 Consumer<SimulationExecutionResult> resultObserver
         ) {
             this.delegate = delegate;
             this.registry = registry;
             this.context = context;
             this.initialActorTags = initialActorTags;
+            this.initialTargetEntityTags = initialTargetEntityTags;
             this.resultObserver = resultObserver;
         }
 
         @Override
-        public Optional<RuntimeNodeExecutionResult> executeSimulationNode(NodeDefinition node, UUID playerId, String sessionId) {
-            return registry.execute(node, context, delegate);
+        public Optional<RuntimeNodeExecutionResult> executeSimulationNode(
+                NodeDefinition node,
+                RuntimeExecutionContext runtimeContext
+        ) {
+            return registry.execute(node, context, runtimeContext, delegate);
         }
 
         @Override
-        public Optional<RuntimePredicateResult> evaluatePredicate(NodeDefinition node, UUID playerId, String sessionId) {
-            return registry.evaluatePredicate(node, context, delegate);
+        public Optional<RuntimePredicateResult> evaluatePredicate(
+                NodeDefinition node,
+                RuntimeExecutionContext runtimeContext
+        ) {
+            return registry.evaluatePredicate(node, context, runtimeContext, delegate);
+        }
+
+        @Override
+        public Optional<RuntimeSubjectReference> runEntity(UUID playerId, String sessionId) {
+            return Optional.of(context.actor().reference());
+        }
+
+        @Override
+        public Optional<RuntimeSubjectReference> targetEntity(UUID playerId, String sessionId) {
+            return context.targetEntity().map(SimulationEntity::reference);
+        }
+
+        @Override
+        public boolean entityResolvable(RuntimeSubjectReference entity, UUID playerId, String sessionId) {
+            return entity != null && context.entity(entity.id()).isPresent();
         }
 
         @Override
@@ -149,7 +203,12 @@ public final class SimulationRunner {
 
         @Override
         public void recordRuntimeResult(RuntimeResult result) {
-            resultObserver.accept(SimulationExecutionResult.from(result, context, initialActorTags));
+            resultObserver.accept(SimulationExecutionResult.from(
+                    result,
+                    context,
+                    initialActorTags,
+                    initialTargetEntityTags
+            ));
         }
     }
 }

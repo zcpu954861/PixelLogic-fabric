@@ -19,6 +19,7 @@ import {
 } from '../model/richText';
 import { simulationTestPayload, validateSimulationTestContext } from '../model/simulationTestContext';
 import { containerGeometry } from '../model/containerGeometry';
+import { isBodyContainerNode } from '../model/containerNodes';
 import { conditionSlots, hasPredicateRack, nextConditionSlotId } from '../model/conditionRack';
 import { state, world } from '../state/appState';
 import {
@@ -1220,7 +1221,7 @@ function addCatalogBlockAt(
     : null;
   const selectedContainer = dropPoint
     ? containerAtPoint(graph, dropPoint)
-    : graph.nodes.find((item) => item.id === state.selectedNodeId && item.blockId?.startsWith('control.loop.'));
+    : graph.nodes.find((item) => item.id === state.selectedNodeId && isBodyContainerNode(item));
   if (conditionHit) {
     placeCatalogNodeInConditionSlot(graph, nodeItem, conditionHit);
   } else if (selectedContainer && nodeItem.id !== selectedContainer.id) {
@@ -1270,7 +1271,7 @@ function blockRectSnapshot(rect: DOMRect): BlockRectSnapshot {
 
 function containerAtPoint(graph: GraphDocument, point: GraphPosition): GraphNode | null {
   return graph.nodes
-    .filter((nodeItem) => nodeItem.blockId?.startsWith('control.loop.'))
+    .filter(isBodyContainerNode)
     .filter((nodeItem) => {
       const rect = containerBodyDropZone(graph, nodeItem);
       return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;

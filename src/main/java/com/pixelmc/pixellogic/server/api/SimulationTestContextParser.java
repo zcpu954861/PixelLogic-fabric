@@ -7,11 +7,13 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationActor;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationBlockFact;
+import com.pixelmc.pixellogic.core.simulation.context.SimulationEntity;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationPosition;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationRegionFact;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationWorld;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
@@ -128,8 +130,35 @@ final class SimulationTestContextParser {
         return new SimulationWorld(
                 namespacedId(world.get("defaultDimensionId"), "测试环境默认维度 ID 不合法。", defaultDimensionId),
                 parseTargetBlock(world.get("targetBlock")),
-                parseRegions(world.get("regions"))
+                parseRegions(world.get("regions")),
+                parseTargetEntity(world.get("targetEntity"))
         );
+    }
+
+    private SimulationEntity parseTargetEntity(JsonElement targetElement) {
+        if (targetElement == null || targetElement.isJsonNull()) {
+            return null;
+        }
+        if (!targetElement.isJsonObject()) {
+            throw new IllegalArgumentException("测试目标实体格式无效。");
+        }
+        JsonObject target = targetElement.getAsJsonObject();
+        boolean enabled = target.has("enabled")
+                && !target.get("enabled").isJsonNull()
+                && target.get("enabled").getAsBoolean();
+        String entityTypeId = namespacedId(
+                target.get("entityTypeId"),
+                "测试目标实体类型 ID 必须类似 minecraft:zombie。",
+                "minecraft:zombie"
+        );
+        String displayName = target.has("displayName") && !target.get("displayName").isJsonNull()
+                ? displayName(target.get("displayName").getAsString(), "测试僵尸", "测试目标实体")
+                : "测试僵尸";
+        String[] rawTags = target.has("tags") && !target.get("tags").isJsonNull()
+                ? gson.fromJson(target.get("tags"), String[].class)
+                : null;
+        List<String> entityTags = tags(rawTags == null ? List.of() : Arrays.asList(rawTags));
+        return enabled ? new SimulationEntity(UUID.randomUUID(), entityTypeId, displayName, entityTags) : null;
     }
 
     private SimulationBlockFact parseTargetBlock(JsonElement targetElement) {
@@ -182,18 +211,22 @@ final class SimulationTestContextParser {
     }
 
     private String displayName(String raw) {
+        return displayName(raw, defaultActorName, "测试玩家");
+    }
+
+    private static String displayName(String raw, String defaultName, String label) {
         if (raw == null) {
-            return defaultActorName;
+            return defaultName;
         }
         String value = raw.trim();
         if (value.isEmpty()) {
-            throw new IllegalArgumentException("测试玩家名称不能为空。");
+            throw new IllegalArgumentException(label + "名称不能为空。");
         }
         if (value.length() > MAX_TEST_PLAYER_NAME_LENGTH) {
-            throw new IllegalArgumentException("测试玩家名称不能超过 64 个字符。");
+            throw new IllegalArgumentException(label + "名称不能超过 64 个字符。");
         }
         if (hasControlCharacter(value)) {
-            throw new IllegalArgumentException("测试玩家名称不能包含换行或控制字符。");
+            throw new IllegalArgumentException(label + "名称不能包含换行或控制字符。");
         }
         return value;
     }
@@ -216,6 +249,9 @@ final class SimulationTestContextParser {
             }
             if (hasControlCharacter(tag)) {
                 throw new IllegalArgumentException("标签不能包含换行或控制字符。");
+            }
+            if (tag.chars().anyMatch(Character::isWhitespace)) {
+                throw new IllegalArgumentException("标签不能包含空白字符。");
             }
             tags.add(tag);
             if (tags.size() > MAX_TEST_TAGS) {
@@ -279,4 +315,5 @@ final class SimulationTestContextParser {
 
     private record TestActorRequest(String displayName, List<String> tags, Boolean operator) {
     }
+
 }

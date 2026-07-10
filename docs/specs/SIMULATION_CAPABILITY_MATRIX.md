@@ -1,6 +1,6 @@
 # PixelLogic Simulation Capability Matrix
 
-This matrix classifies what PixelLogic should simulate in the next backend phase. It is a planning document, not an implementation list.
+This matrix classifies current Simulation capabilities and the boundary of later Minecraft adapters. A `FULLY_SIMULATABLE` entry describes PixelLogic's simulation semantics, not proof of equivalent real-server behavior.
 
 | Capability Area | Examples | Simulation Level | Should simulate in vNext? | Requires real MC? | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -11,6 +11,9 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 | message/chat component | `action.message.chat`, rich text plain output | `APPROXIMATE_SIMULATION` | yes | yes, for real delivery | Simulation records target and plain text; real adapter later converts to Minecraft Text/tellraw-equivalent. |
 | title/actionbar | title, subtitle, actionbar | `APPROXIMATE_SIMULATION` | yes | yes, for real display | Model visible output and channel summary; do not implement client rendering, timing, fade, or combo blocks yet. |
 | player tag | has/add/remove tag | `FULLY_SIMULATABLE` | yes | yes, for real server tags | Good first expansion because it is state-like and common in minigames. |
+| contextual condition result | checked subject + raw result + readable fact | `FULLY_SIMULATABLE` | yes | yes, for real-world subjects | True and false evaluations retain the checked object on the current run/path; the result is temporary cursor state, not graph or global state. |
+| entity execution context | execute as current condition/run/target entity | `FULLY_SIMULATABLE` | yes | yes, for real entities | Simulation switches one current entity and restores it across nesting/delay/loop; v1 is not execute-at and does not scan or fan out entities. |
+| simulated target entity | optional type id, display name, tags | `FULLY_SIMULATABLE` | yes | yes, for real entity lookup | Per-run Test Context fact only; initial/final target tags are reported separately from the run actor. |
 | player gamemode | check/set gamemode | `APPROXIMATE_SIMULATION` | maybe | yes | Check can be simulated; mutation must be clearly approximate until MC adapter. |
 | player position | check position, teleport result | `APPROXIMATE_SIMULATION` | maybe | yes | Simulate dimension/coordinates and teleport result, not collision safety. |
 | inventory simple items | has/give/take item id + count | `APPROXIMATE_SIMULATION` | yes | yes | Use item id/count/display summary; defer NBT/data-component exactness. |
@@ -102,8 +105,20 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 
 - `control.loop.until` pre-checks an ordered condition rack before every body iteration.
 - v1 combines all slot results with AND and applies each slot's independent NOT after raw predicate evaluation.
-- The initial predicate capsule set is `condition.player.has_tag`, `condition.player.is_admin`, `condition.player.dimension_is`, `condition.player.in_region`, and `condition.target_block.is_type`.
+- The predicate capsule set now includes `condition.player.has_tag`, `condition.player.is_admin`, `condition.player.dimension_is`, `condition.player.in_region`, `condition.target_block.is_type`, and `condition.context_entity.has_tag`.
 - These blocks reuse their existing Simulation Test Context facts and the same raw evaluator used by ordinary condition execution.
 - Zero slots, empty slots, illegal predicate membership/evaluation, and a false condition with an empty body fail closed at runtime; incomplete graph states remain saveable warnings where structurally safe.
 - `timer.wait` in the body reuses the existing continuation cursor/frame and does not reset the 20-round loop-until cap.
 - OR, condition groups, asynchronous predicates, cross-restart continuation, and real Minecraft condition/runtime adapters remain deferred.
+
+## Entity Execution Context + Contextual Condition Results v1 Status
+
+- `condition.player.has_tag`, `condition.player.is_admin`, and `condition.context_entity.has_tag` return the checked subject, raw boolean, and readable fact on true and false evaluations. Existing `PASS_ONLY`, `FAIL_ONLY`, and `BRANCH` routing is unchanged.
+- The latest ordinary contextual result is scoped to the current run/control path. A later condition replaces it, and a condition without a contextual result clears it; no static/global last-result state is used. Loop-until predicate evaluation does not overwrite the ordinary path result.
+- `context.entity.execute_as` resolves exactly one of `CONDITION_SUBJECT`, `RUN_ENTITY`, or `TARGET_ENTITY`, switches the current entity for its body, and restores the outer entity on empty or natural body completion.
+- `ExecutionCursor` carries run/target/current entity references, the current condition result, entity-context frames, and loop frames through `timer.wait`. Invalid, cancelled, duplicate, or stale resumes fail closed before entity mutation.
+- `condition.context_entity.has_tag`, `action.context_entity.add_tag`, and `action.context_entity.remove_tag` operate on the current entity. Existing `player.*` blocks remain bound to the run actor and do not silently retarget to a non-player entity.
+- Simulation Test Context optionally supplies one target entity (`minecraft:zombie`, `测试僵尸`, no tags by default). Each run copies actor and target tag state, and results expose actor and target initial/final tags separately.
+- Graph/storage persists only block/config, edges, and flat `body` membership. Runtime subjects, condition facts, entity identity/state, and scope frames are not persisted.
+- Save-time validation rejects unknown sources and invalid/deep/cyclic membership while allowing an empty body as a warning. Runtime fails closed on missing/non-entity/unresolvable subjects or targets and never falls back to another source.
+- Not implemented: execute-at, real Minecraft entity adapters, online-player/world-entity scanning, detector/event blocks, multi-entity arrays or fan-out, and cross-restart continuation. A future detector must produce one isolated path/run and condition result per matched entity.

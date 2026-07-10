@@ -26,11 +26,22 @@ public record SimulationExecutionResult(
         List<SimulationMessageResult> messageResults,
         List<SimulationStateChangeResult> stateChanges,
         Set<String> actorTags,
+        boolean targetEntityEnabled,
+        String targetEntityTypeId,
+        String targetEntityDisplayName,
+        Set<String> initialTargetEntityTags,
+        Set<String> targetEntityTags,
         boolean timerScheduled,
         Status status,
         List<String> errors
 ) {
-    public static SimulationExecutionResult from(RuntimeResult result, SimulationContext context, Set<String> initialActorTags) {
+    public static SimulationExecutionResult from(
+            RuntimeResult result,
+            SimulationContext context,
+            Set<String> initialActorTags,
+            Set<String> initialTargetEntityTags
+    ) {
+        var targetEntity = context.targetEntity().orElse(null);
         return new SimulationExecutionResult(
                 result.success(),
                 result.traceId(),
@@ -45,6 +56,11 @@ public record SimulationExecutionResult(
                 context.messageResults(),
                 context.stateChanges(),
                 context.actor().tags(),
+                targetEntity != null,
+                targetEntity == null ? "" : targetEntity.entityTypeId(),
+                targetEntity == null ? "" : targetEntity.displayName(),
+                Set.copyOf(initialTargetEntityTags),
+                targetEntity == null ? Set.of() : targetEntity.tags(),
                 context.timerScheduled(),
                 result.suspended() ? Status.WAITING : result.success() ? Status.COMPLETED : Status.FAILED,
                 result.success() ? List.of() : List.of(result.message())
@@ -66,6 +82,11 @@ public record SimulationExecutionResult(
                 messageResults,
                 stateChanges,
                 actorTags,
+                targetEntityEnabled,
+                targetEntityTypeId,
+                targetEntityDisplayName,
+                initialTargetEntityTags,
+                targetEntityTags,
                 timerScheduled,
                 Status.CANCELLED,
                 List.of(message)

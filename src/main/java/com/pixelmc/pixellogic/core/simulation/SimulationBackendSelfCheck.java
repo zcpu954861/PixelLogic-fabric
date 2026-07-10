@@ -77,7 +77,7 @@ public final class SimulationBackendSelfCheck {
                 0L
         ));
         require(tagged.success(), "actor with tag should pass condition");
-        require(tagHarness.traces().get(tagged.traceId()).orElseThrow().containsMessage("玩家标签条件通过"),
+        require(tagHarness.traces().get(tagged.traceId()).orElseThrow().containsMessage("玩家 带标签玩家 拥有标签「runner」"),
                 "trace should include player tag pass branch");
 
         RunHarness addTagHarness = harness(tagGraph);

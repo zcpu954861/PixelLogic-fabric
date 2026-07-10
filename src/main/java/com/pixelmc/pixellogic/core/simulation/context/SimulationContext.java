@@ -8,6 +8,7 @@ import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunOptions;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public final class SimulationContext {
@@ -56,6 +57,20 @@ public final class SimulationContext {
 
     public SimulationWorld world() {
         return world;
+    }
+
+    public Optional<SimulationEntity> targetEntity() {
+        return Optional.ofNullable(world.targetEntity());
+    }
+
+    public Optional<SimulationEntity> entity(String referenceId) {
+        if (referenceId == null || referenceId.isBlank()) {
+            return Optional.empty();
+        }
+        if (actor.id().toString().equals(referenceId)) {
+            return Optional.of(actor);
+        }
+        return targetEntity().filter(entity -> entity.id().toString().equals(referenceId));
     }
 
     public SimulationEvent event() {

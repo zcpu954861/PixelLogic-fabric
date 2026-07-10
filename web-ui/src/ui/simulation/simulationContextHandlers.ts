@@ -1,10 +1,12 @@
 import {
   addSimulationRegion,
   addSimulationTag,
+  addSimulationTargetEntityTag,
   cloneSimulationTestContext,
   defaultSimulationTestContext,
   removeSimulationRegion,
   removeSimulationTag,
+  removeSimulationTargetEntityTag,
   simulationTestPayload,
   type SimulationTestContext,
   updateSimulationDisplayName,
@@ -13,6 +15,8 @@ import {
   updateSimulationRegion,
   updateSimulationTargetBlock,
   updateSimulationTargetEnabled,
+  updateSimulationTargetEntity,
+  updateSimulationTargetEntityEnabled,
   validateSimulationTestContext,
 } from '../../model/simulationTestContext';
 import { state } from '../../state/appState';
@@ -130,6 +134,61 @@ export function bindSimulationDraftFields(renderApp: RenderApp): void {
           inputEl.value,
         ),
         false,
+        renderApp,
+      );
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-sim-target-entity-enabled]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      updateSimulationDraft(
+        updateSimulationTargetEntityEnabled(simulationDraft(), buttonEl.dataset.simTargetEntityEnabled === 'true'),
+        true,
+        renderApp,
+      );
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('[data-sim-target-entity-field]').forEach((inputEl) => {
+    inputEl.addEventListener('input', () => {
+      updateSimulationDraft(
+        updateSimulationTargetEntity(
+          simulationDraft(),
+          inputEl.dataset.simTargetEntityField as 'entityTypeId' | 'displayName',
+          inputEl.value,
+        ),
+        false,
+        renderApp,
+      );
+    });
+  });
+
+  const targetEntityTagInput = document.querySelector<HTMLInputElement>('[data-sim-target-entity-tag-input]');
+  const addTargetEntityTag = () => {
+    if (!targetEntityTagInput) {
+      return;
+    }
+    const result = addSimulationTargetEntityTag(simulationDraft(), targetEntityTagInput.value);
+    if (result.error) {
+      state.simulationTestContextError = result.error;
+      renderApp();
+      return;
+    }
+    targetEntityTagInput.value = '';
+    updateSimulationDraft(result.context, true, renderApp);
+  };
+  document.querySelector('[data-sim-target-entity-action="add-tag"]')?.addEventListener('click', addTargetEntityTag);
+  targetEntityTagInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addTargetEntityTag();
+    }
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-sim-target-entity-remove-tag]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      updateSimulationDraft(
+        removeSimulationTargetEntityTag(simulationDraft(), buttonEl.dataset.simTargetEntityRemoveTag ?? ''),
+        true,
         renderApp,
       );
     });

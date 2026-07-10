@@ -6,7 +6,8 @@ import java.util.Optional;
 public record SimulationWorld(
         String defaultDimensionId,
         SimulationBlockFact targetBlock,
-        List<SimulationRegionFact> regions
+        List<SimulationRegionFact> regions,
+        SimulationEntity targetEntity
 ) {
     public SimulationWorld {
         defaultDimensionId = defaultDimensionId == null || defaultDimensionId.isBlank()
@@ -17,7 +18,11 @@ public record SimulationWorld(
     }
 
     public SimulationWorld(String dimensionId) {
-        this(dimensionId, SimulationBlockFact.disabled(), List.of());
+        this(dimensionId, SimulationBlockFact.disabled(), List.of(), null);
+    }
+
+    public SimulationWorld(String defaultDimensionId, SimulationBlockFact targetBlock, List<SimulationRegionFact> regions) {
+        this(defaultDimensionId, targetBlock, regions, null);
     }
 
     public static SimulationWorld overworld() {

@@ -6,6 +6,8 @@ import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.runtime.RuntimeNodeExecutionResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimePredicateResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
+import com.pixelmc.pixellogic.core.runtime.RuntimeExecutionContext;
+import com.pixelmc.pixellogic.core.runtime.RuntimeConditionResult;
 import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationBlockFact;
@@ -44,13 +46,26 @@ public final class SimulationExecutionRegistry {
                 new TargetBlockYCompareExecutor(),
                 new PlayerNearTargetBlockExecutor(),
                 new PlayerAddTagExecutor(),
-                new PlayerRemoveTagExecutor()
+                new PlayerRemoveTagExecutor(),
+                ContextEntityTagExecutors.hasTag(),
+                ContextEntityTagExecutors.addTag(),
+                ContextEntityTagExecutors.removeTag()
         ));
     }
 
     public Optional<RuntimeNodeExecutionResult> execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
         return Optional.ofNullable(executors.get(node.type()))
                 .map(executor -> executor.execute(node, context, services));
+    }
+
+    public Optional<RuntimeNodeExecutionResult> execute(
+            NodeDefinition node,
+            SimulationContext context,
+            RuntimeExecutionContext runtimeContext,
+            RuntimeServices services
+    ) {
+        return Optional.ofNullable(executors.get(node.type()))
+                .map(executor -> executor.execute(node, context, runtimeContext, services));
     }
 
     public Optional<RuntimePredicateResult> evaluatePredicate(
@@ -61,6 +76,19 @@ public final class SimulationExecutionRegistry {
         SimulationBlockExecutor executor = executors.get(node.type());
         if (executor instanceof SimulationPredicateEvaluator predicate) {
             return Optional.of(predicate.evaluatePredicate(node, context, services));
+        }
+        return Optional.empty();
+    }
+
+    public Optional<RuntimePredicateResult> evaluatePredicate(
+            NodeDefinition node,
+            SimulationContext context,
+            RuntimeExecutionContext runtimeContext,
+            RuntimeServices services
+    ) {
+        SimulationBlockExecutor executor = executors.get(node.type());
+        if (executor instanceof SimulationPredicateEvaluator predicate) {
+            return Optional.of(predicate.evaluatePredicate(node, context, runtimeContext, services));
         }
         return Optional.empty();
     }
@@ -110,16 +138,18 @@ public final class SimulationExecutionRegistry {
         public RuntimePredicateResult evaluatePredicate(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             String tag = tag(node);
             boolean passed = context.actor().hasTag(tag);
+            String fact = "玩家 " + context.actor().displayName() + (passed ? " 拥有" : " 没有")
+                    + "标签「" + tag + "」";
             return new RuntimePredicateResult(
                     passed,
-                    "玩家标签条件" + (passed ? "通过" : "失败") + "：" + context.actor().displayName() + " "
-                            + (passed ? "拥有" : "不拥有") + "标签 " + tag + "。"
+                    fact + "。",
+                    new RuntimeConditionResult(node.id(), node.blockId(), context.actor().reference(), passed, fact)
             );
         }
 
         @Override
         public String outputModeTrace(ConditionOutputMode mode, boolean value) {
-            return playerTagModeTrace(mode, value);
+            return SimulationPredicateEvaluator.contextualPathTrace(mode, value);
         }
     }
 
@@ -132,16 +162,17 @@ public final class SimulationExecutionRegistry {
         @Override
         public RuntimePredicateResult evaluatePredicate(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             boolean passed = context.actor().operator();
+            String fact = "玩家 " + context.actor().displayName() + (passed ? " 是管理员" : " 不是管理员");
             return new RuntimePredicateResult(
                     passed,
-                    "管理员条件" + (passed ? "通过" : "失败") + "：" + context.actor().displayName()
-                            + (passed ? " 是管理员。" : " 不是管理员。")
+                    fact + "。",
+                    new RuntimeConditionResult(node.id(), node.blockId(), context.actor().reference(), passed, fact)
             );
         }
 
         @Override
         public String outputModeTrace(ConditionOutputMode mode, boolean value) {
-            return adminModeTrace(mode, value);
+            return SimulationPredicateEvaluator.contextualPathTrace(mode, value);
         }
     }
 
@@ -361,10 +392,10 @@ public final class SimulationExecutionRegistry {
         }
     }
 
-    private static String tag(NodeDefinition node) {
+    static String tag(NodeDefinition node) {
         String tag = node.config().getOrDefault("tag", "");
         if (tag.isBlank()) {
-            throw new IllegalStateException("玩家标签不能为空。");
+            throw new IllegalStateException("标签不能为空。");
         }
         return tag;
     }
@@ -424,22 +455,6 @@ public final class SimulationExecutionRegistry {
             case PASS_ONLY -> passed ? positive + "时继续。" : negative + "，流程在此结束。";
             case FAIL_ONLY -> passed ? positive + "，流程在此结束。" : negative + "时继续。";
             case BRANCH -> passed ? "走" + positive + "分支。" : "走" + negative + "分支。";
-        };
-    }
-
-    private static String playerTagModeTrace(ConditionOutputMode mode, boolean passed) {
-        return switch (mode) {
-            case PASS_ONLY -> passed ? "拥有标签时继续。" : "不拥有标签，流程在此结束。";
-            case FAIL_ONLY -> passed ? "拥有标签，流程在此结束。" : "不拥有标签时继续。";
-            case BRANCH -> passed ? "走拥有标签分支。" : "走不拥有标签分支。";
-        };
-    }
-
-    private static String adminModeTrace(ConditionOutputMode mode, boolean passed) {
-        return switch (mode) {
-            case PASS_ONLY -> passed ? "是管理员时继续。" : "不是管理员，流程在此结束。";
-            case FAIL_ONLY -> passed ? "是管理员，流程在此结束。" : "不是管理员时继续。";
-            case BRANCH -> passed ? "走是管理员分支。" : "走不是管理员分支。";
         };
     }
 

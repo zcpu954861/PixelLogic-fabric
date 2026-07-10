@@ -34,9 +34,17 @@ export type SimulationRegionFact = {
   maxZ: number;
 };
 
+export type SimulationTargetEntity = {
+  enabled: boolean;
+  entityTypeId: string;
+  displayName: string;
+  tags: string[];
+};
+
 export type SimulationTestWorld = {
   playerPosition: SimulationPosition;
   targetBlock: SimulationTargetBlock;
+  targetEntity: SimulationTargetEntity;
   regions: SimulationRegionFact[];
 };
 
@@ -63,6 +71,11 @@ export type SimulationTestResult = {
   regions?: SimulationRegionFact[];
   initialActorTags: string[];
   actorTags: string[];
+  targetEntityEnabled: boolean;
+  targetEntityTypeId: string;
+  targetEntityDisplayName: string;
+  initialTargetEntityTags: string[];
+  targetEntityTags: string[];
   timerScheduled: boolean;
   status: 'WAITING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 };
@@ -89,6 +102,10 @@ export function cloneSimulationTestContext(context: SimulationTestContext): Simu
     world: {
       playerPosition: { ...normalized.world.playerPosition },
       targetBlock: { ...normalized.world.targetBlock },
+      targetEntity: {
+        ...normalized.world.targetEntity,
+        tags: [...normalized.world.targetEntity.tags],
+      },
       regions: normalized.world.regions.map((region) => ({ ...region })),
     },
   };
@@ -157,6 +174,81 @@ export function updateSimulationTargetBlock(
       targetBlock: {
         ...targetBlock,
         [field]: field === 'dimensionId' || field === 'blockId' ? value : toNumberInput(value),
+      },
+    },
+  };
+}
+
+export function updateSimulationTargetEntityEnabled(
+  context: SimulationTestContext,
+  enabled: boolean,
+): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  return {
+    ...normalized,
+    world: {
+      ...normalized.world,
+      targetEntity: { ...normalized.world.targetEntity, enabled },
+    },
+  };
+}
+
+export function updateSimulationTargetEntity(
+  context: SimulationTestContext,
+  field: 'entityTypeId' | 'displayName',
+  value: string,
+): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  return {
+    ...normalized,
+    world: {
+      ...normalized.world,
+      targetEntity: { ...normalized.world.targetEntity, [field]: value },
+    },
+  };
+}
+
+export function addSimulationTargetEntityTag(
+  context: SimulationTestContext,
+  rawTag: string,
+): { context: SimulationTestContext; error: string } {
+  const normalized = withWorldDefaults(context);
+  const tag = rawTag.trim();
+  if (!tag) {
+    return { context, error: '标签不能为空。' };
+  }
+  const tags = normalizeSimulationTags(normalized.world.targetEntity.tags);
+  const error = validateTag(tag, tags);
+  if (error) {
+    return { context, error };
+  }
+  return {
+    context: {
+      ...normalized,
+      world: {
+        ...normalized.world,
+        targetEntity: {
+          ...normalized.world.targetEntity,
+          tags: tags.includes(tag) ? tags : [...tags, tag],
+        },
+      },
+    },
+    error: '',
+  };
+}
+
+export function removeSimulationTargetEntityTag(
+  context: SimulationTestContext,
+  tag: string,
+): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  return {
+    ...normalized,
+    world: {
+      ...normalized.world,
+      targetEntity: {
+        ...normalized.world.targetEntity,
+        tags: normalized.world.targetEntity.tags.filter((item) => item !== tag),
       },
     },
   };
@@ -346,6 +438,12 @@ function normalizeSimulationTestContext(context: SimulationTestContext): Simulat
         enabled: normalized.world.targetBlock.enabled,
         blockId: normalized.world.targetBlock.blockId.trim() || defaultBlockId,
       },
+      targetEntity: {
+        ...normalized.world.targetEntity,
+        entityTypeId: normalized.world.targetEntity.entityTypeId.trim() || 'minecraft:zombie',
+        displayName: normalized.world.targetEntity.displayName.trim() || '测试僵尸',
+        tags: normalizeSimulationTags(normalized.world.targetEntity.tags),
+      },
       regions: normalized.world.regions.map(normalizeRegion),
     },
   };
@@ -357,6 +455,7 @@ function withWorldDefaults(context: SimulationTestContext): SimulationTestContex
     world: {
       playerPosition: context.world?.playerPosition ?? defaultSimulationPosition(),
       targetBlock: context.world?.targetBlock ?? defaultSimulationTargetBlock(),
+      targetEntity: context.world?.targetEntity ?? defaultSimulationTargetEntity(),
       regions: context.world?.regions ?? [],
     },
   };
@@ -366,6 +465,7 @@ function defaultSimulationWorld(): SimulationTestWorld {
   return {
     playerPosition: defaultSimulationPosition(),
     targetBlock: defaultSimulationTargetBlock(),
+    targetEntity: defaultSimulationTargetEntity(),
     regions: [],
   };
 }
@@ -387,6 +487,22 @@ function defaultSimulationTargetBlock(): SimulationTargetBlock {
     y: 64,
     z: 0,
     blockId: defaultBlockId,
+  };
+}
+
+export function formatSimulationTargetEntity(targetEntity?: SimulationTargetEntity): string {
+  const target = targetEntity ?? defaultSimulationTargetEntity();
+  return target.enabled
+    ? `${target.displayName || '测试实体'}（${target.entityTypeId || 'minecraft:zombie'}）`
+    : '未启用';
+}
+
+function defaultSimulationTargetEntity(): SimulationTargetEntity {
+  return {
+    enabled: false,
+    entityTypeId: 'minecraft:zombie',
+    displayName: '测试僵尸',
+    tags: [],
   };
 }
 
@@ -431,6 +547,28 @@ function validateWorld(world: SimulationTestWorld): string {
   }
   if (!isNamespacedId(world.targetBlock.blockId.trim())) {
     return '目标方块 ID 必须类似 minecraft:stone。';
+  }
+  if (!isNamespacedId(world.targetEntity.entityTypeId.trim())) {
+    return '测试目标实体类型 ID 必须类似 minecraft:zombie。';
+  }
+  if (!world.targetEntity.displayName.trim()) {
+    return '测试目标实体名称不能为空。';
+  }
+  if (world.targetEntity.displayName.trim().length > simulationNameLengthLimit) {
+    return '测试目标实体名称不能超过 64 个字符。';
+  }
+  if (hasControlCharacter(world.targetEntity.displayName)) {
+    return '测试目标实体名称不能包含换行或控制字符。';
+  }
+  const targetTags = normalizeSimulationTags(world.targetEntity.tags);
+  if (targetTags.length > simulationTagLimit) {
+    return '测试目标实体标签数量不能超过 32 个。';
+  }
+  for (const tag of targetTags) {
+    const error = validateTag(tag, targetTags);
+    if (error) {
+      return error;
+    }
   }
   if (world.regions.length > simulationRegionLimit) {
     return '测试区域数量不能超过 8 个。';
@@ -505,6 +643,9 @@ function validateTag(tag: string, currentTags: string[]): string {
   }
   if (hasControlCharacter(tag)) {
     return '标签不能包含换行或控制字符。';
+  }
+  if (/\s/.test(tag)) {
+    return '标签不能包含空白字符。';
   }
   if (!currentTags.includes(tag) && currentTags.length >= simulationTagLimit) {
     return '标签数量不能超过 32 个。';

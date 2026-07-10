@@ -65,6 +65,12 @@
   padding: 15px 54px 5px 38px;
 }
 
+.logic-block.control[data-category="context"] {
+  --accent: #6d28d9;
+  --block-outline: #6d28d9;
+  --fill: #fbf8ff;
+}
+
 .puzzle-shape {
   position: absolute;
   inset: 0;

@@ -17,6 +17,10 @@ assert.match(polling, /window\.setTimeout/, 'polling must use a delayed one-shot
 assert.doesNotMatch(polling, /setInterval|applyGraphEdit|persistDraft|scheduleAutoSave|undoStack|redoStack/, 'polling must not busy-loop or mutate graph/history');
 assert.match(app, /state\.latestTrace = update\.trace/, 'polling must replace the bounded trace snapshot instead of appending duplicates');
 assert.match(app, /pagehide.*stopTestRunPolling/, 'page exit must clean up polling');
+assert.match(app, /data-trace-scroll/, 'execution trace must have a stable scroll target');
+assert.match(app, /captureTraceScrollSnapshot\(\)/, 'rerenders must capture execution trace scroll');
+assert.match(app, /restoreTraceScrollSnapshot\(traceScroll\)/, 'rerenders must restore execution trace scroll');
+assert.match(app, /stickToBottom.*scrollHeight/s, 'a trace already at the bottom must follow new entries');
 assert.match(graphTypes, /runStatus\?: 'WAITING' \| 'COMPLETED' \| 'FAILED' \| 'CANCELLED'/, 'API types must expose run status');
 assert.match(resultPanel, /等待后续执行/, 'suspended runs must not be displayed as completed');
 

@@ -34,10 +34,12 @@ export function clearCatalogDragGhost(): void {
   ghostEl?.remove();
   ghostEl = null;
   clearCatalogContainerTarget();
+  clearCatalogConditionSlotTarget();
 }
 
 export function showCatalogContainerTarget(containerNodeId: string | null): void {
   clearCatalogContainerTarget();
+  clearCatalogConditionSlotTarget();
   if (!containerNodeId) {
     return;
   }
@@ -46,8 +48,25 @@ export function showCatalogContainerTarget(containerNodeId: string | null): void
     ?.classList.add('catalog-container-target');
 }
 
+export function showCatalogConditionSlotTarget(containerNodeId: string | null, slotId: string | null): void {
+  clearCatalogContainerTarget();
+  clearCatalogConditionSlotTarget();
+  if (!containerNodeId || !slotId) {
+    return;
+  }
+  document.querySelector<HTMLElement>(
+    `[data-condition-container="${CSS.escape(containerNodeId)}"][data-condition-slot="${CSS.escape(slotId)}"]`,
+  )?.classList.add('catalog-condition-slot-target');
+}
+
 function clearCatalogContainerTarget(): void {
   document.querySelectorAll('.catalog-container-target').forEach((element) => {
     element.classList.remove('catalog-container-target');
+  });
+}
+
+function clearCatalogConditionSlotTarget(): void {
+  document.querySelectorAll('.catalog-condition-slot-target').forEach((element) => {
+    element.classList.remove('catalog-condition-slot-target');
   });
 }

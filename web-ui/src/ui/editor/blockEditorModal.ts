@@ -1,19 +1,22 @@
-import type { BlockCatalog, GraphNode } from '../../model/graphTypes';
+import type { BlockCatalog, GraphDocument, GraphNode } from '../../model/graphTypes';
+import { conditionRackParent } from '../../model/conditionRack';
 import type { SimulationTestContext } from '../../model/simulationTestContext';
 import { escapeHtml } from '../../utils/dom';
-import { nodeOfficialLabel, nodeSummary } from '../humanize/labels';
+import { nodeOfficialLabel, rackAwareNodeSummary } from '../humanize/labels';
 import { renderNodeEditor } from './formControls';
+import { renderConditionRackEditor } from './conditionRackEditor';
 
 export function renderEditorModal(
   nodeItem: GraphNode,
   catalog: BlockCatalog,
-  options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string; steady: boolean; simulationTestContext: SimulationTestContext },
+  options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string; steady: boolean; simulationTestContext: SimulationTestContext; graph: GraphDocument; rackChildEditing?: boolean },
 ): string {
   const officialName = nodeOfficialLabel(nodeItem, catalog);
   const customName = nodeItem.displayName.trim();
   const titleName = customName && customName !== officialName ? customName : '未命名';
   const title = `${titleName}(${officialName})`;
   const modalIssue = options.modalIssue;
+  const rackCapsule = Boolean(conditionRackParent(options.graph, nodeItem));
 
   return `
     <div class="editor-overlay${options.editorClosing ? ' is-closing' : ''}${options.steady ? ' is-steady' : ''}" data-modal-overlay>
@@ -28,9 +31,10 @@ export function renderEditorModal(
         <div class="editor-body">
           <section class="editor-summary">
             <b>当前摘要</b>
-            <p data-modal-summary>${escapeHtml(nodeSummary(nodeItem, catalog))}</p>
+            <p data-modal-summary>${escapeHtml(rackAwareNodeSummary(nodeItem, options.graph, catalog))}</p>
           </section>
-          ${renderNodeEditor(nodeItem, catalog, options.simulationTestContext)}
+          ${renderNodeEditor(nodeItem, catalog, options.simulationTestContext, rackCapsule)}
+          ${renderConditionRackEditor(nodeItem, options.graph, catalog)}
           ${options.error || options.hasValidation ? `
             <section class="editor-issues" role="${options.error ? 'alert' : 'status'}">
               <b>${options.error ? '保存提示' : '检查结果'}</b>
@@ -39,8 +43,8 @@ export function renderEditorModal(
           ` : ''}
         </div>
         <footer class="editor-actions">
-          <button type="button" class="ghost-button" data-modal-action="cancel">关闭</button>
-          <button type="button" class="run-button" data-modal-action="save">保存</button>
+          <button type="button" class="ghost-button" data-modal-action="cancel">${options.rackChildEditing ? '返回条件架' : '关闭'}</button>
+          <button type="button" class="run-button" data-modal-action="save">${options.rackChildEditing ? '保存条件并返回' : '保存'}</button>
         </footer>
         <div class="unsaved-confirm" data-unsaved-confirm hidden>
           <section role="alertdialog" aria-modal="true" aria-labelledby="unsaved-confirm-title">

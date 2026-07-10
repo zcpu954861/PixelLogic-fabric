@@ -33,6 +33,7 @@ public final class BuiltInBlockCatalog {
     public static final String ACTION_PLAYER_REMOVE_TAG = "action.player.remove_tag";
     public static final String CONTROL_LOOP_COUNT = "control.loop.count";
     public static final String CONTROL_LOOP_FOREVER = "control.loop.forever";
+    public static final String CONTROL_LOOP_UNTIL = "control.loop.until";
     public static final String STATE_SET = "state.set";
     public static final String STATE_ADD = "state.add";
     public static final String TIMER_WAIT = "timer.wait";
@@ -86,7 +87,7 @@ public final class BuiltInBlockCatalog {
     private static List<BlockCategoryDefinition> categories() {
         return List.of(
                 category("trigger", "触发事件", "从玩家操作或测试入口开始一条逻辑流。", 10),
-                category("condition", "条件判断", "按状态或上下文决定走哪条分支。", 20),
+                category("condition", "条件判断块(胶囊)", "按状态或上下文决定走哪条分支。", 20),
                 category("player", "玩家操作", "修改当前玩家的模拟属性。", 30),
                 category("message", "消息显示", "向玩家或调试视图展示文本反馈。", 40),
                 category("control", "控制流", "包裹并重复执行一段内部逻辑。", 50),
@@ -214,7 +215,7 @@ public final class BuiltInBlockCatalog {
                         "向「{target}」显示快捷栏消息「{message.plainText}」。",
                         "action.message.actionbar"
                 ),
-                block(
+                blockWithCapabilities(
                         CONDITION_PLAYER_HAS_TAG,
                         "玩家是否拥有标签",
                         "按当前模拟玩家是否拥有指定标签继续流程。",
@@ -226,6 +227,10 @@ public final class BuiltInBlockCatalog {
                         List.of(conditionMode("拥有标签时继续", "不拥有标签时继续", "分开执行"), text("tag", "标签", false, "例如 runner")),
                         "按当前玩家是否拥有标签「{tag}」继续。",
                         "condition.player.has_tag",
+                        List.of(BlockCapability.PREDICATE),
+                        "玩家拥有标签「{tag}」",
+                        "玩家没有标签「{tag}」",
+                        List.of(),
                         List.of(in("input")),
                         List.of(out("pass"), out("fail")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
@@ -233,7 +238,7 @@ public final class BuiltInBlockCatalog {
                         List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER),
                         List.of()
                 ),
-                block(
+                blockWithCapabilities(
                         CONDITION_PLAYER_IS_ADMIN,
                         "玩家是否为管理员",
                         "按当前模拟玩家是否为管理员继续流程。",
@@ -245,6 +250,10 @@ public final class BuiltInBlockCatalog {
                         List.of(conditionMode("是管理员时继续", "不是管理员时继续", "分开执行")),
                         "按当前玩家是否为管理员继续。",
                         "condition.player.is_admin",
+                        List.of(BlockCapability.PREDICATE),
+                        "玩家是管理员",
+                        "玩家不是管理员",
+                        List.of(),
                         List.of(in("input")),
                         List.of(out("pass"), out("fail")),
                         BlockCapabilityLevel.APPROXIMATE_SIMULATION,
@@ -252,7 +261,7 @@ public final class BuiltInBlockCatalog {
                         List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER),
                         List.of()
                 ),
-                block(
+                blockWithCapabilities(
                         CONDITION_PLAYER_DIMENSION_IS,
                         "玩家所在维度是否为",
                         "按当前模拟玩家所在维度继续流程。",
@@ -267,6 +276,10 @@ public final class BuiltInBlockCatalog {
                         ),
                         "按当前玩家所在维度是否为「{dimensionId}」继续。",
                         "condition.player.dimension_is",
+                        List.of(BlockCapability.PREDICATE),
+                        "玩家位于「{dimensionId}」",
+                        "玩家不在维度「{dimensionId}」",
+                        List.of(),
                         List.of(in("input")),
                         List.of(out("pass"), out("fail")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
@@ -274,7 +287,7 @@ public final class BuiltInBlockCatalog {
                         List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER),
                         List.of()
                 ),
-                block(
+                blockWithCapabilities(
                         CONDITION_PLAYER_IN_REGION,
                         "玩家是否在区域内",
                         "按当前模拟玩家是否位于测试区域内继续流程。",
@@ -289,6 +302,10 @@ public final class BuiltInBlockCatalog {
                         ),
                         "按当前玩家是否在区域「{regionName}」内继续。",
                         "condition.player.in_region",
+                        List.of(BlockCapability.PREDICATE),
+                        "玩家在区域「{regionName}」内",
+                        "玩家不在区域「{regionName}」内",
+                        List.of(),
                         List.of(in("input")),
                         List.of(out("pass"), out("fail")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
@@ -321,7 +338,7 @@ public final class BuiltInBlockCatalog {
                         List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER),
                         List.of()
                 ),
-                block(
+                blockWithCapabilities(
                         CONDITION_TARGET_BLOCK_IS_TYPE,
                         "目标方块是否为",
                         "按测试上下文中的目标方块类型继续流程。",
@@ -336,6 +353,10 @@ public final class BuiltInBlockCatalog {
                         ),
                         "按目标方块是否为「{blockId}」继续。",
                         "condition.target_block.is_type",
+                        List.of(BlockCapability.PREDICATE),
+                        "目标方块是「{blockId}」",
+                        "目标方块不是「{blockId}」",
+                        List.of(),
                         List.of(in("input")),
                         List.of(out("pass"), out("fail")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
@@ -490,6 +511,34 @@ public final class BuiltInBlockCatalog {
                         List.of("body"),
                         List.of(in("input")),
                         List.of(),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY),
+                        List.of()
+                ),
+                blockWithCapabilities(
+                        CONTROL_LOOP_UNTIL,
+                        "循环直到",
+                        "每轮开始前检查结束条件；全部成立时退出，否则执行内部积木。",
+                        "control",
+                        "control.loop",
+                        "control",
+                        NodeType.CONTROL_LOOP_UNTIL,
+                        Map.of(),
+                        List.of(readonly(
+                                "conditionRack",
+                                "结束条件",
+                                "在条件架中管理",
+                                "双击循环直到后新增、删除或取反条件槽。"
+                        )),
+                        "直到全部结束条件成立，否则重复内部积木。",
+                        "control.loop.until",
+                        List.of(BlockCapability.PREDICATE_RACK),
+                        "",
+                        "",
+                        List.of("body"),
+                        List.of(in("input")),
+                        List.of(out("done")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
                         BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
                         List.of(BlockSafetyFlag.READ_ONLY),
@@ -653,6 +702,54 @@ public final class BuiltInBlockCatalog {
             List<BlockSafetyFlag> safetyFlags,
             List<String> aliases
     ) {
+        return blockWithCapabilities(
+                id,
+                displayName,
+                description,
+                categoryId,
+                subcategoryId,
+                nodeKind,
+                nodeType,
+                defaultConfig,
+                formSchema,
+                summaryTemplate,
+                summaryFormatter,
+                List.of(),
+                "",
+                "",
+                containerSlots,
+                inputSlots,
+                outputSlots,
+                simulationCapability,
+                mcCapability,
+                safetyFlags,
+                aliases
+        );
+    }
+
+    private static BlockDefinition blockWithCapabilities(
+            String id,
+            String displayName,
+            String description,
+            String categoryId,
+            String subcategoryId,
+            String nodeKind,
+            NodeType nodeType,
+            Map<String, String> defaultConfig,
+            List<BlockFormFieldDefinition> formSchema,
+            String summaryTemplate,
+            String summaryFormatter,
+            List<BlockCapability> capabilities,
+            String predicateSummaryTemplate,
+            String predicateNegatedSummaryTemplate,
+            List<String> containerSlots,
+            List<SlotDefinition> inputSlots,
+            List<SlotDefinition> outputSlots,
+            BlockCapabilityLevel simulationCapability,
+            BlockCapabilityLevel mcCapability,
+            List<BlockSafetyFlag> safetyFlags,
+            List<String> aliases
+    ) {
         return new BlockDefinition(
                 id,
                 1,
@@ -661,12 +758,15 @@ public final class BuiltInBlockCatalog {
                 categoryId,
                 subcategoryId,
                 List.of(),
+                capabilities,
                 nodeKind,
                 nodeType,
                 defaultConfig,
                 formSchema,
                 summaryTemplate,
                 summaryFormatter,
+                predicateSummaryTemplate,
+                predicateNegatedSummaryTemplate,
                 containerSlots,
                 inputSlots,
                 outputSlots,

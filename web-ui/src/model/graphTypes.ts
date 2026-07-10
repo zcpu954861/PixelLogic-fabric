@@ -38,6 +38,11 @@ export type GraphSlot = {
   edgeType: 'CONTROL';
 };
 
+export type ConditionSlotDefinition = {
+  slotId: string;
+  negated: boolean;
+};
+
 export type GraphNode = {
   id: string;
   type: string;
@@ -47,6 +52,7 @@ export type GraphNode = {
   position?: GraphPosition;
   parentContainerId?: string;
   parentSlot?: string;
+  conditionSlots?: ConditionSlotDefinition[];
   slots: GraphSlot[];
 };
 
@@ -90,12 +96,15 @@ export type CatalogBlock = {
   categoryId: string;
   subcategoryId: string;
   tags: string[];
+  capabilities: string[];
   nodeKind: string;
   nodeType: string;
   defaultConfig: Record<string, string>;
   formSchema: CatalogFormField[];
   summaryTemplate: string;
   summaryFormatter: string;
+  predicateSummaryTemplate?: string;
+  predicateNegatedSummaryTemplate?: string;
   containerSlots: string[];
   inputSlots: GraphSlot[];
   outputSlots: GraphSlot[];
@@ -246,8 +255,29 @@ export type SlotBlock = {
   height: number;
   inputY: number | null;
   outputOffsets: Record<string, number>;
+  bodyOffsetY?: number;
+  presentation?: 'block' | 'predicate-capsule';
+  embeddedParentId?: string;
+  conditionRack?: ConditionRackView;
   selected?: boolean;
   hasChildren?: boolean;
+};
+
+export type ConditionRackRowView = {
+  slotId: string;
+  negated: boolean;
+  index: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  slotRect: { x: number; y: number; width: number; height: number };
+  toggleRect: { x: number; y: number; width: number; height: number };
+  capsule?: SlotBlock;
+};
+
+export type ConditionRackView = {
+  rows: ConditionRackRowView[];
 };
 
 export type BlockMetrics = {
@@ -255,6 +285,7 @@ export type BlockMetrics = {
   height: number;
   inputY: number | null;
   outputOffsets: Record<string, number>;
+  visualBounds: { x: number; y: number; width: number; height: number };
 };
 
 export type LaneSpan = {
@@ -281,6 +312,13 @@ export type InsertCandidate = {
   message: string;
 } | {
   kind: 'container';
+  containerNodeId: string;
+  slotId: string;
+  join: SlotJoin;
+  valid: boolean;
+  message: string;
+} | {
+  kind: 'condition-slot';
   containerNodeId: string;
   slotId: string;
   join: SlotJoin;

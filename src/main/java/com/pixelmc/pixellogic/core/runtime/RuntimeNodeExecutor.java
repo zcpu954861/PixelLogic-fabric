@@ -44,7 +44,7 @@ final class RuntimeNodeExecutor {
             case STATE_SET_ACTION -> executeStateSet(node, context);
             case STATE_ADD_ACTION -> executeStateAdd(node, context);
             case DEBUG_LOG_ACTION -> executeDebug(node, context);
-            case TIMER_START_ACTION, CONTROL_LOOP_COUNT, CONTROL_LOOP_FOREVER ->
+            case TIMER_START_ACTION, CONTROL_LOOP_COUNT, CONTROL_LOOP_FOREVER, CONTROL_LOOP_UNTIL ->
                     throw new IllegalStateException("控制流节点必须由 GraphRuntime 游标执行：" + node.type());
             case PLAYER_HAS_TAG_CONDITION,
                  PLAYER_IS_ADMIN_CONDITION,

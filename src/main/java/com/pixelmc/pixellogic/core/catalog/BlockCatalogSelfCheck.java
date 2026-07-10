@@ -46,6 +46,7 @@ public final class BlockCatalogSelfCheck {
                 BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG,
                 BuiltInBlockCatalog.CONTROL_LOOP_COUNT,
                 BuiltInBlockCatalog.CONTROL_LOOP_FOREVER,
+                BuiltInBlockCatalog.CONTROL_LOOP_UNTIL,
                 BuiltInBlockCatalog.STATE_SET,
                 BuiltInBlockCatalog.STATE_ADD,
                 BuiltInBlockCatalog.TIMER_WAIT,
@@ -55,6 +56,10 @@ public final class BlockCatalogSelfCheck {
         catalog.blocks().forEach(block -> actual.add(block.id()));
 
         require(actual.equals(expected), "catalog should contain demo, player, and message concrete block ids");
+        require(catalog.categories().stream()
+                        .anyMatch(category -> category.id().equals("condition")
+                                && category.displayName().equals("条件判断块(胶囊)")),
+                "condition category should explain its capsule form");
         catalog.blocks().forEach(block -> {
             require(catalog.categories().stream().anyMatch(category -> category.id().equals(block.categoryId())),
                     "block category should exist: " + block.id());
@@ -140,6 +145,25 @@ public final class BlockCatalogSelfCheck {
                 "target block y compare condition should live under block conditions");
         require(block(BuiltInBlockCatalog.CONDITION_PLAYER_NEAR_TARGET_BLOCK).subcategoryId().equals("condition.spatial"),
                 "near target condition should live under spatial conditions");
+        BlockDefinition loopUntil = block(BuiltInBlockCatalog.CONTROL_LOOP_UNTIL);
+        require(loopUntil.capabilities().equals(List.of(BlockCapability.PREDICATE_RACK))
+                        && loopUntil.containerSlots().equals(List.of("body")),
+                "loop until should declare a dynamic predicate rack beside its static body");
+        Set<String> predicateBlocks = new HashSet<>();
+        catalog.blocks().stream()
+                .filter(item -> item.capabilities().contains(BlockCapability.PREDICATE))
+                .forEach(item -> {
+                    predicateBlocks.add(item.id());
+                    require(!item.predicateSummaryTemplate().isBlank(), "predicate capsule summary should exist: " + item.id());
+                    require(!item.predicateNegatedSummaryTemplate().isBlank(), "negated predicate capsule summary should exist: " + item.id());
+                });
+        require(predicateBlocks.equals(Set.of(
+                        BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG,
+                        BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN,
+                        BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS,
+                        BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION,
+                        BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE
+                )), "predicate capability should stay scoped to the first five conditions");
         });
     }
 

@@ -13,6 +13,10 @@ public interface RuntimeServices {
         return Optional.empty();
     }
 
+    default Optional<RuntimePredicateResult> evaluatePredicate(NodeDefinition node, UUID playerId, String sessionId) {
+        return Optional.empty();
+    }
+
     void sendPlayerMessage(UUID playerId, String message);
 
     void debug(String message);

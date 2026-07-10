@@ -16,6 +16,10 @@ Version development happens on `mc-<minecraft-version>` branches, not on `main` 
 
 ## Next
 
+Active scoped work:
+
+- `feature/v1-loop-until-condition-rack` adds `control.loop.until`, typed stable condition slots, a predicate-capability rack, AND plus per-slot NOT, pre-check execution, existing continuation reuse, and a 20-round simulation cap. The first capsule set is limited to player tag/admin/dimension/region and target-block-type conditions.
+
 Near-term track:
 
 1. Move more current demo block behavior toward per-block simulation executors only when it reduces real duplication.
@@ -77,7 +81,8 @@ P2 before broader runtime use:
 - Server HTTP API is still the current dev/local/self-check WebUI transport. The long-term recommended admin flow is client-hosted WebUI through an authorized PixelLogic client session, but that track is deferred until a future scoped prompt.
 - Context-aware condition blocks currently consume only per-run Simulation Test Context facts. Real Minecraft adapter behavior, Region old system integration, world mutation, named scenarios, and persisted test contexts remain deferred.
 - Spatial condition blocks remain intentionally small: no target-block-exists block, no X/Z coordinate compare blocks, no area geometry conditions, no world map, and no named scenario persistence.
-- Container control flow v1 is intentionally small: no loop-until, break/continue, if/else, for-each, variable loop count, persistent server loop scheduler, or real MC adapter yet.
+- Loop control remains intentionally bounded: no OR/condition groups, asynchronous predicates, break/continue, if/else, for-each, variable loop count, persistent server loop scheduler, or real MC adapter yet.
+- The editor still has no copy, duplicate, or graph-import UI. Future fragment import/copy must remap node, edge, container, and dynamic condition-slot identities together.
 
 ## Loader Event Policy
 

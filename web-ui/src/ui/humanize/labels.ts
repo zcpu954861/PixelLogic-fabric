@@ -1,6 +1,7 @@
 import { catalogBlock, catalogCategory } from '../../model/blockCatalog';
+import { conditionRackParent, conditionSlots } from '../../model/conditionRack';
 import { conditionOutputMode, conditionOutputModeLabel } from '../../model/conditionOutputMode';
-import type { BlockCatalog, BlockKind, CatalogBlock, FieldOption, GraphNode } from '../../model/graphTypes';
+import type { BlockCatalog, BlockKind, CatalogBlock, FieldOption, GraphDocument, GraphNode } from '../../model/graphTypes';
 import { richTextPlainText, shortRichText } from '../../model/richText';
 
 export function blockKind(type: string): BlockKind {
@@ -66,7 +67,7 @@ export function nodeTypeLabel(type: string): string {
     case 'COMMAND_TRIGGER':
       return '命令触发';
     case 'STATE_COMPARE_CONDITION':
-      return '条件判断';
+      return '条件判断块(胶囊)';
     case 'MESSAGE_ACTION':
       return '发送消息';
     case 'PLAYER_HAS_TAG_CONDITION':
@@ -78,7 +79,7 @@ export function nodeTypeLabel(type: string): string {
     case 'TARGET_BLOCK_IN_REGION_CONDITION':
     case 'TARGET_BLOCK_Y_COMPARE_CONDITION':
     case 'PLAYER_NEAR_TARGET_BLOCK_CONDITION':
-      return '条件判断';
+      return '条件判断块(胶囊)';
     case 'CONTROL_LOOP_COUNT':
     case 'CONTROL_LOOP_FOREVER':
       return '控制流';
@@ -124,6 +125,31 @@ export function nodeSummary(nodeItem: GraphNode, catalog?: BlockCatalog): string
   return legacyNodeTypeSummary(nodeItem);
 }
 
+export function predicateNodeSummary(nodeItem: GraphNode, catalog: BlockCatalog, negated = false): string {
+  const blockItem = catalogBlock(catalog, nodeItem.blockId ?? '')
+    ?? catalog.blocks.find((item) => item.nodeType === nodeItem.type);
+  const positiveTemplate = blockItem?.predicateSummaryTemplate ?? '';
+  const template = negated
+    ? blockItem?.predicateNegatedSummaryTemplate || (positiveTemplate ? `非（${positiveTemplate}）` : '')
+    : positiveTemplate;
+  if (template) {
+    return template
+      .replaceAll('{tag}', nodeItem.config.tag || '标签')
+      .replaceAll('{dimensionId}', nodeItem.config.dimensionId || 'minecraft:overworld')
+      .replaceAll('{regionName}', nodeItem.config.regionName || '区域名称')
+      .replaceAll('{blockId}', nodeItem.config.blockId || 'minecraft:stone');
+  }
+  return nodeSummary(nodeItem, catalog);
+}
+
+export function rackAwareNodeSummary(nodeItem: GraphNode, graph: GraphDocument, catalog: BlockCatalog): string {
+  const parent = conditionRackParent(graph, nodeItem);
+  const slot = parent
+    ? conditionSlots(parent).find((item) => item.slotId === nodeItem.parentSlot)
+    : null;
+  return slot ? predicateNodeSummary(nodeItem, catalog, slot.negated) : nodeSummary(nodeItem, catalog);
+}
+
 function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   if (blockItem.id === 'condition.state.equals') {
     return conditionStateSummary(nodeItem);
@@ -160,6 +186,9 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   }
   if (blockItem.id === 'control.loop.forever') {
     return `持续循环内部积木，每轮间隔 ${nodeItem.config.intervalSeconds || '1'} 秒。`;
+  }
+  if (blockItem.id === 'control.loop.until') {
+    return `配置了 ${nodeItem.conditionSlots?.length ?? 0} 个结束条件槽。`;
   }
   const template = blockItem.summaryTemplate;
   if (!template) {
@@ -210,6 +239,8 @@ function legacyNodeTypeSummary(nodeItem: GraphNode): string {
       return `把内部积木循环 ${config.count ?? '3'} 次后继续。`;
     case 'CONTROL_LOOP_FOREVER':
       return `持续循环内部积木，每轮间隔 ${config.intervalSeconds ?? '1'} 秒。`;
+    case 'CONTROL_LOOP_UNTIL':
+      return `配置了 ${nodeItem.conditionSlots?.length ?? 0} 个结束条件槽。`;
     case 'PLAYER_ADD_TAG_ACTION':
       return `给当前玩家添加标签“${config.tag ?? '标签'}”。`;
     case 'PLAYER_REMOVE_TAG_ACTION':

@@ -1,6 +1,7 @@
 package com.pixelmc.pixellogic.core.graph;
 
 import com.pixelmc.pixellogic.core.catalog.BlockDefinition;
+import com.pixelmc.pixellogic.core.catalog.BlockCapability;
 import com.pixelmc.pixellogic.core.catalog.BlockFormFieldDefinition;
 import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
@@ -107,6 +108,8 @@ public final class GraphValidator {
                 case PLAYER_NEAR_TARGET_BLOCK_CONDITION -> validateNearTargetBlockCondition(node, issues);
                 case CONTROL_LOOP_COUNT -> validateLoopCount(node, issues);
                 case CONTROL_LOOP_FOREVER -> validateLoopForever(node, issues);
+                case CONTROL_LOOP_UNTIL -> {
+                }
                 case PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION -> validatePlayerTagConfig(node, issues);
                 case STATE_SET_ACTION -> validateStateAction(node, issues, true);
                 case STATE_ADD_ACTION -> validateStateAction(node, issues, false);
@@ -128,8 +131,23 @@ public final class GraphValidator {
                 continue;
             }
             BlockDefinition parentBlock = BuiltInBlockCatalog.block(parent.blockId()).orElse(null);
-            if (parentBlock == null || !parentBlock.containerSlots().contains(node.parentSlot())) {
+            boolean staticSlot = parentBlock != null && parentBlock.containerSlots().contains(node.parentSlot());
+            boolean predicateSlot = parentBlock != null
+                    && parentBlock.capabilities().contains(BlockCapability.PREDICATE_RACK)
+                    && parent.conditionSlots().stream().anyMatch(slot -> slot.slotId().equals(node.parentSlot()));
+            if (!staticSlot && !predicateSlot) {
                 error(issues, "container_slot_invalid", "容器槽位不存在：" + node.id() + "." + node.parentSlot());
+            } else if (predicateSlot) {
+                BlockDefinition childBlock = BuiltInBlockCatalog.block(node.blockId()).orElse(null);
+                if (childBlock == null || !childBlock.capabilities().contains(BlockCapability.PREDICATE)) {
+                    error(issues, "condition_slot_predicate_required", "结束条件槽只能放入可求值条件：" + node.id());
+                }
+                boolean hasControlEdge = graph.edges().stream().anyMatch(edge ->
+                        edge.edgeType() == com.pixelmc.pixellogic.core.model.EdgeType.CONTROL
+                                && (edge.sourceNodeId().equals(node.id()) || edge.targetNodeId().equals(node.id())));
+                if (hasControlEdge) {
+                    error(issues, "condition_slot_control_edge", "条件胶囊不能保留控制连线：" + node.id());
+                }
             }
             if (containerDepth(node, nodes, new HashSet<>()) > MAX_CONTAINER_DEPTH) {
                 error(issues, "container_depth_exceeded", "容器嵌套不能超过 " + MAX_CONTAINER_DEPTH + " 层：" + node.id());
@@ -138,7 +156,7 @@ public final class GraphValidator {
 
         for (NodeDefinition node : graph.nodes()) {
             BlockDefinition block = BuiltInBlockCatalog.block(node.blockId()).orElse(null);
-            if (block == null || block.containerSlots().isEmpty()) {
+            if (block == null) {
                 continue;
             }
             for (String slot : block.containerSlots()) {
@@ -147,6 +165,47 @@ public final class GraphValidator {
                 if (!hasChild) {
                     warning(issues, "container_body_empty", "容器内部为空：" + node.id());
                 }
+            }
+            validateConditionRack(graph, node, block, issues);
+        }
+    }
+
+    private void validateConditionRack(
+            GraphDefinition graph,
+            NodeDefinition node,
+            BlockDefinition block,
+            List<ValidationIssue> issues
+    ) {
+        if (!block.capabilities().contains(BlockCapability.PREDICATE_RACK)) {
+            if (!node.conditionSlots().isEmpty()) {
+                error(issues, "condition_rack_not_supported", "该积木不支持结束条件槽：" + node.id());
+            }
+            return;
+        }
+        if (node.conditionSlots().isEmpty()) {
+            warning(issues, "condition_rack_empty", "循环直到缺少结束条件：" + node.id());
+            return;
+        }
+
+        Set<String> slotIds = new HashSet<>();
+        for (int index = 0; index < node.conditionSlots().size(); index += 1) {
+            String slotId = node.conditionSlots().get(index).slotId();
+            if (slotId.isBlank()) {
+                error(issues, "condition_slot_id_missing", "结束条件槽 ID 不能为空：" + node.id());
+                continue;
+            }
+            if (!slotIds.add(slotId)) {
+                error(issues, "condition_slot_id_duplicate", "结束条件槽 ID 重复：" + node.id() + "." + slotId);
+            }
+            if (block.containerSlots().contains(slotId)) {
+                error(issues, "condition_slot_id_conflict", "结束条件槽 ID 与静态容器槽冲突：" + node.id() + "." + slotId);
+            }
+            long children = graph.nodes().stream().filter(child ->
+                    child.parentContainerId().equals(node.id()) && child.parentSlot().equals(slotId)).count();
+            if (children == 0) {
+                warning(issues, "condition_slot_empty", "结束条件 " + (index + 1) + " 尚未设置：" + node.id());
+            } else if (children > 1) {
+                error(issues, "condition_slot_multiple_nodes", "一个结束条件槽只能放入一个条件：" + node.id() + "." + slotId);
             }
         }
     }

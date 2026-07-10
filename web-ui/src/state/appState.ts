@@ -2,7 +2,16 @@ import type { UiState } from '../model/graphTypes';
 import { fallbackCatalog } from '../model/blockCatalog';
 import { defaultSimulationTestContext } from '../model/simulationTestContext';
 
-export const world = { width: 2160, height: 620 };
+export const world = {
+  width: 2160,
+  height: 620,
+  minLeft: 0,
+  minTop: 0,
+  maxRight: 2160,
+  maxBottom: 620,
+  contentWidth: 2160,
+  contentHeight: 620,
+};
 
 export const state: UiState = {
   apiStatus: 'checking',

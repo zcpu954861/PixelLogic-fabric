@@ -19,6 +19,7 @@ import {
 } from '../model/richText';
 import { simulationTestPayload, validateSimulationTestContext } from '../model/simulationTestContext';
 import { containerGeometry } from '../model/containerGeometry';
+import { conditionSlots, hasPredicateRack, nextConditionSlotId } from '../model/conditionRack';
 import { state, world } from '../state/appState';
 import {
   blockMetrics,
@@ -49,10 +50,11 @@ import type {
 import {
   nodeCategoryLabel,
   nodeSummary,
+  rackAwareNodeSummary,
 } from './humanize/labels';
 import { autoSaveDelayMs, connectedOverlap, doubleClickMs, dragThreshold, historyLimit, normalBlockHeight, normalBlockWidth } from './canvas/blockConstants';
 import { renderBlock, renderSlotJoin } from './canvas/blockView';
-import { buildBlocks, buildJoins, updateWorldSize } from './canvas/slotFlowViewModel';
+import { buildBlocks, buildJoins, updateWorldSize, visualBlockById } from './canvas/slotFlowViewModel';
 import {
   connectedActionText,
   computeDragDrop,
@@ -64,9 +66,11 @@ import {
   catalogDragGhostRect,
   clearCatalogDragGhost,
   showCatalogContainerTarget,
+  showCatalogConditionSlotTarget,
   showCatalogDragGhost,
   updateCatalogDragGhost,
 } from './canvas/dragGhostView';
+import { catalogConditionSlotAtPoint, placeCatalogNodeInConditionSlot } from './canvas/conditionRackPlacement';
 import {
   type BlockRectSnapshot,
   cancelInteractionAnimations,
@@ -122,6 +126,15 @@ let saveSequence = 0;
 let confirmedModeSwitchSignature: string | null = null;
 const undoStack: GraphHistoryEntry[] = [];
 const redoStack: GraphHistoryEntry[] = [];
+
+type RackEditorSession = {
+  rootId: string;
+  currentNodeId: string;
+  draftGraph: GraphDocument;
+  originalGraph: GraphDocument;
+};
+
+let rackEditorSession: RackEditorSession | null = null;
 
 type ModalScrollSnapshot = {
   editor: number | null;
@@ -302,7 +315,7 @@ function renderApp(): void {
           </ol>
         </section>
       </footer>
-      ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation && !state.validation.valid), modalIssue: state.error || validationSummaryText(state), steady: editorWasOpen, simulationTestContext: state.simulationTestContext }) : ''}
+      ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation && !state.validation.valid), modalIssue: state.error || validationSummaryText(state), steady: editorWasOpen, simulationTestContext: state.simulationTestContext, graph: rackEditorSession?.draftGraph ?? graph, rackChildEditing: Boolean(rackEditorSession && rackEditorSession.currentNodeId !== rackEditorSession.rootId) }) : ''}
       ${state.simulationEditorOpen && state.simulationDraftContext ? renderSimulationTestContextModal(state.simulationDraftContext, { closing: state.simulationEditorClosing, error: state.simulationTestContextError, steady: simulationEditorWasOpen }) : ''}
     </section>
   `;
@@ -349,9 +362,13 @@ function fitView(): void {
   }
 
   const rect = viewport.getBoundingClientRect();
-  scale = Math.min(1, (rect.width - 72) / world.width, (rect.height - 56) / world.height);
-  offsetX = Math.max(26, (rect.width - world.width * scale) / 2);
-  offsetY = Math.max(22, (rect.height - world.height * scale) / 2);
+  const marginX = 36;
+  const marginY = 28;
+  const contentWidth = Math.max(1, world.contentWidth);
+  const contentHeight = Math.max(1, world.contentHeight);
+  scale = Math.min(1, (rect.width - marginX * 2) / contentWidth, (rect.height - marginY * 2) / contentHeight);
+  offsetX = marginX - world.minLeft * scale;
+  offsetY = marginY - world.minTop * scale;
   setTransform();
 }
 
@@ -364,14 +381,14 @@ function centerView(): void {
 
   const rect = viewport.getBoundingClientRect();
   scale = 0.78;
-  offsetX = rect.width > 1200 ? -28 : 28;
-  offsetY = Math.max(24, (rect.height - world.height * scale) / 2);
+  offsetX = rect.width / 2 - ((world.minLeft + world.maxRight) / 2) * scale;
+  offsetY = rect.height / 2 - ((world.minTop + world.maxBottom) / 2) * scale;
   setTransform();
 }
 
 function focusSelectedBlock(): void {
   const viewport = document.querySelector<HTMLElement>('.canvas-viewport');
-  const selected = buildBlocks(currentGraph(), activeCatalog(), state.selectedNodeId).find((block) => block.selected);
+  const selected = visualBlockById(buildBlocks(currentGraph(), activeCatalog(), state.selectedNodeId), state.selectedNodeId);
 
   if (!viewport || !selected) {
     return;
@@ -417,7 +434,10 @@ function bindInteractions(): void {
 
   viewport.addEventListener('pointerdown', (event) => {
     const target = event.target as HTMLElement;
-    const blockEl = target.closest<HTMLElement>('.logic-block');
+    if (target.closest('button, input, select, textarea')) {
+      return;
+    }
+    const blockEl = target.closest<HTMLElement>('[data-block]');
     if (blockEl?.dataset.block) {
       event.preventDefault();
       beginBlockPointerDown(event, blockEl.dataset.block, viewport);
@@ -516,6 +536,16 @@ function bindInteractions(): void {
   document.querySelector('[data-history-action="redo"]')?.addEventListener('click', redoGraphEdit);
   document.querySelector('[data-graph-action="disconnect-input"]')?.addEventListener('click', disconnectSelectedInput);
   document.querySelector('[data-graph-action="delete-selected"]')?.addEventListener('click', deleteSelectedNode);
+  document.querySelectorAll<HTMLButtonElement>('[data-condition-negate]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const containerId = buttonEl.dataset.conditionNegate;
+      const slotId = buttonEl.dataset.conditionSlotId;
+      if (containerId && slotId) {
+        toggleCanvasConditionNegation(containerId, slotId);
+      }
+    });
+  });
   document.querySelector('[data-modal-action="close"]')?.addEventListener('click', requestCloseEditor);
   document.querySelector('[data-modal-action="cancel"]')?.addEventListener('click', requestCloseEditor);
   document.querySelector('[data-modal-action="save"]')?.addEventListener('click', () => void saveEditorDraft());
@@ -526,6 +556,19 @@ function bindInteractions(): void {
     confirmedModeSwitchSignature = conditionModeRemovalSignature();
     hideModeSwitchConfirm();
     void saveEditorDraft();
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-rack-draft-action]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => updateRackEditorDraft(
+      buttonEl.dataset.rackDraftAction ?? '',
+      buttonEl.dataset.rackSlotId ?? '',
+    ));
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-rack-edit-node]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      if (buttonEl.dataset.rackEditNode) {
+        openRackConditionEditor(buttonEl.dataset.rackEditNode);
+      }
+    });
   });
   document.querySelector('[data-sim-modal-action="close"]')?.addEventListener('click', () => requestCloseSimulationEditor(renderApp));
   document.querySelector('[data-sim-modal-action="cancel"]')?.addEventListener('click', () => requestCloseSimulationEditor(renderApp));
@@ -727,7 +770,7 @@ function moveBlockDrag(event: PointerEvent): void {
     drag.previewPositions.set(id, next);
   });
   const graph = currentGraph();
-  drag.candidate = findInsertCandidate(graph, drag);
+  drag.candidate = findInsertCandidate(graph, drag, activeCatalog());
   applyDragPreviewPositions(drag);
   renderInsertPreview(drag);
 }
@@ -767,10 +810,28 @@ function endBlockDrag(event: PointerEvent, viewport: HTMLElement): void {
 function applyDragPreviewPositions(drag: BlockDrag): void {
   drag.previewPositions.forEach((position, nodeId) => {
     const blockEl = document.querySelector<HTMLElement>(`[data-block="${nodeId}"]`);
-    if (blockEl) {
-      blockEl.style.left = `${position.x}px`;
-      blockEl.style.top = `${position.y}px`;
+    const embeddedParentId = blockEl?.dataset.embeddedParent;
+    if (blockEl && (!embeddedParentId || !drag.groupIds.includes(embeddedParentId))) {
+      const start = drag.startPositions.get(nodeId);
+      if (start) {
+        blockEl.style.transform = `translate3d(${position.x - start.x}px, ${position.y - start.y}px, 0)`;
+      }
     }
+  });
+}
+
+function toggleCanvasConditionNegation(containerId: string, slotId: string): void {
+  const graph = cloneGraph(currentGraph());
+  const container = graph.nodes.find((nodeItem) => nodeItem.id === containerId);
+  if (!container || !conditionSlots(container).some((slot) => slot.slotId === slotId)) {
+    return;
+  }
+  container.conditionSlots = conditionSlots(container).map((slot) =>
+    slot.slotId === slotId ? { ...slot, negated: !slot.negated } : slot,
+  );
+  applyGraphEdit(graph, '已切换结束条件取反，正在自动保存。', {
+    selectedNodeId: containerId,
+    recentNodeId: null,
   });
 }
 
@@ -805,14 +866,18 @@ function cancelBlockDrag(viewport: HTMLElement): void {
 }
 
 function pointerToWorld(event: PointerEvent): GraphPosition {
+  return clientToWorld(event.clientX, event.clientY);
+}
+
+function clientToWorld(clientX: number, clientY: number): GraphPosition {
   const viewport = document.querySelector<HTMLElement>('.canvas-viewport');
   if (!viewport) {
     return { x: 0, y: 0 };
   }
   const rect = viewport.getBoundingClientRect();
   return {
-    x: (event.clientX - rect.left - offsetX) / scale,
-    y: (event.clientY - rect.top - offsetY) / scale,
+    x: (clientX - rect.left - offsetX) / scale,
+    y: (clientY - rect.top - offsetY) / scale,
   };
 }
 
@@ -991,6 +1056,9 @@ function renderInsertPreview(drag: BlockDrag): void {
       joinEl?.classList.add(candidate.valid ? 'insert-target' : 'insert-invalid');
     } else if (candidate?.kind === 'container' && candidate.valid) {
       document.querySelector<HTMLElement>(`[data-block="${candidate.containerNodeId}"]`)?.classList.add('container-target');
+    } else if (candidate?.kind === 'condition-slot' && candidate.valid) {
+      document.querySelector<HTMLElement>(`[data-condition-container="${candidate.containerNodeId}"][data-condition-slot="${candidate.slotId}"]`)
+        ?.classList.add('condition-slot-target');
     }
   }
   if (!candidate) {
@@ -1005,7 +1073,7 @@ function renderInsertPreview(drag: BlockDrag): void {
       key: `${drag.rootId}:${candidate.kind}:${candidate.join.id}`,
       baseBlocks: buildBlocks(graph, activeCatalog(), state.selectedNodeId),
       placementBlocks: buildBlocks(placement, activeCatalog(), state.selectedNodeId),
-      draggedNodeIds: new Set(drag.groupIds),
+      draggedNodeIds: candidate.kind === 'condition-slot' ? new Set([drag.rootId]) : new Set(drag.groupIds),
     });
   } else {
     clearPlacementPreview();
@@ -1027,6 +1095,9 @@ function clearInsertDecorations(): void {
   });
   document.querySelectorAll('.logic-block.container-target').forEach((item) => {
     item.classList.remove('container-target');
+  });
+  document.querySelectorAll('.condition-rack-row.condition-slot-target').forEach((item) => {
+    item.classList.remove('condition-slot-target');
   });
   clearFocus();
 }
@@ -1079,13 +1150,37 @@ function beginCatalogPointer(event: PointerEvent, blockId: string, buttonEl: HTM
       return;
     }
     updateCatalogDragGhost(moveEvent.clientX, moveEvent.clientY);
-    showCatalogContainerTarget(containerAtPoint(currentGraph(), pointerToWorld(moveEvent))?.id ?? null);
+    const point = pointerToWorld(moveEvent);
+    const ghostRect = catalogDragGhostRect();
+    const conditionPoint = ghostRect
+      ? clientToWorld(moveEvent.clientX, ghostRect.top + ghostRect.height / 2)
+      : point;
+    const blockItem = catalogBlock(activeCatalog(), blockId);
+    const conditionHit = blockItem
+      ? catalogConditionSlotAtPoint(currentGraph(), conditionPoint, blockItem, activeCatalog())
+      : null;
+    if (conditionHit) {
+      showCatalogConditionSlotTarget(conditionHit.container.id, conditionHit.slotId);
+    } else {
+      showCatalogContainerTarget(containerAtPoint(currentGraph(), point)?.id ?? null);
+    }
   };
   const onUp = (upEvent: PointerEvent) => {
+    if (moved) {
+      updateCatalogDragGhost(upEvent.clientX, upEvent.clientY);
+    }
     const ghostRect = catalogDragGhostRect();
+    const conditionPoint = ghostRect
+      ? clientToWorld(upEvent.clientX, ghostRect.top + ghostRect.height / 2)
+      : null;
     cleanup();
     clearCatalogDragGhost();
-    addCatalogBlockAt(blockId, moved ? upEvent : null, ghostRect ? blockRectSnapshot(ghostRect) : null);
+    addCatalogBlockAt(
+      blockId,
+      moved ? upEvent : null,
+      ghostRect ? blockRectSnapshot(ghostRect) : null,
+      conditionPoint,
+    );
   };
   const onCancel = () => {
     cleanup();
@@ -1103,7 +1198,12 @@ function beginCatalogPointer(event: PointerEvent, blockId: string, buttonEl: HTM
   document.addEventListener('keydown', onKeyDown);
 }
 
-function addCatalogBlockAt(blockId: string, event: PointerEvent | null, animationOrigin: BlockRectSnapshot | null = null): void {
+function addCatalogBlockAt(
+  blockId: string,
+  event: PointerEvent | null,
+  animationOrigin: BlockRectSnapshot | null = null,
+  conditionProbePoint: GraphPosition | null = null,
+): void {
   const blockItem = catalogBlock(activeCatalog(), blockId);
   if (!blockItem) {
     state.error = '没有找到这个积木，请重新打开积木库。';
@@ -1114,11 +1214,19 @@ function addCatalogBlockAt(blockId: string, event: PointerEvent | null, animatio
   const kind = blockKindFromCatalogBlock(blockItem);
   const nodeItem = createCatalogNode(blockItem, uniqueNodeId(catalogNodeIdPrefix(blockItem), graph), { x: 0, y: 0 });
   const dropPoint = event ? pointerToWorld(event) : null;
+  const conditionDropPoint = conditionProbePoint ?? dropPoint;
+  const conditionHit = conditionDropPoint
+    ? catalogConditionSlotAtPoint(graph, conditionDropPoint, blockItem, activeCatalog())
+    : null;
   const selectedContainer = dropPoint
     ? containerAtPoint(graph, dropPoint)
     : graph.nodes.find((item) => item.id === state.selectedNodeId && item.blockId?.startsWith('control.loop.'));
-  if (selectedContainer && nodeItem.id !== selectedContainer.id) {
-    const childIndex = graph.nodes.filter((item) => item.parentContainerId === selectedContainer.id).length;
+  if (conditionHit) {
+    placeCatalogNodeInConditionSlot(graph, nodeItem, conditionHit);
+  } else if (selectedContainer && nodeItem.id !== selectedContainer.id) {
+    const childIndex = graph.nodes.filter((item) =>
+      item.parentContainerId === selectedContainer.id && (item.parentSlot || 'body') === 'body',
+    ).length;
     nodeItem.parentContainerId = selectedContainer.id;
     nodeItem.parentSlot = 'body';
     const size = blockSize(kind);
@@ -1235,12 +1343,25 @@ function deleteSelectedNode(): void {
 }
 
 function openEditor(nodeId: string): void {
-  const nodeItem = currentGraph().nodes.find((item) => item.id === nodeId);
+  const graph = currentGraph();
+  const nodeItem = graph.nodes.find((item) => item.id === nodeId);
   if (!nodeItem) {
     return;
   }
+  if (hasPredicateRack(nodeItem, activeCatalog())) {
+    const draftGraph = cloneGraph(graph);
+    rackEditorSession = {
+      rootId: nodeId,
+      currentNodeId: nodeId,
+      draftGraph,
+      originalGraph: cloneGraph(graph),
+    };
+  } else {
+    rackEditorSession = null;
+  }
+  const draftNode = rackEditorSession?.draftGraph.nodes.find((item) => item.id === nodeId) ?? cloneNode(nodeItem);
   state.selectedNodeId = nodeId;
-  state.editorDraftNode = cloneNode(nodeItem);
+  state.editorDraftNode = draftNode;
   state.editorOriginalNode = cloneNode(nodeItem);
   state.editorSaving = false;
   state.editorOpen = true;
@@ -1249,6 +1370,10 @@ function openEditor(nodeId: string): void {
 }
 
 function requestCloseEditor(): void {
+  if (rackEditorSession && rackEditorSession.currentNodeId !== rackEditorSession.rootId && !hasCurrentEditorNodeChanges()) {
+    returnToRackEditor(false);
+    return;
+  }
   if (hasEditorDraftChanges()) {
     showUnsavedConfirm();
     return;
@@ -1271,6 +1396,7 @@ function closeEditor(): void {
     state.editorDraftNode = null;
     state.editorOriginalNode = null;
     state.editorSaving = false;
+    rackEditorSession = null;
     renderApp();
   }, 160);
 }
@@ -1296,8 +1422,84 @@ function hideModeSwitchConfirm(): void {
 }
 
 function discardEditorDraft(): void {
+  if (rackEditorSession && rackEditorSession.currentNodeId !== rackEditorSession.rootId) {
+    returnToRackEditor(true);
+    return;
+  }
   state.editorDraftNode = state.editorOriginalNode ? cloneNode(state.editorOriginalNode) : null;
   closeEditor();
+}
+
+function updateRackEditorDraft(action: string, slotId: string): void {
+  const session = rackEditorSession;
+  const root = session?.draftGraph.nodes.find((nodeItem) => nodeItem.id === session.rootId);
+  if (!session || !root || session.currentNodeId !== session.rootId) {
+    return;
+  }
+  if (action === 'add') {
+    root.conditionSlots = [...conditionSlots(root), { slotId: nextConditionSlotId(root), negated: false }];
+  } else if (action === 'toggle') {
+    root.conditionSlots = conditionSlots(root).map((slot) =>
+      slot.slotId === slotId ? { ...slot, negated: !slot.negated } : slot,
+    );
+  } else if (action === 'delete') {
+    const member = session.draftGraph.nodes.find((nodeItem) =>
+      nodeItem.parentContainerId === root.id && nodeItem.parentSlot === slotId,
+    );
+    if (member && !window.confirm('删除该条件槽会在保存时同时删除其中的条件积木。确定继续吗？')) {
+      return;
+    }
+    root.conditionSlots = conditionSlots(root).filter((slot) => slot.slotId !== slotId);
+    if (member) {
+      session.draftGraph.nodes = session.draftGraph.nodes.filter((nodeItem) => nodeItem.id !== member.id);
+      session.draftGraph.edges = session.draftGraph.edges.filter((graphEdge) =>
+        graphEdge.sourceNodeId !== member.id && graphEdge.targetNodeId !== member.id,
+      );
+    }
+  } else {
+    return;
+  }
+  state.editorDraftNode = root;
+  state.error = '';
+  hideUnsavedConfirm();
+  renderApp();
+}
+
+function openRackConditionEditor(nodeId: string): void {
+  const session = rackEditorSession;
+  const nodeItem = session?.draftGraph.nodes.find((item) => item.id === nodeId);
+  if (!session || !nodeItem) {
+    return;
+  }
+  session.currentNodeId = nodeId;
+  state.editorDraftNode = nodeItem;
+  state.editorOriginalNode = cloneNode(nodeItem);
+  state.selectedNodeId = nodeId;
+  state.error = '';
+  renderApp();
+}
+
+function returnToRackEditor(discardChild: boolean): void {
+  const session = rackEditorSession;
+  if (!session) {
+    return;
+  }
+  if (discardChild && state.editorOriginalNode && session.currentNodeId !== session.rootId) {
+    const index = session.draftGraph.nodes.findIndex((nodeItem) => nodeItem.id === session.currentNodeId);
+    if (index >= 0) {
+      session.draftGraph.nodes[index] = cloneNode(state.editorOriginalNode);
+    }
+  }
+  session.currentNodeId = session.rootId;
+  const root = session.draftGraph.nodes.find((nodeItem) => nodeItem.id === session.rootId);
+  const originalRoot = session.originalGraph.nodes.find((nodeItem) => nodeItem.id === session.rootId);
+  state.editorDraftNode = root ?? null;
+  state.editorOriginalNode = originalRoot ? cloneNode(originalRoot) : null;
+  state.selectedNodeId = session.rootId;
+  confirmedModeSwitchSignature = null;
+  hideUnsavedConfirm();
+  hideModeSwitchConfirm();
+  renderApp();
 }
 
 function focusEditor(editorWasOpen = false, simulationEditorWasOpen = false): void {
@@ -1846,6 +2048,23 @@ async function saveEditorDraft(): Promise<void> {
   if (state.editorSaving || !state.editorDraftNode || !state.editorOriginalNode) {
     return;
   }
+  if (rackEditorSession && rackEditorSession.currentNodeId !== rackEditorSession.rootId) {
+    if (!hasCurrentEditorNodeChanges()) {
+      returnToRackEditor(false);
+      return;
+    }
+    const childRemovalSignature = conditionModeRemovalSignature();
+    if (childRemovalSignature && childRemovalSignature !== confirmedModeSwitchSignature) {
+      showModeSwitchConfirm();
+      return;
+    }
+    const child = state.editorDraftNode;
+    rackEditorSession.draftGraph.edges = rackEditorSession.draftGraph.edges.filter((graphEdge) =>
+      graphEdge.sourceNodeId !== child.id || activeConditionOutputSlots(child).includes(graphEdge.sourceSlotId),
+    );
+    returnToRackEditor(false);
+    return;
+  }
   if (!hasEditorDraftChanges()) {
     closeEditor();
     return;
@@ -1858,7 +2077,9 @@ async function saveEditorDraft(): Promise<void> {
     return;
   }
 
-  const nextGraph = cloneGraph(graph);
+  const nextGraph = rackEditorSession
+    ? cloneGraph(rackEditorSession.draftGraph)
+    : cloneGraph(graph);
   const nextNode = nextGraph.nodes.find((item) => item.id === state.editorOriginalNode?.id);
   if (!nextNode) {
     state.error = '保存失败：当前积木不存在。';
@@ -1868,6 +2089,7 @@ async function saveEditorDraft(): Promise<void> {
 
   nextNode.displayName = state.editorDraftNode.displayName;
   nextNode.config = { ...state.editorDraftNode.config };
+  nextNode.conditionSlots = conditionSlots(state.editorDraftNode).map((slot) => ({ ...slot }));
   nextGraph.edges = nextGraph.edges.filter((graphEdge) =>
     graphEdge.sourceNodeId !== nextNode.id || activeConditionOutputSlots(nextNode).includes(graphEdge.sourceSlotId),
   );
@@ -1906,7 +2128,11 @@ function refreshEditorDraftIndicators(): void {
   const modalSummary = document.querySelector<HTMLElement>('[data-modal-summary]');
   const modalError = document.querySelector<HTMLElement>('[data-modal-error]');
   if (modalSummary) {
-    modalSummary.textContent = nodeSummary(draftNode, activeCatalog());
+    modalSummary.textContent = rackAwareNodeSummary(
+      draftNode,
+      rackEditorSession?.draftGraph ?? currentGraph(),
+      activeCatalog(),
+    );
   }
   if (modalError) {
     modalError.textContent = state.error || validationSummaryText(state);
@@ -1950,7 +2176,9 @@ function refreshDraftIndicators(): void {
   }
   if (modalSummary) {
     const selected = state.editorDraftNode ?? selectedNodeFrom(currentGraph());
-    modalSummary.textContent = selected ? nodeSummary(selected, activeCatalog()) : '';
+    modalSummary.textContent = selected
+      ? rackAwareNodeSummary(selected, rackEditorSession?.draftGraph ?? currentGraph(), activeCatalog())
+      : '';
   }
   if (modalError) {
     modalError.textContent = state.error || validationSummaryText(state);
@@ -2270,12 +2498,24 @@ function cloneNode(nodeItem: GraphNode): GraphNode {
   return {
     ...nodeItem,
     config: { ...nodeItem.config },
+    conditionSlots: conditionSlots(nodeItem).map((slot) => ({ ...slot })),
     position: nodeItem.position ? { ...nodeItem.position } : undefined,
     slots: nodeItem.slots.map((slot) => ({ ...slot })),
   };
 }
 
 function hasEditorDraftChanges(): boolean {
+  if (rackEditorSession) {
+    if (rackEditorSession.currentNodeId !== rackEditorSession.rootId) {
+      return hasCurrentEditorNodeChanges();
+    }
+    return JSON.stringify(rackEditorSession.draftGraph) !== JSON.stringify(rackEditorSession.originalGraph);
+  }
+  return Boolean(state.editorDraftNode && state.editorOriginalNode)
+    && JSON.stringify(state.editorDraftNode) !== JSON.stringify(state.editorOriginalNode);
+}
+
+function hasCurrentEditorNodeChanges(): boolean {
   return Boolean(state.editorDraftNode && state.editorOriginalNode)
     && JSON.stringify(state.editorDraftNode) !== JSON.stringify(state.editorOriginalNode);
 }

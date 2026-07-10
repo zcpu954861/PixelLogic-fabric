@@ -1,6 +1,7 @@
 package com.pixelmc.pixellogic.core.runtime;
 
 import com.pixelmc.pixellogic.core.graph.CompiledGraph;
+import com.pixelmc.pixellogic.core.model.ConditionSlotDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.runtime.ExecutionCursor.LoopFrame;
@@ -20,7 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 
 public final class GraphRuntime {
-    private static final int FOREVER_SIMULATION_ITERATION_CAP = 20;
+    private static final int SIMULATION_LOOP_ITERATION_CAP = 20;
     private static final int MAX_PENDING_CONTINUATIONS = 128;
 
     private final CompiledGraph graph;
@@ -172,8 +173,14 @@ public final class GraphRuntime {
                     continue;
                 }
 
+                if (frame.kind() == LoopKind.UNTIL) {
+                    traces.add(traceId, frame.containerNodeId(), "第 " + frame.iteration() + " 轮完成，重新检查结束条件。");
+                    nodeId = frame.containerNodeId();
+                    continue;
+                }
+
                 traces.add(traceId, frame.containerNodeId(), "第 " + frame.iteration() + " 轮结束。");
-                if (frame.iteration() >= FOREVER_SIMULATION_ITERATION_CAP) {
+                if (frame.iteration() >= SIMULATION_LOOP_ITERATION_CAP) {
                     traces.add(traceId, frame.containerNodeId(), "已达到测试模拟循环上限，已停止继续模拟。");
                     return new RuntimeResult(true, traceId, "执行完成。");
                 }
@@ -250,7 +257,7 @@ public final class GraphRuntime {
                             node.id(),
                             LoopKind.FOREVER,
                             1,
-                            FOREVER_SIMULATION_ITERATION_CAP,
+                            SIMULATION_LOOP_ITERATION_CAP,
                             bodyEntry.get().id(),
                             "",
                             intervalSeconds
@@ -261,6 +268,63 @@ public final class GraphRuntime {
                     continue;
                 } catch (RuntimeException exception) {
                     return fail(traceId, node.id(), exception, "无限循环执行失败。");
+                }
+            }
+
+            if (node.type() == NodeType.CONTROL_LOOP_UNTIL) {
+                try {
+                    long predicateSteps = (long) steps + node.conditionSlots().size();
+                    if (predicateSteps > limits.maxStepsPerExecution()) {
+                        traces.add(traceId, node.id(), "执行失败：超过最大执行步数。");
+                        return new RuntimeResult(false, traceId, "超过最大执行步数。");
+                    }
+                    steps = (int) predicateSteps;
+
+                    boolean recheck = !frames.isEmpty()
+                            && frames.getLast().kind() == LoopKind.UNTIL
+                            && frames.getLast().containerNodeId().equals(node.id());
+                    boolean complete = evaluateUntilConditions(node, context, !recheck);
+                    if (complete) {
+                        traces.add(traceId, node.id(), "全部结束条件成立，退出循环。");
+                        if (recheck) {
+                            frames.removeLast();
+                        }
+                        nodeId = nodeWithinCurrentBody(targetId(node.id(), "done"), frames);
+                        continue;
+                    }
+
+                    if (recheck) {
+                        LoopFrame currentFrame = frames.getLast();
+                        if (currentFrame.iteration() >= currentFrame.iterationLimit()) {
+                            traces.add(traceId, node.id(), "已达到测试模拟循环上限，已停止继续模拟。");
+                            return new RuntimeResult(true, traceId, "执行完成。");
+                        }
+                        LoopFrame nextFrame = nextIteration(currentFrame);
+                        frames.set(frames.size() - 1, nextFrame);
+                        traces.add(traceId, node.id(), "结束条件未全部成立，执行第 " + nextFrame.iteration() + " 轮。");
+                        nodeId = nextFrame.bodyEntryNodeId();
+                        continue;
+                    }
+
+                    Optional<NodeDefinition> bodyEntry = graph.bodyEntry(node.id(), "body");
+                    if (bodyEntry.isEmpty()) {
+                        throw new IllegalStateException("循环直到的结束条件未成立，但循环内容为空。");
+                    }
+                    LoopFrame frame = new LoopFrame(
+                            node.id(),
+                            LoopKind.UNTIL,
+                            1,
+                            SIMULATION_LOOP_ITERATION_CAP,
+                            bodyEntry.get().id(),
+                            targetId(node.id(), "done"),
+                            0
+                    );
+                    frames.add(frame);
+                    traces.add(traceId, node.id(), "结束条件未全部成立，执行第 1 轮。");
+                    nodeId = frame.bodyEntryNodeId();
+                    continue;
+                } catch (RuntimeException exception) {
+                    return fail(traceId, node.id(), exception, "循环直到执行失败。");
                 }
             }
 
@@ -389,9 +453,11 @@ public final class GraphRuntime {
             }
             Optional<NodeDefinition> container = graph.node(frame.containerNodeId());
             Optional<NodeDefinition> bodyEntry = graph.node(frame.bodyEntryNodeId());
-            NodeType expected = frame.kind() == LoopKind.COUNT
-                    ? NodeType.CONTROL_LOOP_COUNT
-                    : NodeType.CONTROL_LOOP_FOREVER;
+            NodeType expected = switch (frame.kind()) {
+                case COUNT -> NodeType.CONTROL_LOOP_COUNT;
+                case FOREVER -> NodeType.CONTROL_LOOP_FOREVER;
+                case UNTIL -> NodeType.CONTROL_LOOP_UNTIL;
+            };
             if (container.isEmpty() || container.get().type() != expected) {
                 return "循环容器不存在或类型已变化。";
             }
@@ -401,7 +467,7 @@ public final class GraphRuntime {
             if (frame.iteration() < 1 || frame.iteration() > frame.iterationLimit()) {
                 return "循环迭代快照无效。";
             }
-            if (frame.kind() == LoopKind.COUNT) {
+            if (frame.kind() == LoopKind.COUNT || frame.kind() == LoopKind.UNTIL) {
                 String completion;
                 try {
                     completion = targetId(frame.containerNodeId(), "done");
@@ -410,6 +476,9 @@ public final class GraphRuntime {
                 }
                 if (!completion.equals(frame.completionNodeId())) {
                     return "循环返回位置已失效。";
+                }
+                if (frame.intervalSeconds() != 0) {
+                    return "循环间隔快照无效。";
                 }
             } else if (!frame.completionNodeId().isBlank() || frame.intervalSeconds() <= 0) {
                 return "无限循环间隔快照无效。";
@@ -443,7 +512,9 @@ public final class GraphRuntime {
             return "等待节点类型已变化。";
         }
         if (continuation.reason() == TimerContinuation.Reason.LOOP_INTERVAL
-                && (frames.isEmpty() || !frames.getLast().containerNodeId().equals(source.get().id()))) {
+                && (frames.isEmpty()
+                || frames.getLast().kind() != LoopKind.FOREVER
+                || !frames.getLast().containerNodeId().equals(source.get().id()))) {
             return "循环间隔 frame 已失效。";
         }
         return null;
@@ -474,6 +545,48 @@ public final class GraphRuntime {
                 frame.completionNodeId(),
                 frame.intervalSeconds()
         );
+    }
+
+    private boolean evaluateUntilConditions(NodeDefinition loop, ExecutionContext context, boolean announceCheck) {
+        if (announceCheck) {
+            traces.add(context.traceId(), loop.id(), "循环直到：条件检查开始。");
+        }
+        if (loop.conditionSlots().isEmpty()) {
+            throw new IllegalStateException("循环直到缺少结束条件。");
+        }
+
+        boolean allMatched = true;
+        Set<String> slotIds = new HashSet<>();
+        for (int index = 0; index < loop.conditionSlots().size(); index += 1) {
+            ConditionSlotDefinition slot = loop.conditionSlots().get(index);
+            if (slot.slotId().isBlank() || !slotIds.add(slot.slotId())) {
+                throw new IllegalStateException("结束条件 " + (index + 1) + " 的槽位 ID 无效。");
+            }
+            List<NodeDefinition> conditions = graph.childrenInSlot(loop.id(), slot.slotId());
+            if (conditions.isEmpty()) {
+                throw new IllegalStateException("结束条件 " + (index + 1) + " 尚未设置。");
+            }
+            if (conditions.size() != 1) {
+                throw new IllegalStateException("结束条件 " + (index + 1) + " 包含多个条件积木。");
+            }
+
+            NodeDefinition condition = conditions.getFirst();
+            Optional<RuntimePredicateResult> evaluated = services.evaluatePredicate(
+                    condition,
+                    context.playerId(),
+                    context.sessionId()
+            );
+            if (evaluated.isEmpty()) {
+                throw new IllegalStateException("结束条件 " + (index + 1) + " 不支持布尔求值。");
+            }
+            RuntimePredicateResult predicate = evaluated.get();
+            boolean matched = slot.negated() ? !predicate.value() : predicate.value();
+            String detail = predicate.traceMessage().isBlank() ? "" : predicate.traceMessage() + " ";
+            traces.add(context.traceId(), condition.id(), "结束条件 " + (index + 1) + "：" + detail
+                    + "原始结果 " + predicate.value() + "，应用取反后 " + matched + "。");
+            allMatched &= matched;
+        }
+        return allMatched;
     }
 
     private String targetId(String nodeId, String outputSlot) {

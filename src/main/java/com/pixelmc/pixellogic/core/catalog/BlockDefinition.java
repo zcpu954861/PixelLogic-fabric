@@ -14,12 +14,15 @@ public record BlockDefinition(
         String categoryId,
         String subcategoryId,
         List<String> tags,
+        List<BlockCapability> capabilities,
         String nodeKind,
         NodeType nodeType,
         Map<String, String> defaultConfig,
         List<BlockFormFieldDefinition> formSchema,
         String summaryTemplate,
         String summaryFormatter,
+        String predicateSummaryTemplate,
+        String predicateNegatedSummaryTemplate,
         List<String> containerSlots,
         List<SlotDefinition> inputSlots,
         List<SlotDefinition> outputSlots,
@@ -32,10 +35,13 @@ public record BlockDefinition(
 ) {
     public BlockDefinition {
         tags = tags == null ? List.of() : List.copyOf(tags);
+        capabilities = capabilities == null ? List.of() : List.copyOf(capabilities);
         defaultConfig = defaultConfig == null ? Map.of() : Map.copyOf(defaultConfig);
         formSchema = formSchema == null ? List.of() : List.copyOf(formSchema);
         summaryTemplate = summaryTemplate == null ? "" : summaryTemplate;
         summaryFormatter = summaryFormatter == null ? "" : summaryFormatter;
+        predicateSummaryTemplate = predicateSummaryTemplate == null ? "" : predicateSummaryTemplate;
+        predicateNegatedSummaryTemplate = predicateNegatedSummaryTemplate == null ? "" : predicateNegatedSummaryTemplate;
         containerSlots = containerSlots == null ? List.of() : List.copyOf(containerSlots);
         inputSlots = inputSlots == null ? List.of() : List.copyOf(inputSlots);
         outputSlots = outputSlots == null ? List.of() : List.copyOf(outputSlots);

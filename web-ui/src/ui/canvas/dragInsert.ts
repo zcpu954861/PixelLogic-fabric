@@ -4,6 +4,7 @@ import { blockMetrics, branchForNode, cloneGraph, connectedGraphEdges, container
 import { normalBlockHeight, normalBlockWidth } from '../../model/containerGeometry';
 import { conditionRackParent } from '../../model/conditionRack';
 import { isBodyContainerNode } from '../../model/containerNodes';
+import { activeOutputSlots } from '../../model/conditionOutputMode';
 import { preferredMainOutput } from './activeOutput';
 import { connectedOverlap, insertSnapX, insertSnapY, linkSnapX, linkSnapY, reconnectSnapX, reconnectSnapY } from './blockConstants';
 import {
@@ -371,8 +372,7 @@ export function appendCandidates(graph: GraphDocument, drag: BlockDrag): Array<E
     }
     const sourcePosition = source.position ?? fallbackPosition(source.id);
     const sourceSize = blockMetrics(graph, source);
-    const output = preferredMainOutput(source);
-    return (output ? [output] : [])
+    return activeOutputSlots(source)
       .filter((slot) => slot.edgeType === rootInput.edgeType)
       .filter((slot) => !connectedEdges.some((edgeItem) => edgeItem.sourceNodeId === source.id && edgeItem.sourceSlotId === slot.id))
       .map((slot): Extract<InsertCandidate, { kind: 'append' }> => ({

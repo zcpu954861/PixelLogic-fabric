@@ -159,7 +159,30 @@ try {
   assert.equal(draggedTailOutput(graph([passOnly]), new Set(['pass-only']))?.slot.id, 'pass');
   const conditionGraph = graph([passOnly, action('dragged', { x: 900, y: 0 })]);
   assert.equal(appendCandidates(conditionGraph, drag('dragged', { x: 900, y: 0 }, { x: 246, y: 0 })).length, 1);
-  assert.equal(appendCandidates(graph([branch, action('dragged', { x: 900, y: 0 })]), drag('dragged', { x: 900, y: 0 }, { x: 246, y: 0 })).length, 0);
+  for (const slotId of ['pass', 'fail']) {
+    const draggedId = `dragged-${slotId}`;
+    const start = { x: 900, y: slotId === 'pass' ? 0 : 300 };
+    const branchGraph = graph([branch, action(draggedId, start)]);
+    const probeDrag = drag(draggedId, start, start);
+    const candidates = appendCandidates(branchGraph, probeDrag);
+    assert.deepEqual(candidates.map((candidate) => candidate.sourceSlotId).sort(), ['fail', 'pass']);
+    const candidate = candidates.find((item) => item.sourceSlotId === slotId);
+    const draggedNode = branchGraph.nodes.find((item) => item.id === draggedId);
+    const inputY = blockMetrics(branchGraph, draggedNode).inputY;
+    assert.ok(candidate && inputY !== null);
+    const branchDrag = drag(draggedId, start, {
+      x: candidate.join.x + candidate.join.width / 2,
+      y: candidate.join.y + 15 - inputY,
+    });
+    branchDrag.candidate = findInsertCandidate(branchGraph, branchDrag);
+    assert.equal(branchDrag.candidate?.kind, 'append');
+    assert.equal(branchDrag.candidate?.sourceSlotId, slotId, `BRANCH ${slotId} output must accept a downstream block`);
+    const dropped = computeDragDrop(branchGraph, branchDrag).graph;
+    assert.equal(dropped.edges.some((item) =>
+      item.sourceNodeId === 'branch'
+      && item.sourceSlotId === slotId
+      && item.targetNodeId === draggedId), true);
+  }
 
   const conditionHead = {
     ...passOnly,

@@ -1,0 +1,136 @@
+.logic-block.is-placement-preview {
+  will-change: transform;
+  transition: transform var(--interaction-preview-duration) var(--interaction-easing);
+}
+
+.container-preview-shell,
+.placement-ghost-block {
+  position: absolute;
+  z-index: 7350;
+  pointer-events: none;
+  animation: interaction-preview-in var(--interaction-preview-duration) var(--interaction-easing) both;
+}
+
+.placement-ghost-block {
+  --interaction-preview-opacity: 0.46;
+  opacity: var(--interaction-preview-opacity);
+  pointer-events: none !important;
+}
+
+.placement-ghost-block * {
+  pointer-events: none !important;
+}
+
+.container-preview-shell {
+  --block-outline: #0f766e;
+  --fill: #f8fffc;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #0f766e;
+  filter: drop-shadow(7px 7px 0 rgba(23, 33, 29, 0.14));
+}
+
+.container-preview-shell .puzzle-shape .block-body {
+  fill: var(--fill);
+  stroke: var(--block-outline);
+  stroke-dasharray: none;
+}
+
+.logic-block.control.is-container-previewed > .puzzle-shape > .block-body {
+  opacity: 0;
+}
+
+.logic-block.control.container-target::after,
+.logic-block.control.catalog-container-target::after,
+.logic-block.control.container-target .block-body,
+.logic-block.control.catalog-container-target .block-body {
+  transition:
+    background var(--interaction-preview-duration) var(--interaction-easing),
+    border-color var(--interaction-preview-duration) var(--interaction-easing),
+    filter var(--interaction-preview-duration) var(--interaction-easing),
+    stroke var(--interaction-preview-duration) var(--interaction-easing);
+}
+
+.logic-block.control.catalog-container-target::after {
+  content: "";
+  position: absolute;
+  left: var(--container-body-left);
+  right: var(--container-body-right);
+  top: var(--container-body-top);
+  bottom: var(--container-body-bottom);
+  z-index: 1;
+  border: 2px dashed rgba(22, 163, 74, 0.72);
+  border-radius: 8px;
+  background: rgba(220, 252, 231, 0.38);
+  box-shadow: 0 0 22px rgba(22, 163, 74, 0.22);
+  pointer-events: none;
+}
+
+.logic-block.control.catalog-container-target .block-body {
+  stroke: #16a34a;
+  filter: drop-shadow(0 0 8px rgba(22, 163, 74, 0.42));
+}
+
+.catalog-drag-ghost {
+  position: fixed !important;
+  inset: auto !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 20000 !important;
+  opacity: 0.74;
+  transform-origin: 0 0;
+  filter:
+    drop-shadow(0 0 14px rgba(22, 163, 74, 0.2))
+    drop-shadow(12px 14px 0 rgba(23, 33, 29, 0.16));
+  pointer-events: none !important;
+  will-change: transform;
+}
+
+.catalog-drag-ghost .block-topline,
+.catalog-drag-ghost h3,
+.catalog-drag-ghost p {
+  pointer-events: none;
+}
+
+.slot-join.insert-target {
+  animation: candidate-in var(--interaction-preview-duration) var(--interaction-easing) both;
+}
+
+.logic-block.newly-added {
+  animation-duration: var(--interaction-settle-duration);
+  animation-timing-function: var(--interaction-easing);
+}
+
+@keyframes interaction-preview-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--interaction-preview-opacity, 1);
+  }
+}
+
+@keyframes candidate-in {
+  from {
+    opacity: 0.35;
+    filter: saturate(0.75);
+  }
+  to {
+    opacity: 1;
+    filter: saturate(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logic-block,
+  .logic-block.is-placement-preview,
+  .placement-ghost-block,
+  .container-preview-shell,
+  .catalog-drag-ghost,
+  .slot-join.insert-target,
+  .logic-block.newly-added {
+    animation: none !important;
+    transition-duration: 1ms !important;
+  }
+}

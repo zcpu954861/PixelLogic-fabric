@@ -60,19 +60,19 @@ public final class SimulationActor {
         return position;
     }
 
-    public boolean hasTag(String tag) {
+    public synchronized boolean hasTag(String tag) {
         return tags.contains(tag);
     }
 
-    public boolean addTag(String tag) {
+    public synchronized boolean addTag(String tag) {
         return tags.add(tag);
     }
 
-    public boolean removeTag(String tag) {
+    public synchronized boolean removeTag(String tag) {
         return tags.remove(tag);
     }
 
-    public Set<String> tags() {
+    public synchronized Set<String> tags() {
         return Collections.unmodifiableSet(new LinkedHashSet<>(tags));
     }
 }

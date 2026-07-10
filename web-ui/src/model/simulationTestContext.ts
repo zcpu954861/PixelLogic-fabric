@@ -64,6 +64,7 @@ export type SimulationTestResult = {
   initialActorTags: string[];
   actorTags: string[];
   timerScheduled: boolean;
+  status: 'WAITING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 };
 
 export function defaultSimulationTestContext(): SimulationTestContext {

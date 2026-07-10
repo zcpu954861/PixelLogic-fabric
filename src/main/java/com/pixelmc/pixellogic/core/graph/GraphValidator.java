@@ -110,7 +110,7 @@ public final class GraphValidator {
                 case PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION -> validatePlayerTagConfig(node, issues);
                 case STATE_SET_ACTION -> validateStateAction(node, issues, true);
                 case STATE_ADD_ACTION -> validateStateAction(node, issues, false);
-                case TIMER_START_ACTION -> validateTimer(graph, node, issues);
+                case TIMER_START_ACTION -> validateTimer(node, issues);
                 case MANUAL_TRIGGER, COMMAND_TRIGGER, MESSAGE_ACTION, DEBUG_LOG_ACTION -> {
                 }
             }
@@ -440,7 +440,7 @@ public final class GraphValidator {
         }
     }
 
-    private void validateTimer(GraphDefinition graph, NodeDefinition node, List<ValidationIssue> issues) {
+    private void validateTimer(NodeDefinition node, List<ValidationIssue> issues) {
         try {
             int seconds = Integer.parseInt(node.config().getOrDefault("durationSeconds", "0"));
             if (seconds <= 0) {
@@ -449,13 +449,6 @@ public final class GraphValidator {
         } catch (NumberFormatException exception) {
             error(issues, "timer_duration_invalid", "计时器时间无效：" + node.id());
         }
-        if (!hasOutgoing(graph, node.id(), "timer_completed")) {
-            error(issues, "timer_missing_completed", "计时器缺少完成后的连接：" + node.id());
-        }
-    }
-
-    private boolean hasOutgoing(GraphDefinition graph, String nodeId, String slotId) {
-        return graph.edges().stream().anyMatch(edge -> edge.sourceNodeId().equals(nodeId) && edge.sourceSlotId().equals(slotId));
     }
 
     private void validateSingleOutgoingPerSlot(GraphDefinition graph, List<ValidationIssue> issues) {

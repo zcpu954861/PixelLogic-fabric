@@ -55,6 +55,7 @@
 
 ## Known Limits
 
-- Timer continuation inside a loop body is not a full coroutine loop engine in v1.
+- Control Flow Continuation v1 now preserves count/forever loop progress, nested return frames, cumulative steps, and the forever cap across `timer.wait` resumes.
+- Continuations remain in-memory and do not survive server restart; waiting for events and break/continue are still out of scope.
 - Catalog drag from the left library creates the block on pointer release; it does not render a live ghost preview yet.
 - Copy/duplicate behavior is not added because the editor has no existing copy command.

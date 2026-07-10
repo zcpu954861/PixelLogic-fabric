@@ -47,6 +47,7 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     private final WallClockTimerScheduler timerScheduler = new WallClockTimerScheduler();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicLong runtimeGeneration = new AtomicLong();
+    private final AtomicLong simulationRunSequence = new AtomicLong();
     private final GraphStorageService graphStorage;
     private final RuntimeServices services;
 
@@ -143,6 +144,10 @@ public final class PixelLogicSpikeService implements AutoCloseable {
                     : "Committed graph validation failed: " + validationIssues.getFirst().message();
             return new RuntimeResult(false, "", message);
         }
+        long runSequence = simulationRunSequence.incrementAndGet();
+        cancelRuntime();
+        timerScheduler.clearPendingTimers();
+        cancelSimulationResult("已被新的测试运行替代。");
         SimulationExecutionResult result = currentRunner.run(SimulationExecutionRequest.manual(
                 graph.id(),
                 DemoGraphFactory.TRIGGER_TYPE,
@@ -151,12 +156,19 @@ public final class PixelLogicSpikeService implements AutoCloseable {
                 world,
                 MANUAL_SESSION_ID,
                 runtimeGeneration.get()
-        ));
-        lastSimulationResult = result;
-        return new RuntimeResult(result.success(), result.traceId(), result.message());
+        ), update -> recordSimulationResult(runSequence, update));
+        recordSimulationResult(runSequence, result);
+        return new RuntimeResult(
+                result.success(),
+                result.traceId(),
+                result.message(),
+                result.status() == SimulationExecutionResult.Status.WAITING
+        );
     }
 
     public void resetPlayer(UUID playerId) {
+        simulationRunSequence.incrementAndGet();
+        cancelSimulationResult("测试运行已重置。");
         runtimeGeneration.incrementAndGet();
         timerScheduler.clearPendingTimers();
         stateStore.removeOwner(StateScope.PLAYER, playerId.toString());
@@ -238,9 +250,17 @@ public final class PixelLogicSpikeService implements AutoCloseable {
         return Optional.ofNullable(lastSimulationResult);
     }
 
+    public Optional<SimulationExecutionResult> simulationRun(String runId) {
+        SimulationExecutionResult result = lastSimulationResult;
+        return result != null && result.traceId().equals(runId) ? Optional.of(result) : Optional.empty();
+    }
+
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
+            simulationRunSequence.incrementAndGet();
+            cancelSimulationResult("服务已停止。");
+            cancelRuntime();
             runtimeGeneration.incrementAndGet();
             timerScheduler.close();
             stateStore.clear();
@@ -248,6 +268,9 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     }
 
     private void installCommittedGraph(GraphDocument document) {
+        simulationRunSequence.incrementAndGet();
+        cancelSimulationResult("Graph 已更新，测试运行已取消。");
+        cancelRuntime();
         long generation = runtimeGeneration.incrementAndGet();
         timerScheduler.clearPendingTimers();
         GraphDefinition graph = document.toGraphDefinition();
@@ -271,10 +294,35 @@ public final class PixelLogicSpikeService implements AutoCloseable {
                     RuntimeLimits.spikeDefaults(),
                     generation
             );
+            cancelRuntime();
             runtime = nextRuntime;
             return nextRuntime;
         }, services, SimulationExecutionRegistry.playerTags());
         validationIssues = issues;
         committedGraph = document;
+    }
+
+    private void cancelRuntime() {
+        GraphRuntime current = runtime;
+        if (current != null) {
+            current.cancelPendingContinuations();
+        }
+    }
+
+    private void recordSimulationResult(long runSequence, SimulationExecutionResult result) {
+        if (runSequence == simulationRunSequence.get()) {
+            SimulationExecutionResult current = lastSimulationResult;
+            if (current != null && current.traceId().equals(result.traceId()) && current.status().terminal()) {
+                return;
+            }
+            lastSimulationResult = result;
+        }
+    }
+
+    private void cancelSimulationResult(String message) {
+        SimulationExecutionResult result = lastSimulationResult;
+        if (result != null && !result.status().terminal()) {
+            lastSimulationResult = result.cancelled(message);
+        }
     }
 }

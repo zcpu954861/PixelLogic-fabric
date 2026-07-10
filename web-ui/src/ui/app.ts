@@ -1,4 +1,5 @@
 import { PixelLogicApiError, api } from '../api/pixelLogicApi';
+import { startTestRunPolling, stopTestRunPolling } from '../api/testRunPolling';
 import {
   blockKindFromCatalogBlock,
   catalogBlock,
@@ -127,6 +128,11 @@ type ModalScrollSnapshot = {
   simulation: number | null;
 };
 
+type TraceScrollSnapshot = {
+  top: number;
+  stickToBottom: boolean;
+};
+
 
 
 
@@ -153,6 +159,21 @@ function restoreModalScrollSnapshot(snapshot: ModalScrollSnapshot): void {
   }
 }
 
+function captureTraceScrollSnapshot(): TraceScrollSnapshot | null {
+  const trace = document.querySelector<HTMLElement>('[data-trace-scroll]');
+  return trace ? {
+    top: trace.scrollTop,
+    stickToBottom: trace.scrollHeight - trace.clientHeight - trace.scrollTop <= 8,
+  } : null;
+}
+
+function restoreTraceScrollSnapshot(snapshot: TraceScrollSnapshot | null): void {
+  const trace = document.querySelector<HTMLElement>('[data-trace-scroll]');
+  if (snapshot && trace) {
+    trace.scrollTop = snapshot.stickToBottom ? trace.scrollHeight : snapshot.top;
+  }
+}
+
 
 
 
@@ -173,6 +194,7 @@ function renderApp(): void {
   const editorWasOpen = Boolean(document.querySelector('[data-modal-overlay]'));
   const simulationEditorWasOpen = Boolean(document.querySelector('[data-sim-modal-overlay]'));
   const modalScroll = captureModalScrollSnapshot();
+  const traceScroll = captureTraceScrollSnapshot();
   const graph = currentGraph();
   const blocks = buildBlocks(graph, activeCatalog(), state.selectedNodeId);
   const recentNodeId = state.recentNodeId;
@@ -273,7 +295,7 @@ function renderApp(): void {
             ${validationItems}
           </ul>
         </section>
-        <section>
+        <section data-trace-scroll>
           <div class="panel-title"><span>执行记录</span><b>${state.latestTrace ? escapeHtml(shortTraceId(state.latestTrace.id)) : '无'}</b></div>
           <ol class="trace-list">
             ${renderTrace(state.latestTrace)}
@@ -289,6 +311,7 @@ function renderApp(): void {
   setTransform();
   updateBlockOverflowMotion();
   restoreModalScrollSnapshot(modalScroll);
+  restoreTraceScrollSnapshot(traceScroll);
   focusEditor(editorWasOpen, simulationEditorWasOpen);
   if (recentNodeId) {
     state.recentNodeId = null;
@@ -2149,6 +2172,7 @@ async function startTest(): Promise<void> {
       return;
     }
     state.simulationTestContextError = '';
+    stopTestRunPolling();
     state.simulationResult = null;
     await waitForPendingAutoSave();
     if (state.dirty || state.hasDraft) {
@@ -2166,6 +2190,27 @@ async function startTest(): Promise<void> {
     state.latestTrace = data.trace ?? null;
     state.simulationResult = data.simulation ?? null;
     state.lastAction = data.message || '测试运行已执行';
+    if (!data.runId || !data.runStatus || typeof data.terminal !== 'boolean') {
+      throw new Error('API 未返回测试运行状态。');
+    }
+    if (!data.terminal) {
+      startTestRunPolling(data.runId, {
+        onUpdate: (update) => {
+          state.apiStatus = 'online';
+          state.latestTrace = update.trace ?? state.latestTrace;
+          state.simulationResult = update.simulation ?? state.simulationResult;
+          state.lastAction = update.message || state.lastAction;
+          renderApp();
+        },
+        onFailure: (error) => {
+          const connected = error instanceof PixelLogicApiError ? error.connected : false;
+          state.apiStatus = connected ? 'online' : 'offline';
+          state.statusMessage = connected ? 'API 已连接' : 'API 未连接';
+          state.error = error instanceof Error ? error.message : '测试运行状态查询失败。';
+          renderApp();
+        },
+      });
+    }
   });
 }
 
@@ -2293,6 +2338,7 @@ export function startPixelLogicApp(): void {
     return;
   }
   renderApp();
+  window.addEventListener('pagehide', stopTestRunPolling, { once: true });
   centerView();
   void loadCatalog().then(() => loadGraph()).then(() => {
     if (state.apiStatus === 'online') {

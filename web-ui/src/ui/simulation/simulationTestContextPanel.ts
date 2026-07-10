@@ -247,9 +247,19 @@ function renderSimulationResult(result: SimulationTestResult | null): string {
       <div><span>初始标签</span><b>${escapeHtml(formatTags(initialTags))}</b></div>
       <div><span>结束标签</span><b>${escapeHtml(formatTags(finalTags))}</b></div>
       <div><span>标签变化</span><b>${escapeHtml(tagChanges(initialTags, finalTags))}</b></div>
-      <small>${result.success ? '运行完成' : '运行失败'} · ${escapeHtml(shortTraceId(result.traceId))}</small>
+      <small>${simulationRunStatusLabel(result)} · ${escapeHtml(shortTraceId(result.traceId))}</small>
     </div>
   `;
+}
+
+function simulationRunStatusLabel(result: SimulationTestResult): string {
+  if (result.status === 'WAITING') {
+    return '等待后续执行';
+  }
+  if (result.status === 'CANCELLED') {
+    return '运行已取消';
+  }
+  return result.success ? '运行完成' : '运行失败';
 }
 
 function coordinateValue(value: number): string {

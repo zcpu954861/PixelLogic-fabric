@@ -8,6 +8,7 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
+import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionResult;
 import com.pixelmc.pixellogic.core.trace.ExecutionTrace;
 import com.pixelmc.pixellogic.core.trace.TraceStep;
 import com.pixelmc.pixellogic.server.PixelLogicSpikeService;
@@ -43,6 +44,9 @@ public final class PixelLogicApiServer implements AutoCloseable {
     private static final SimulationTestContextParser TEST_CONTEXT_PARSER =
             new SimulationTestContextParser(GSON, WEBUI_DEMO_PLAYER_ID, WEBUI_DEMO_PLAYER_NAME);
     private static final Pattern GRAPH_PATH = Pattern.compile("^/api/pixellogic/graphs/([A-Za-z0-9_-]+)(?:/(draft|validate|commit))?$");
+    private static final Pattern TEST_RUN_PATH = Pattern.compile(
+            "^/api/pixellogic/test/runs/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+    );
 
     private final PixelLogicSpikeService service;
     private final Executor serverThreadExecutor;
@@ -112,20 +116,26 @@ public final class PixelLogicApiServer implements AutoCloseable {
             }
             return onServerThread(() -> {
                 RuntimeResult result = service.startManualTest(testContext.actor(), testContext.world());
-                Optional<ExecutionTrace> trace = result.traceId().isBlank() ? Optional.empty() : service.trace(result.traceId());
-                Map<String, Object> fields = fields(
-                        "message", result.message(),
-                        "traceId", result.traceId(),
-                        "trace", trace.map(PixelLogicApiServer::traceView).orElse(null),
-                        "simulation", service.lastSimulationResult().orElse(null),
-                        "demoActor", demoActor()
-                );
+                Map<String, Object> fields = service.simulationRun(result.traceId())
+                        .map(this::testRunFields)
+                        .orElseGet(() -> fields("message", result.message(), "traceId", result.traceId()));
+                fields.put("demoActor", demoActor());
                 if (!result.success()) {
                     fields.put("error", errorMap("RUNTIME_FAILED", result.message()));
                     return json(500, false, fields);
                 }
                 return ok(fields);
             });
+        }
+        Matcher testRunMatcher = TEST_RUN_PATH.matcher(path);
+        if ("GET".equals(method) && testRunMatcher.matches()) {
+            String runId = testRunMatcher.group(1);
+            return onServerThread(() -> service.simulationRun(runId)
+                    .map(run -> ok(testRunFields(run)))
+                    .orElseGet(() -> error(404, "RUN_NOT_FOUND", "测试运行不存在或已被新的运行替代。")));
+        }
+        if (path.startsWith("/api/pixellogic/test/runs/")) {
+            return error(400, "INVALID_RUN_ID", "测试运行 ID 无效。");
         }
         if ("GET".equals(method) && "/api/pixellogic/traces/latest".equals(path)) {
             return onServerThread(() -> ok(fields(
@@ -308,6 +318,18 @@ public final class PixelLogicApiServer implements AutoCloseable {
                 trace.id(),
                 trace.truncated(),
                 trace.steps().stream().map(PixelLogicApiServer::traceStepView).toList()
+        );
+    }
+
+    private Map<String, Object> testRunFields(SimulationExecutionResult run) {
+        return fields(
+                "message", run.message(),
+                "traceId", run.traceId(),
+                "runId", run.traceId(),
+                "runStatus", run.status().name(),
+                "terminal", run.status().terminal(),
+                "trace", service.trace(run.traceId()).map(PixelLogicApiServer::traceView).orElse(null),
+                "simulation", run
         );
     }
 

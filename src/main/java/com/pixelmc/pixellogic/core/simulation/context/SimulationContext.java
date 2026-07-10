@@ -66,35 +66,35 @@ public final class SimulationContext {
         return options;
     }
 
-    public void addActionResult(SimulationActionResult result) {
+    public synchronized void addActionResult(SimulationActionResult result) {
         actionResults.add(result);
     }
 
-    public void addMessageResult(SimulationMessageResult result) {
+    public synchronized void addMessageResult(SimulationMessageResult result) {
         messageResults.add(result);
     }
 
-    public void addStateChange(SimulationStateChangeResult result) {
+    public synchronized void addStateChange(SimulationStateChangeResult result) {
         stateChanges.add(result);
     }
 
-    public void markTimerScheduled() {
+    public synchronized void markTimerScheduled() {
         timerScheduled = true;
     }
 
-    public boolean timerScheduled() {
+    public synchronized boolean timerScheduled() {
         return timerScheduled;
     }
 
-    public List<SimulationActionResult> actionResults() {
+    public synchronized List<SimulationActionResult> actionResults() {
         return List.copyOf(actionResults);
     }
 
-    public List<SimulationMessageResult> messageResults() {
+    public synchronized List<SimulationMessageResult> messageResults() {
         return List.copyOf(messageResults);
     }
 
-    public List<SimulationStateChangeResult> stateChanges() {
+    public synchronized List<SimulationStateChangeResult> stateChanges() {
         return List.copyOf(stateChanges);
     }
 }

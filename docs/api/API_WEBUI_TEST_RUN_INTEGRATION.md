@@ -14,6 +14,7 @@ Implemented:
 - Vite dev proxy from `/api` to `http://127.0.0.1:18111`.
 - WebUI demo actor for PLAYER-scoped state.
 - Spike-level pending timer capacity limit.
+- Suspended-run status lookup and finite WebUI polling for asynchronous continuation results.
 
 Not implemented:
 
@@ -30,11 +31,16 @@ Not implemented:
 GET  /api/pixellogic/status
 POST /api/pixellogic/test/reset
 POST /api/pixellogic/test/start
+GET  /api/pixellogic/test/runs/{runId}
 GET  /api/pixellogic/traces/latest
 GET  /api/pixellogic/traces
 ```
 
 All responses are JSON.
+
+`POST /test/start` reuses the trace id as `runId` and returns `runStatus` plus `terminal`. A suspended timer returns `WAITING`; the WebUI queries the run endpoint every 750 ms and replaces its bounded trace/result snapshot. Polling stops on `COMPLETED`, `FAILED`, `CANCELLED`, a new run, page exit, or three consecutive request failures. No WebSocket, SSE, persistent run history, or unbounded registry is used.
+
+Only the current simulation result is queryable. Reset, graph replacement, a newer run, and service stop cancel the prior non-terminal result; sequence guards prevent late callbacks and stale browser responses from replacing the current run.
 
 Example success:
 

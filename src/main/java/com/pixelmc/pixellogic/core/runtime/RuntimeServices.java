@@ -35,4 +35,7 @@ public interface RuntimeServices {
     default void recordTimerScheduled(String nodeId, Duration delay, TimerContinuation continuation) {
     }
 
+    default void recordRuntimeResult(RuntimeResult result) {
+    }
+
 }

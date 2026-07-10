@@ -17,13 +17,15 @@ import {
   type RichTextStyleKey,
 } from '../model/richText';
 import { simulationTestPayload, validateSimulationTestContext } from '../model/simulationTestContext';
+import { containerGeometry } from '../model/containerGeometry';
 import { state, world } from '../state/appState';
 import {
+  blockMetrics,
   blockSize,
   cloneGraph,
-  connectedComponentNodeIds,
   connectedGraphEdges,
-  containerBodyRect,
+  containerBodyDropZone,
+  containerBodyEntryAnchor,
   containerDescendantNodeIds,
   downstreamNodeIds,
   fallbackPosition,
@@ -41,23 +43,18 @@ import type {
   GraphHistoryEntry,
   GraphNode,
   GraphPosition,
-  InsertCandidate,
 } from '../model/graphTypes';
 import {
   nodeCategoryLabel,
   nodeSummary,
 } from './humanize/labels';
-import { autoSaveDelayMs, doubleClickMs, dragThreshold, historyLimit, normalBlockHeight, normalBlockWidth } from './canvas/blockConstants';
+import { autoSaveDelayMs, connectedOverlap, doubleClickMs, dragThreshold, historyLimit, normalBlockHeight, normalBlockWidth } from './canvas/blockConstants';
 import { renderBlock, renderSlotJoin } from './canvas/blockView';
 import { buildBlocks, buildJoins, updateWorldSize } from './canvas/slotFlowViewModel';
 import {
   connectedActionText,
+  computeDragDrop,
   findInsertCandidate,
-  graphWithPreviewPositions,
-  insertDraggedGroup,
-  makeInsertionGap,
-  snapDraggedGroupToCandidate,
-  syncDraggedContainerMembership,
 } from './canvas/dragInsert';
 import { renderCatalogLibrary } from './catalog/catalogLibrary';
 import { updateBlockOverflowMotion } from './canvas/cardOverflow';
@@ -156,6 +153,7 @@ function renderApp(): void {
   const modalScroll = captureModalScrollSnapshot();
   const graph = currentGraph();
   const blocks = buildBlocks(graph, activeCatalog(), state.selectedNodeId);
+  const recentNodeId = state.recentNodeId;
   updateWorldSize(blocks, world);
   const joins = buildJoins(graph, blocks);
   const selectedNode = selectedNodeFrom(graph);
@@ -220,7 +218,7 @@ function renderApp(): void {
         <section class="canvas-viewport" aria-label="可拖动画布">
           <div class="flow-world" style="width:${world.width}px; height:${world.height}px">
             ${joins.map(renderSlotJoin).join('')}
-            ${blocks.map((block) => renderBlock(block, state.recentNodeId)).join('')}
+            ${blocks.map((block) => renderBlock(block, recentNodeId)).join('')}
           </div>
           <div class="drag-hint" data-drag-hint aria-live="polite"></div>
         </section>
@@ -270,7 +268,12 @@ function renderApp(): void {
   updateBlockOverflowMotion();
   restoreModalScrollSnapshot(modalScroll);
   focusEditor(editorWasOpen, simulationEditorWasOpen);
-  window.requestAnimationFrame(() => updateBlockOverflowMotion());
+  if (recentNodeId) {
+    state.recentNodeId = null;
+  }
+  window.requestAnimationFrame(() => {
+    updateBlockOverflowMotion();
+  });
 }
 
 function activeCatalog(): BlockCatalog {
@@ -380,9 +383,12 @@ function bindInteractions(): void {
       return;
     }
 
+    event.preventDefault();
+    window.getSelection()?.removeAllRanges();
     isPanning = true;
     panStart = { x: event.clientX, y: event.clientY };
     panOffset = { x: offsetX, y: offsetY };
+    document.body.classList.add('is-canvas-panning');
     viewport.classList.add('is-dragging');
     viewport.setPointerCapture(event.pointerId);
   });
@@ -397,6 +403,7 @@ function bindInteractions(): void {
       return;
     }
 
+    event.preventDefault();
     offsetX = panOffset.x + event.clientX - panStart.x;
     offsetY = panOffset.y + event.clientY - panStart.y;
     setTransform();
@@ -409,6 +416,7 @@ function bindInteractions(): void {
     }
 
     isPanning = false;
+    document.body.classList.remove('is-canvas-panning');
     viewport.classList.remove('is-dragging');
     if (viewport.hasPointerCapture(event.pointerId)) {
       viewport.releasePointerCapture(event.pointerId);
@@ -421,6 +429,7 @@ function bindInteractions(): void {
       return;
     }
     isPanning = false;
+    document.body.classList.remove('is-canvas-panning');
     viewport.classList.remove('is-dragging');
   });
 
@@ -515,6 +524,14 @@ function bindInteractions(): void {
 
   document.onkeydown = (event) => {
     const editableTarget = isEditableTarget(event.target);
+    if (event.key === 'Escape' && activeBlockDrag) {
+      event.preventDefault();
+      const activeViewport = document.querySelector<HTMLElement>('.canvas-viewport');
+      if (activeViewport) {
+        cancelBlockDrag(activeViewport);
+      }
+      return;
+    }
     if ((state.editorOpen || state.simulationEditorOpen) && editableTarget && (isUndoShortcut(event) || isRedoShortcut(event))) {
       return;
     }
@@ -660,14 +677,10 @@ function moveBlockDrag(event: PointerEvent): void {
       y: Math.round(start.y + worldDy),
     };
     drag.previewPositions.set(id, next);
-    const blockEl = document.querySelector<HTMLElement>(`[data-block="${id}"]`);
-    if (blockEl) {
-      blockEl.style.left = `${next.x}px`;
-      blockEl.style.top = `${next.y}px`;
-    }
   });
-
-  drag.candidate = findInsertCandidate(currentGraph(), drag);
+  const graph = currentGraph();
+  drag.candidate = findInsertCandidate(graph, drag);
+  applyDragPreviewPositions(drag);
   renderInsertPreview(drag);
 }
 
@@ -677,6 +690,9 @@ function endBlockDrag(event: PointerEvent, viewport: HTMLElement): void {
     return;
   }
 
+  if (drag.started) {
+    moveBlockDrag(event);
+  }
   activeBlockDrag = null;
   clearInsertPreview();
   setDragHint('', '');
@@ -690,24 +706,24 @@ function endBlockDrag(event: PointerEvent, viewport: HTMLElement): void {
     return;
   }
 
-  snapDraggedGroupToCandidate(currentGraph(), drag);
-  const nextGraph = cloneGraph(currentGraph());
-  nextGraph.nodes = nextGraph.nodes.map((nodeItem) => {
-    const nextPosition = drag.previewPositions.get(nodeItem.id);
-    return nextPosition ? { ...nodeItem, position: nextPosition } : nodeItem;
-  });
-  nextGraph.edges = connectedGraphEdges(nextGraph);
-  const inserted = drag.candidate?.valid ? insertDraggedGroup(nextGraph, drag) : false;
-  if (inserted) {
-    makeInsertionGap(nextGraph, drag);
-  }
-  const movedOutOfContainer = inserted ? false : syncDraggedContainerMembership(nextGraph, drag);
+  const result = computeDragDrop(currentGraph(), drag);
+  const { inserted, movedOutOfContainer } = result;
   const actionText = inserted
     ? connectedActionText(drag.candidate)
     : movedOutOfContainer
       ? '已移出容器内部，正在自动保存。'
     : '位置已更新，正在自动保存。';
-  applyGraphEdit(nextGraph, actionText, { selectedNodeId: drag.rootId, recentNodeId: null });
+  applyGraphEdit(result.graph, actionText, { selectedNodeId: drag.rootId, recentNodeId: null });
+}
+
+function applyDragPreviewPositions(drag: BlockDrag): void {
+  drag.previewPositions.forEach((position, nodeId) => {
+    const blockEl = document.querySelector<HTMLElement>(`[data-block="${nodeId}"]`);
+    if (blockEl) {
+      blockEl.style.left = `${position.x}px`;
+      blockEl.style.top = `${position.y}px`;
+    }
+  });
 }
 
 
@@ -729,10 +745,14 @@ function selectOrOpenBlock(nodeId: string): void {
 }
 
 function cancelBlockDrag(viewport: HTMLElement): void {
+  const drag = activeBlockDrag;
   activeBlockDrag = null;
   clearInsertPreview();
   setDragHint('', '');
   viewport.classList.remove('is-block-dragging');
+  if (drag && viewport.hasPointerCapture(drag.pointerId)) {
+    viewport.releasePointerCapture(drag.pointerId);
+  }
   renderApp();
 }
 
@@ -906,41 +926,41 @@ function renderInsertPreview(drag: BlockDrag): void {
   if (candidate.kind === 'insert') {
     const joinEl = document.querySelector<HTMLElement>(`[data-join="${candidate.join.id}"]`);
     joinEl?.classList.add(candidate.valid ? 'insert-target' : 'insert-invalid');
-    if (candidate.valid) {
-      markInsertSplitGroups(graphWithPreviewPositions(currentGraph(), drag), candidate);
-    }
-  }
-  if (candidate.kind === 'container') {
+  } else if (candidate.kind === 'container' && candidate.valid) {
     document.querySelector<HTMLElement>(`[data-block="${candidate.containerNodeId}"]`)?.classList.add('container-target');
   }
+  renderDropPlaceholder(drag);
   document.querySelector<HTMLElement>(`[data-block="${candidate.join.from}"]`)?.classList.add('is-related');
   document.querySelector<HTMLElement>(`[data-block="${candidate.join.to}"]`)?.classList.add('is-related');
   setDragHint(candidate.message, candidate.valid ? 'valid' : 'invalid');
 }
 
-function markInsertSplitGroups(graph: GraphDocument, candidate: Extract<InsertCandidate, { kind: 'insert' }>): void {
-  const leftSide = new Set(connectedComponentNodeIds(graph, candidate.edge.sourceNodeId, candidate.edge.id));
-  const rightSide = new Set(connectedComponentNodeIds(graph, candidate.edge.targetNodeId, candidate.edge.id));
-  const overlap = new Set(Array.from(leftSide).filter((nodeId) => rightSide.has(nodeId)));
-
-  leftSide.forEach((nodeId) => {
-    if (!overlap.has(nodeId)) {
-      document.querySelector<HTMLElement>(`[data-block="${nodeId}"]`)?.classList.add('is-insert-split-left');
-    }
-  });
-  rightSide.forEach((nodeId) => {
-    if (!overlap.has(nodeId)) {
-      document.querySelector<HTMLElement>(`[data-block="${nodeId}"]`)?.classList.add('is-insert-split-right');
-    }
-  });
+function renderDropPlaceholder(drag: BlockDrag): void {
+  if (!drag.candidate?.valid) {
+    return;
+  }
+  const placement = computeDragDrop(currentGraph(), drag).graph;
+  const root = placement.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
+  const worldEl = document.querySelector<HTMLElement>('.flow-world');
+  if (!root || !worldEl) {
+    return;
+  }
+  const position = root.position ?? fallbackPosition(root.id);
+  const metrics = blockMetrics(placement, root);
+  const placeholder = document.createElement('div');
+  placeholder.className = 'drop-placeholder';
+  placeholder.setAttribute('aria-hidden', 'true');
+  placeholder.style.left = `${position.x}px`;
+  placeholder.style.top = `${position.y}px`;
+  placeholder.style.width = `${metrics.width}px`;
+  placeholder.style.height = `${metrics.height}px`;
+  worldEl.append(placeholder);
 }
 
 function clearInsertPreview(): void {
+  document.querySelectorAll('.drop-placeholder').forEach((item) => item.remove());
   document.querySelectorAll('.slot-join.insert-target, .slot-join.insert-invalid').forEach((item) => {
     item.classList.remove('insert-target', 'insert-invalid');
-  });
-  document.querySelectorAll('.logic-block.is-insert-split-left, .logic-block.is-insert-split-right').forEach((item) => {
-    item.classList.remove('is-insert-split-left', 'is-insert-split-right');
   });
   document.querySelectorAll('.logic-block.container-target').forEach((item) => {
     item.classList.remove('container-target');
@@ -1010,14 +1030,19 @@ function addCatalogBlockAt(blockId: string, event: PointerEvent | null): void {
     ? containerAtPoint(graph, dropPoint)
     : graph.nodes.find((item) => item.id === state.selectedNodeId && item.blockId?.startsWith('control.loop.'));
   if (selectedContainer && nodeItem.id !== selectedContainer.id) {
-    const rect = containerBodyRect(graph, selectedContainer);
     const childIndex = graph.nodes.filter((item) => item.parentContainerId === selectedContainer.id).length;
     nodeItem.parentContainerId = selectedContainer.id;
     nodeItem.parentSlot = 'body';
     const size = blockSize(kind);
-    const x = dropPoint ? dropPoint.x - size.width / 2 : rect.x + 18;
-    const y = dropPoint ? dropPoint.y - normalBlockHeight / 2 : rect.y + 18 + childIndex * 34;
-    nodeItem.position = { x: Math.round(Math.max(rect.x + 12, x)), y: Math.round(Math.max(rect.y + 12, y)) };
+    const entryAnchor = containerBodyEntryAnchor(graph, selectedContainer);
+    const graphWithNode = { ...graph, nodes: [...graph.nodes, nodeItem] };
+    const inputY = blockMetrics(graphWithNode, nodeItem).inputY ?? normalBlockHeight / 2;
+    const childOrigin = { x: entryAnchor.x, y: entryAnchor.y - inputY };
+    const x = dropPoint
+      ? dropPoint.x - size.width / 2
+      : childOrigin.x + childIndex * (normalBlockWidth - connectedOverlap + containerGeometry.childGap);
+    const y = dropPoint ? dropPoint.y - normalBlockHeight / 2 : childOrigin.y;
+    nodeItem.position = { x: Math.round(Math.max(childOrigin.x, x)), y: Math.round(Math.max(childOrigin.y, y)) };
   } else {
     nodeItem.position = dropPoint
       ? { x: Math.max(28, Math.round(dropPoint.x - blockSize(kind).width / 2)), y: Math.max(28, Math.round(dropPoint.y - normalBlockHeight / 2)) }
@@ -1034,12 +1059,12 @@ function containerAtPoint(graph: GraphDocument, point: GraphPosition): GraphNode
   return graph.nodes
     .filter((nodeItem) => nodeItem.blockId?.startsWith('control.loop.'))
     .filter((nodeItem) => {
-      const rect = containerBodyRect(graph, nodeItem);
+      const rect = containerBodyDropZone(graph, nodeItem);
       return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
     })
     .sort((left, right) => {
-      const leftRect = containerBodyRect(graph, left);
-      const rightRect = containerBodyRect(graph, right);
+      const leftRect = containerBodyDropZone(graph, left);
+      const rightRect = containerBodyDropZone(graph, right);
       return leftRect.width * leftRect.height - rightRect.width * rightRect.height;
     })[0] ?? null;
 }
@@ -1836,6 +1861,10 @@ function scheduleAutoSave(): void {
   }
   autoSaveTimer = window.setTimeout(() => {
     autoSaveTimer = null;
+    if (activeBlockDrag) {
+      scheduleAutoSave();
+      return;
+    }
     void startAutoSave();
   }, autoSaveDelayMs);
 }
@@ -1863,6 +1892,10 @@ async function performAutoSave(): Promise<void> {
   if (!state.dirty && !state.hasDraft) {
     return;
   }
+  if (activeBlockDrag) {
+    scheduleAutoSave();
+    return;
+  }
 
   const saveVersion = graphVersion;
   autoSaveInFlight = true;
@@ -1887,7 +1920,7 @@ async function performAutoSave(): Promise<void> {
     if (changedDuringSave) {
       scheduleAutoSave();
     }
-    if (state.editorOpen) {
+    if (activeBlockDrag || state.editorOpen) {
       refreshDraftIndicators();
     } else {
       renderApp();

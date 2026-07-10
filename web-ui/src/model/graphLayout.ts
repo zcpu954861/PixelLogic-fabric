@@ -1,26 +1,27 @@
 import { fallbackGraph } from './demoGraph';
 import type { BlockKind, BlockMetrics, Branch, GraphDocument, GraphEdge, GraphNode, GraphPosition, LaneSpan } from './graphTypes';
 import { activeOutputSlots, conditionOutputMode, isActiveOutputSlot } from './conditionOutputMode';
+import {
+  containerFrame,
+  containerHeightForChildBottom,
+  containerMinimumHeight,
+  containerMinimumWidth,
+  containerWidthForChildRight,
+  normalBlockHeight,
+  normalBlockWidth,
+} from './containerGeometry';
 import { blockKind } from '../ui/humanize/labels';
 import {
   connectedOverlap,
   conditionBlockWidth,
   conditionBranchGap,
-  containerBlockWidth,
-  containerBodyInset,
-  containerBodyMinHeight,
-  containerBodyPadding,
-  containerFooterHeight,
-  containerHeaderHeight,
-  normalBlockHeight,
-  normalBlockWidth,
   visualConnectXTolerance,
   visualConnectYTolerance,
 } from '../ui/canvas/blockConstants';
 import { preferredMainOutput } from '../ui/canvas/activeOutput';
 export function blockSize(kind: BlockKind): { width: number; height: number } {
   if (kind === 'control') {
-    return { width: containerBlockWidth, height: containerHeaderHeight + containerBodyMinHeight + containerFooterHeight };
+    return { width: containerMinimumWidth, height: containerMinimumHeight };
   }
   return kind === 'condition' ? { width: conditionBlockWidth, height: normalBlockHeight * 2 + conditionBranchGap } : { width: normalBlockWidth, height: normalBlockHeight };
 }
@@ -33,30 +34,32 @@ export function blockMetrics(graph: GraphDocument, nodeItem: GraphNode, cache = 
 
   const kind = blockKind(nodeItem.type);
   if (kind === 'control') {
+    const outerAnchorY = normalBlockHeight / 2;
     if (visiting.has(nodeItem.id)) {
       return {
-        width: containerBlockWidth,
-        height: containerHeaderHeight + containerBodyMinHeight + containerFooterHeight,
-        inputY: normalBlockHeight / 2,
-        outputOffsets: Object.fromEntries(nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT').map((slot) => [slot.id, containerHeaderHeight + containerBodyMinHeight + containerFooterHeight - containerFooterHeight / 2])),
+        width: containerMinimumWidth,
+        height: containerMinimumHeight,
+        inputY: outerAnchorY,
+        outputOffsets: Object.fromEntries(nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT').map((slot) => [slot.id, outerAnchorY])),
       };
     }
     visiting.add(nodeItem.id);
     const position = nodePosition(graph, nodeItem.id);
     const children = containerChildren(graph, nodeItem.id, 'body');
-    const childBottom = children.reduce((bottom, child) => {
+    let width = containerMinimumWidth;
+    let height = containerMinimumHeight;
+    children.forEach((child) => {
       const childPosition = nodePosition(graph, child.id);
       const childMetrics = blockMetrics(graph, child, cache, visiting);
-      return Math.max(bottom, childPosition.y + childMetrics.height - position.y + containerBodyPadding);
-    }, containerHeaderHeight + containerBodyMinHeight + containerFooterHeight);
+      width = Math.max(width, containerWidthForChildRight(childPosition.x + childMetrics.width - position.x));
+      height = Math.max(height, containerHeightForChildBottom(childPosition.y + childMetrics.height - position.y));
+    });
     visiting.delete(nodeItem.id);
-    const height = Math.max(containerHeaderHeight + containerBodyMinHeight + containerFooterHeight, childBottom);
-    const outputY = height - containerFooterHeight / 2;
     const metrics = {
-      width: containerBlockWidth,
+      width,
       height,
-      inputY: normalBlockHeight / 2,
-      outputOffsets: Object.fromEntries(nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT').map((slot) => [slot.id, outputY])),
+      inputY: outerAnchorY,
+      outputOffsets: Object.fromEntries(nodeItem.slots.filter((slot) => slot.direction === 'OUTPUT').map((slot) => [slot.id, outerAnchorY])),
     };
     cache.set(nodeItem.id, metrics);
     return metrics;
@@ -200,12 +203,27 @@ export function containerDescendantNodeIds(graph: GraphDocument, containerNodeId
 export function containerBodyRect(graph: GraphDocument, containerNode: GraphNode): { x: number; y: number; width: number; height: number } {
   const position = nodePosition(graph, containerNode.id);
   const metrics = blockMetrics(graph, containerNode);
+  const rect = containerFrame(metrics.width, metrics.height).bodyRect;
   return {
-    x: position.x + containerBodyInset,
-    y: position.y + containerHeaderHeight,
-    width: Math.max(140, metrics.width - containerBodyInset - containerBodyPadding),
-    height: Math.max(containerBodyMinHeight, metrics.height - containerHeaderHeight - containerFooterHeight),
+    x: position.x + rect.x,
+    y: position.y + rect.y,
+    width: rect.width,
+    height: rect.height,
   };
+}
+
+export function containerBodyDropZone(graph: GraphDocument, containerNode: GraphNode): { x: number; y: number; width: number; height: number } {
+  const position = nodePosition(graph, containerNode.id);
+  const metrics = blockMetrics(graph, containerNode);
+  const rect = containerFrame(metrics.width, metrics.height).bodyDropZone;
+  return { x: position.x + rect.x, y: position.y + rect.y, width: rect.width, height: rect.height };
+}
+
+export function containerBodyEntryAnchor(graph: GraphDocument, containerNode: GraphNode): GraphPosition {
+  const position = nodePosition(graph, containerNode.id);
+  const metrics = blockMetrics(graph, containerNode);
+  const anchor = containerFrame(metrics.width, metrics.height).bodyEntryAnchor;
+  return { x: position.x + anchor.x, y: position.y + anchor.y };
 }
 
 export function connectedComponentNodeIds(graph: GraphDocument, rootId: string, omittedEdgeId: string): string[] {

@@ -244,6 +244,7 @@ export type SlotBlock = {
   inputY: number | null;
   outputOffsets: Record<string, number>;
   selected?: boolean;
+  hasChildren?: boolean;
 };
 
 export type BlockMetrics = {

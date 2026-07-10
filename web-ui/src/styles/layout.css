@@ -412,6 +412,11 @@ h1 {
   cursor: grabbing;
 }
 
+body.is-canvas-panning,
+body.is-canvas-panning * {
+  user-select: none;
+}
+
 .canvas-viewport.is-block-dragging {
   cursor: grabbing;
   user-select: none;

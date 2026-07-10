@@ -245,6 +245,7 @@ export type GraphHistoryEntry = {
 export type SlotBlock = {
   id: string;
   kind: BlockKind;
+  categoryId?: string;
   branch: Branch;
   type: string;
   title: string;

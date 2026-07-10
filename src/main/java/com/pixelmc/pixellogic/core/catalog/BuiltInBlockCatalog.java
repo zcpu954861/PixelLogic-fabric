@@ -34,6 +34,10 @@ public final class BuiltInBlockCatalog {
     public static final String CONTROL_LOOP_COUNT = "control.loop.count";
     public static final String CONTROL_LOOP_FOREVER = "control.loop.forever";
     public static final String CONTROL_LOOP_UNTIL = "control.loop.until";
+    public static final String CONTEXT_ENTITY_EXECUTE_AS = "context.entity.execute_as";
+    public static final String CONDITION_CONTEXT_ENTITY_HAS_TAG = "condition.context_entity.has_tag";
+    public static final String ACTION_CONTEXT_ENTITY_ADD_TAG = "action.context_entity.add_tag";
+    public static final String ACTION_CONTEXT_ENTITY_REMOVE_TAG = "action.context_entity.remove_tag";
     public static final String STATE_SET = "state.set";
     public static final String STATE_ADD = "state.add";
     public static final String TIMER_WAIT = "timer.wait";
@@ -91,6 +95,7 @@ public final class BuiltInBlockCatalog {
                 category("player", "玩家操作", "修改当前玩家的模拟属性。", 30),
                 category("message", "消息显示", "向玩家或调试视图展示文本反馈。", 40),
                 category("control", "控制流", "包裹并重复执行一段内部逻辑。", 50),
+                category("context", "执行上下文", "选择后续内部积木所操作的实体。", 55),
                 category("state", "状态数据", "读取或修改流程运行时状态。", 60),
                 category("timer", "时间调度", "等待一段时间后继续流程。", 70),
                 category("debug", "调试诊断", "记录测试和排查信息。", 80)
@@ -105,10 +110,12 @@ public final class BuiltInBlockCatalog {
                 subcategory("condition.region", "condition", "区域条件", "基于测试上下文中的区域事实做判断。", 30),
                 subcategory("condition.block", "condition", "方块条件", "基于测试上下文中的目标方块事实做判断。", 40),
                 subcategory("condition.spatial", "condition", "空间关系", "基于玩家和目标方块之间的位置关系做判断。", 50),
+                subcategory("condition.context_entity", "condition", "上下文实体条件", "判断当前实体上下文。", 60),
                 subcategory("player.tag", "player", "标签", "写入当前模拟玩家的标签。", 10),
                 subcategory("message.player", "message", "玩家消息", "面向玩家的文本反馈。", 10),
                 subcategory("message.screen", "message", "屏幕提示", "显示标题、副标题或快捷栏消息。", 20),
                 subcategory("control.loop", "control", "循环", "重复执行内部积木。", 10),
+                subcategory("context.entity", "context", "实体上下文", "切换并操作当前实体上下文。", 10),
                 subcategory("state.write", "state", "写入状态", "设置或累加状态值。", 10),
                 subcategory("timer.basic", "timer", "基础等待", "等待后继续执行。", 10),
                 subcategory("debug.basic", "debug", "调试输出", "记录模拟执行信息。", 10)
@@ -542,6 +549,94 @@ public final class BuiltInBlockCatalog {
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
                         BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
                         List.of(BlockSafetyFlag.READ_ONLY),
+                        List.of()
+                ),
+                block(
+                        CONTEXT_ENTITY_EXECUTE_AS,
+                        "以实体为上下文执行",
+                        "在内部积木执行期间切换当前实体上下文，完成后恢复外层实体。",
+                        "context",
+                        "context.entity",
+                        "control",
+                        NodeType.CONTEXT_ENTITY_EXECUTE_AS,
+                        Map.of("entitySource", "CONDITION_SUBJECT"),
+                        List.of(select("entitySource", "实体来源", List.of(
+                                option("CONDITION_SUBJECT", "当前条件对象"),
+                                option("RUN_ENTITY", "运行实体"),
+                                option("TARGET_ENTITY", "目标实体")
+                        ))),
+                        "以「{entitySource}」为上下文执行。",
+                        "context.entity.execute_as",
+                        List.of("body"),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY),
+                        List.of()
+                ),
+                blockWithCapabilities(
+                        CONDITION_CONTEXT_ENTITY_HAS_TAG,
+                        "上下文实体是否拥有标签",
+                        "按当前实体上下文是否拥有指定标签继续流程。",
+                        "condition",
+                        "condition.context_entity",
+                        "condition",
+                        NodeType.CONTEXT_ENTITY_HAS_TAG_CONDITION,
+                        Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "tag", "ready"),
+                        List.of(
+                                conditionMode("拥有标签时继续", "没有标签时继续", "分开执行"),
+                                text("tag", "标签", false, "例如 ready")
+                        ),
+                        "按上下文实体是否拥有标签「{tag}」继续。",
+                        "condition.context_entity.has_tag",
+                        List.of(BlockCapability.PREDICATE),
+                        "上下文实体拥有标签「{tag}」",
+                        "上下文实体没有标签「{tag}」",
+                        List.of(),
+                        List.of(in("input")),
+                        List.of(out("pass"), out("fail")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY),
+                        List.of()
+                ),
+                block(
+                        ACTION_CONTEXT_ENTITY_ADD_TAG,
+                        "为上下文实体添加标签",
+                        "给当前实体上下文添加一个标签。",
+                        "context",
+                        "context.entity",
+                        "action",
+                        NodeType.CONTEXT_ENTITY_ADD_TAG_ACTION,
+                        Map.of("tag", "ready"),
+                        List.of(text("tag", "标签", false, "例如 ready")),
+                        "为上下文实体添加标签「{tag}」。",
+                        "action.context_entity.add_tag",
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
+                        List.of()
+                ),
+                block(
+                        ACTION_CONTEXT_ENTITY_REMOVE_TAG,
+                        "移除上下文实体标签",
+                        "从当前实体上下文移除一个标签。",
+                        "context",
+                        "context.entity",
+                        "action",
+                        NodeType.CONTEXT_ENTITY_REMOVE_TAG_ACTION,
+                        Map.of("tag", "ready"),
+                        List.of(text("tag", "标签", false, "例如 ready")),
+                        "移除上下文实体标签「{tag}」。",
+                        "action.context_entity.remove_tag",
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
                         List.of()
                 ),
                 block(

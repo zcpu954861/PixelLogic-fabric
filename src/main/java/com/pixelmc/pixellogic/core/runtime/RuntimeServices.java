@@ -13,8 +13,40 @@ public interface RuntimeServices {
         return Optional.empty();
     }
 
+    default Optional<RuntimeNodeExecutionResult> executeSimulationNode(
+            NodeDefinition node,
+            RuntimeExecutionContext context
+    ) {
+        return executeSimulationNode(node, context.playerId(), context.sessionId());
+    }
+
     default Optional<RuntimePredicateResult> evaluatePredicate(NodeDefinition node, UUID playerId, String sessionId) {
         return Optional.empty();
+    }
+
+    default Optional<RuntimePredicateResult> evaluatePredicate(
+            NodeDefinition node,
+            RuntimeExecutionContext context
+    ) {
+        return evaluatePredicate(node, context.playerId(), context.sessionId());
+    }
+
+    default Optional<RuntimeSubjectReference> runEntity(UUID playerId, String sessionId) {
+        return playerId == null
+                ? Optional.empty()
+                : Optional.of(new RuntimeSubjectReference(
+                        playerId.toString(),
+                        RuntimeSubjectReference.Kind.PLAYER,
+                        "运行实体"
+                ));
+    }
+
+    default Optional<RuntimeSubjectReference> targetEntity(UUID playerId, String sessionId) {
+        return Optional.empty();
+    }
+
+    default boolean entityResolvable(RuntimeSubjectReference entity, UUID playerId, String sessionId) {
+        return entity != null && entity.isEntity() && !entity.id().isBlank();
     }
 
     void sendPlayerMessage(UUID playerId, String message);

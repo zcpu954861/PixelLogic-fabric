@@ -121,6 +121,10 @@ public record GraphDocument(
             case CONTROL_LOOP_COUNT -> "循环次数";
             case CONTROL_LOOP_FOREVER -> "无限循环";
             case CONTROL_LOOP_UNTIL -> "循环直到";
+            case CONTEXT_ENTITY_EXECUTE_AS -> "以实体为上下文执行";
+            case CONTEXT_ENTITY_HAS_TAG_CONDITION -> "上下文实体是否拥有标签";
+            case CONTEXT_ENTITY_ADD_TAG_ACTION -> "为上下文实体添加标签";
+            case CONTEXT_ENTITY_REMOVE_TAG_ACTION -> "移除上下文实体标签";
             case PLAYER_ADD_TAG_ACTION -> "添加玩家标签";
             case PLAYER_REMOVE_TAG_ACTION -> "移除玩家标签";
             case STATE_SET_ACTION -> "记录开始状态";

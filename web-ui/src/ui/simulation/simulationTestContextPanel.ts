@@ -2,10 +2,12 @@ import {
   formatSimulationPosition,
   formatSimulationRegions,
   formatSimulationTargetBlock,
+  formatSimulationTargetEntity,
   normalizeSimulationTags,
   type SimulationPosition,
   type SimulationRegionFact,
   type SimulationTargetBlock,
+  type SimulationTargetEntity,
   type SimulationTestContext,
   type SimulationTestResult,
 } from '../../model/simulationTestContext';
@@ -20,7 +22,7 @@ export function renderTestRunControl(menuOpen: boolean, busyAttr: string): strin
       </button>
       ${menuOpen ? `
         <div class="test-run-menu">
-          <small>配置本次测试使用的玩家、位置、目标方块和区域。</small>
+          <small>配置本次测试使用的玩家、目标实体、位置、目标方块和区域。</small>
           <button type="button" class="ghost-button" data-sim-action="open-editor">编辑测试上下文</button>
         </div>
       ` : ''}
@@ -46,10 +48,11 @@ export function renderSimulationTestContextModal(
         <div class="editor-body">
           <section class="editor-summary">
             <b>当前摘要</b>
-            <p>${escapeHtml(context.actor.displayName || 'WebUI 模拟玩家')} · ${escapeHtml(formatSimulationPosition(context.world.playerPosition))} · 目标方块 ${escapeHtml(formatSimulationTargetBlock(context.world.targetBlock))} · 区域 ${escapeHtml(formatSimulationRegions(context.world.regions))}</p>
+            <p>${escapeHtml(context.actor.displayName || 'WebUI 模拟玩家')} · ${escapeHtml(formatSimulationPosition(context.world.playerPosition))} · 目标实体 ${escapeHtml(formatSimulationTargetEntity(context.world.targetEntity))} · 目标方块 ${escapeHtml(formatSimulationTargetBlock(context.world.targetBlock))} · 区域 ${escapeHtml(formatSimulationRegions(context.world.regions))}</p>
           </section>
           ${renderPlayerSection(context, tags)}
           ${renderPositionSection(context.world.playerPosition)}
+          ${renderTargetEntitySection(context.world.targetEntity)}
           ${renderTargetBlockSection(context.world.targetBlock)}
           ${renderRegionSection(context.world.regions)}
           ${options.error ? `
@@ -74,6 +77,49 @@ export function renderSimulationTestContextModal(
         </div>
       </section>
     </div>
+  `;
+}
+
+function renderTargetEntitySection(target: SimulationTargetEntity): string {
+  const tags = normalizeSimulationTags(target.tags);
+  return `
+    <section class="editor-section">
+      <b>测试目标实体</b>
+      <div class="field-grid">
+        <div class="field-row">
+          <span>启用目标实体</span>
+          <div class="segmented-control" role="group" aria-label="启用测试目标实体">
+            <button type="button" data-sim-target-entity-enabled="true" aria-pressed="${target.enabled}">是</button>
+            <button type="button" data-sim-target-entity-enabled="false" aria-pressed="${!target.enabled}">否</button>
+          </div>
+        </div>
+        <label class="field-row">
+          实体类型 ID
+          <input type="text" data-sim-target-entity-field="entityTypeId" value="${escapeAttr(target.entityTypeId)}" autocomplete="off" placeholder="minecraft:zombie">
+        </label>
+        <label class="field-row is-full">
+          显示名称
+          <input type="text" data-sim-target-entity-field="displayName" maxlength="64" value="${escapeAttr(target.displayName)}" autocomplete="off">
+        </label>
+        <div class="field-row is-full">
+          <span>标签</span>
+          ${tags.length > 0 ? `
+            <div class="sim-tag-list" aria-label="测试目标实体标签">
+              ${tags.map((tag) => `
+                <span class="sim-tag">
+                  <button type="button" class="sim-tag-remove" data-sim-target-entity-remove-tag="${escapeAttr(tag)}" aria-label="移除目标实体标签 ${escapeAttr(tag)}">×</button>
+                  <span>${escapeHtml(tag)}</span>
+                </span>
+              `).join('')}
+            </div>
+          ` : ''}
+          <div class="sim-tag-add">
+            <input type="text" data-sim-target-entity-tag-input maxlength="64" placeholder="输入标签" autocomplete="off">
+            <button type="button" class="tiny-button" data-sim-target-entity-action="add-tag">添加</button>
+          </div>
+        </div>
+      </div>
+    </section>
   `;
 }
 
@@ -233,7 +279,7 @@ function renderRegionCoordinates(region: SimulationRegionFact, index: number): s
 
 function renderSimulationResult(result: SimulationTestResult | null): string {
   if (!result) {
-    return '<div class="sim-result is-empty">测试运行后显示本次玩家、位置、目标方块和区域。</div>';
+    return '<div class="sim-result is-empty">测试运行后显示本次玩家、目标实体、位置、目标方块和区域。</div>';
   }
   const initialTags = normalizeSimulationTags(result.initialActorTags ?? []);
   const finalTags = normalizeSimulationTags(result.actorTags ?? []);
@@ -247,6 +293,9 @@ function renderSimulationResult(result: SimulationTestResult | null): string {
       <div><span>初始标签</span><b>${escapeHtml(formatTags(initialTags))}</b></div>
       <div><span>结束标签</span><b>${escapeHtml(formatTags(finalTags))}</b></div>
       <div><span>标签变化</span><b>${escapeHtml(tagChanges(initialTags, finalTags))}</b></div>
+      <div><span>测试目标实体</span><b>${result.targetEntityEnabled ? escapeHtml(`${result.targetEntityDisplayName}（${result.targetEntityTypeId}）`) : '未启用'}</b></div>
+      <div><span>目标实体初始标签</span><b>${result.targetEntityEnabled ? escapeHtml(formatTags(normalizeSimulationTags(result.initialTargetEntityTags ?? []))) : '未启用'}</b></div>
+      <div><span>目标实体最终标签</span><b>${result.targetEntityEnabled ? escapeHtml(formatTags(normalizeSimulationTags(result.targetEntityTags ?? []))) : '未启用'}</b></div>
       <small>${simulationRunStatusLabel(result)} · ${escapeHtml(shortTraceId(result.traceId))}</small>
     </div>
   `;

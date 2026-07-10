@@ -24,27 +24,27 @@ final class RuntimeNodeExecutor {
         this.services = services;
     }
 
-    String execute(NodeDefinition node, ExecutionContext context) {
+    RuntimeNodeExecutionResult execute(NodeDefinition node, ExecutionContext context) {
         Optional<RuntimeNodeExecutionResult> simulated = services.executeSimulationNode(
                 node,
-                context.playerId(),
-                context.sessionId()
+                context.snapshot()
         );
         if (simulated.isPresent()) {
             RuntimeNodeExecutionResult result = simulated.get();
             if (result.traceMessage() != null && !result.traceMessage().isBlank()) {
                 traces.add(context.traceId(), node.id(), result.traceMessage());
             }
-            return result.outputSlot();
+            return result;
         }
-        return switch (node.type()) {
+        String outputSlot = switch (node.type()) {
             case MANUAL_TRIGGER, COMMAND_TRIGGER -> "started";
             case STATE_COMPARE_CONDITION -> executeCondition(node, context);
             case MESSAGE_ACTION -> executeMessage(node, context);
             case STATE_SET_ACTION -> executeStateSet(node, context);
             case STATE_ADD_ACTION -> executeStateAdd(node, context);
             case DEBUG_LOG_ACTION -> executeDebug(node, context);
-            case TIMER_START_ACTION, CONTROL_LOOP_COUNT, CONTROL_LOOP_FOREVER, CONTROL_LOOP_UNTIL ->
+            case TIMER_START_ACTION, CONTROL_LOOP_COUNT, CONTROL_LOOP_FOREVER, CONTROL_LOOP_UNTIL,
+                 CONTEXT_ENTITY_EXECUTE_AS ->
                     throw new IllegalStateException("控制流节点必须由 GraphRuntime 游标执行：" + node.type());
             case PLAYER_HAS_TAG_CONDITION,
                  PLAYER_IS_ADMIN_CONDITION,
@@ -56,9 +56,13 @@ final class RuntimeNodeExecutor {
                  TARGET_BLOCK_Y_COMPARE_CONDITION,
                  PLAYER_NEAR_TARGET_BLOCK_CONDITION,
                  PLAYER_ADD_TAG_ACTION,
-                 PLAYER_REMOVE_TAG_ACTION ->
+                 PLAYER_REMOVE_TAG_ACTION,
+                 CONTEXT_ENTITY_HAS_TAG_CONDITION,
+                 CONTEXT_ENTITY_ADD_TAG_ACTION,
+                 CONTEXT_ENTITY_REMOVE_TAG_ACTION ->
                     throw new IllegalStateException("缺少模拟执行器：" + node.type());
         };
+        return new RuntimeNodeExecutionResult(outputSlot, "");
     }
 
     private String executeCondition(NodeDefinition node, ExecutionContext context) {

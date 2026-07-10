@@ -12,6 +12,7 @@ import {
   normalBlockWidth,
 } from './containerGeometry';
 import { conditionRackParent, conditionSlots } from './conditionRack';
+import { isBodyContainerNode } from './containerNodes';
 import { blockKind } from '../ui/humanize/labels';
 import {
   connectedOverlap,
@@ -466,7 +467,7 @@ export function branchForNode(graph: GraphDocument, nodeItem: GraphNode): Branch
   if (incoming?.sourceSlotId === 'pass') {
     return 'pass';
   }
-  if (nodeItem.type.includes('TRIGGER') || nodeItem.type.includes('CONDITION') || nodeItem.type.startsWith('CONTROL_LOOP_')) {
+  if (nodeItem.type.includes('TRIGGER') || nodeItem.type.includes('CONDITION') || isBodyContainerNode(nodeItem)) {
     return 'main';
   }
   return 'pass';

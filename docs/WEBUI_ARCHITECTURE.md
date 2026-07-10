@@ -13,7 +13,7 @@ The WebUI is an independent Vite + TypeScript project.
 
 ## Future Block Catalog
 
-The left library is now driven by the Block Catalog skeleton. The current top-level entries (`触发事件 / 条件判断 / 消息显示 / 状态数据 / 时间调度 / 调试诊断`) are catalog data for the demo set, not permanent product categories.
+The left library is now driven by the Block Catalog skeleton. The current top-level entries (`触发事件 / 条件判断块(胶囊) / 玩家操作 / 消息显示 / 控制流 / 执行上下文 / 状态数据 / 时间调度 / 调试诊断`) are catalog data, not hard-coded frontend node families.
 
 Current behavior:
 
@@ -60,6 +60,7 @@ Long-term, `/api` should be treated as a WebUI transport boundary rather than a 
     },
     "world": {
       "playerPosition": { "dimensionId": "minecraft:overworld", "x": 0, "y": 64, "z": 0 },
+      "targetEntity": { "enabled": false, "entityTypeId": "minecraft:zombie", "displayName": "测试僵尸", "tags": [] },
       "targetBlock": { "enabled": false, "dimensionId": "minecraft:overworld", "x": 0, "y": 64, "z": 0, "blockId": "minecraft:stone" },
       "regions": []
     }
@@ -67,7 +68,7 @@ Long-term, `/api` should be treated as a WebUI transport boundary rather than a 
 }
 ```
 
-This context is temporary input for the next run only. It is not written to graph JSON, not saved as a named scenario, and not reused from the previous run result. The result summary displays the run actor, player position, target block, region count/name summary, initial tags, final tags, tag changes, and administrator status.
+This context is temporary input for the next run only. It is not written to graph JSON, not saved as a named scenario, and not reused from the previous run result. The optional target entity exists only in Simulation Test Context; it is not a real Minecraft entity selector or scan result. The result summary displays the run actor and optional target entity separately, including each entity's initial/final tags, plus player position, target block, region count/name summary, tag changes, and administrator status.
 
 ## Graph Draft Flow
 
@@ -94,7 +95,7 @@ Important user semantics:
 - `上一步` / `下一步` plus `Ctrl+Z`, `Ctrl+Y`, and `Ctrl+Shift+Z` roll back and reapply graph operations such as naming, configuration, add/delete, drag, and connection edits.
 - `测试运行` waits for pending automatic save, resets the demo test state, starts the run, and refreshes the trace.
 - `编辑测试上下文` opens a modal using the same local-draft, save, close animation, and unsaved-close confirmation pattern as block editing.
-- The test-context modal sends display name, tags, administrator status, player position, optional target block, and simple region facts with the test run; tag chips use a left-side `×` remove button, and final tags from `action.player.add_tag` stay in the result summary and do not rewrite the input tags.
+- The test-context modal sends display name, tags, administrator status, player position, one optional target entity, optional target block, and simple region facts with the test run; actor and target-entity tag chips use a left-side `×` remove button, and final tags stay in the result summary without rewriting either input tag list.
 - Reset remains an internal API step, not a primary user button.
 - The right panel is an information surface, not the main field editor.
 - Closing the editor modal without saving discards only the modal-local draft and does not mutate the graph.
@@ -122,6 +123,7 @@ Important user semantics:
 - Spatial v3 condition blocks edit only compare mode/Y values or max distance/horizontal-only mode. They still read player/target coordinates from `编辑测试上下文` and do not write test context facts into graph JSON.
 - Y compare fields use the catalog schema with conditional field visibility: non-range modes show `目标 Y`, while `在范围内` shows `最低 Y 值` and `最高 Y 值`.
 - Container Control Flow v1 adds C-shaped control blocks. Loop nodes remain flat graph nodes, while body children store `parentContainerId` and `parentSlot=body`; internal body chains still use normal edges.
+- Entity Execution Context v1 reuses that same C-shaped body model. `context.entity.execute_as` edits one catalog-backed `entitySource` field with user-facing choices `当前条件对象`, `运行实体`, and `目标实体`; the graph stores only the enum value and body membership, never a runtime subject or mutable entity state.
 - Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
 - Card gray type labels and the right-panel selected-block badge show the catalog top-level category, such as `条件判断`, `玩家操作`, or `消息显示`, instead of repeating the concrete block name.
 - Block card titles stay on one line. If the rendered title actually overflows, it scrolls horizontally back and forth instead of wrapping or using a fixed ellipsis.
@@ -185,6 +187,18 @@ Undo/redo restores stable slot and node identities exactly. The current WebUI ha
 
 Static WebUI checks cover pure geometry, complete bounds, predicate-only drop rules, deep cloning, accessible NOT markup, rack-aware drag/ghost grouping, and reduced-motion structure. They are not browser E2E tests.
 
+## Entity Execution Context
+
+`context.entity.execute_as` uses the existing container geometry, layout, drag insertion, ghost, and interaction-animation systems. A shared `isBodyContainerNode` classification covers loop and entity-context nodes so empty-body insertion, multi-node body chains, nested loop/context layouts, descendant dragging, and container growth use one `body` anchor contract. The `执行上下文` catalog category and purple styling distinguish the block visually without introducing a second C-shape geometry.
+
+The entity-context editor is catalog driven. `entitySource` defaults to `当前条件对象` and stores one of `CONDITION_SUBJECT`, `RUN_ENTITY`, or `TARGET_ENTITY`; normal UI never exposes a subject identity or raw runtime object. Contextual condition trace/result text remains readable Chinese and shows the checked object and fact for both satisfied and unsatisfied paths.
+
+Drag preview follows the existing interaction contract: pointer move may calculate a candidate and render a ghost/placeholder or visual spacing, but must not change graph position, edges, membership, history, or autosave state. Pointer up applies one graph edit. Cancelling, leaving the candidate, or pressing Escape removes preview state without leaving a previous candidate in the graph.
+
+The Simulation Test Context modal adds one optional target entity with enabled state, namespaced entity type id, display name, and tag chips. The default is disabled `minecraft:zombie` / `测试僵尸` / no tags. These fields remain modal-local until save. Run results render test-player initial/final tags separately from target-entity initial/final tags and never feed final tags back into the next run's inputs.
+
+`web-ui/checks/entityExecutionContextSelfCheck.mjs` guards source labels, shared loop/context body classification, empty-body placement, nested anchor alignment, target-entity defaults/clone/validation/payload, modal/result separation, preview-only pointer move, ghost reuse, and category styling hooks. It is a static/model self-check and does not claim browser E2E or user hand-testing.
+
 ## Frontend Structure
 
 The WebUI remains Vanilla TypeScript. `main.ts` is a bootstrap entry that imports `styles/index.css` and starts `ui/app.ts`.
@@ -197,6 +211,7 @@ Current responsibility boundaries:
 - `model/richText.ts`: rich text component helpers for structured storage, named/hex color normalization, selected-range formatting, and plain text display.
 - `ui/editor/richText/`: shared rich text editor toolbar, contenteditable rendering, and selection-offset helpers.
 - `model/simulationTestContext.ts`: per-run WebUI test context model, validation, tag normalization, simple world facts, and request payload.
+- `model/containerNodes.ts`: shared classification for loop and entity-context nodes that own an ordinary `body` slot.
 - `state/`: mutable app state and canvas world dimensions.
 - `ui/app.ts`: orchestration, app shell assembly, event binding, autosave, undo/redo, and API actions.
 - `ui/canvas/`: puzzle block view, slot-flow view-model building, card overflow measurement, active output helpers, block constants, and drag/insert graph rules.

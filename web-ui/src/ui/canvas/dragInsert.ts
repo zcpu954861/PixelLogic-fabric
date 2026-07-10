@@ -3,6 +3,7 @@ import { edge } from '../../model/demoGraph';
 import { blockMetrics, branchForNode, cloneGraph, connectedGraphEdges, containerBodyDropZone, containerBodyEntryAnchor, downstreamNodeIds, fallbackPosition, inputCenterOffset, nodePosition, outputCenterOffset } from '../../model/graphLayout';
 import { normalBlockHeight, normalBlockWidth } from '../../model/containerGeometry';
 import { conditionRackParent } from '../../model/conditionRack';
+import { isBodyContainerNode } from '../../model/containerNodes';
 import { preferredMainOutput } from './activeOutput';
 import { connectedOverlap, insertSnapX, insertSnapY, linkSnapX, linkSnapY, reconnectSnapX, reconnectSnapY } from './blockConstants';
 import {
@@ -110,7 +111,7 @@ export function findInsertCandidate(baseGraph: GraphDocument, drag: BlockDrag, c
     return internalEdge ?? {
       ...containerCandidate,
       valid: false,
-      message: '请靠近循环内部的连接线或链尾再松手。',
+      message: '请靠近容器内部的连接线或链尾再松手。',
     };
   }
 
@@ -290,11 +291,7 @@ function insertSnapScore(graph: GraphDocument, edgeItem: GraphEdge, anchor: Grap
 }
 
 function edgeTouchesControlBoundary(source: GraphNode, target: GraphNode): boolean {
-  return isControlLoopNode(source) || isControlLoopNode(target);
-}
-
-function isControlLoopNode(nodeItem: GraphNode): boolean {
-  return Boolean(nodeItem.blockId?.startsWith('control.loop.') || nodeItem.type.startsWith('CONTROL_LOOP_'));
+  return isBodyContainerNode(source) || isBodyContainerNode(target);
 }
 
 function nodesShareContainerBody(source: GraphNode, target: GraphNode): boolean {
@@ -747,7 +744,7 @@ function findContainerCandidate(
 ): Extract<InsertCandidate, { kind: 'container' }> | null {
   const group = new Set(drag.groupIds);
   const container = smallestContainerAtPoint(graph, anchor, (nodeItem) =>
-    !group.has(nodeItem.id) && isControlLoopNode(nodeItem),
+    !group.has(nodeItem.id) && isBodyContainerNode(nodeItem),
   );
   if (!container) {
     return null;

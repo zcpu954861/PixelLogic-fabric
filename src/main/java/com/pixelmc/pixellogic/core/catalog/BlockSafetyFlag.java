@@ -4,6 +4,7 @@ public enum BlockSafetyFlag {
     READ_ONLY,
     STATE_MUTATING,
     PLAYER_MUTATING,
+    ENTITY_MUTATING,
     WORLD_MUTATING,
     COMMAND_LIKE,
     REQUIRES_PLAYER,

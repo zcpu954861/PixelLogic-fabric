@@ -145,6 +145,7 @@ export function renderBlock(block: SlotBlock, recentNodeId: string | null): stri
     <article
       class="logic-block ${block.kind} ${block.branch}${conditionClass}${block.selected ? ' selected' : ''}${recentNodeId === block.id ? ' newly-added' : ''}"
       data-block="${escapeAttr(block.id)}"
+      data-category="${escapeAttr(block.categoryId ?? '')}"
       data-branch="${block.branch}"
       style="left:${block.x}px; top:${block.y}px; width:${block.width}px; height:${block.height}px; --condition-content-top:${Math.max(18, (block.inputY ?? 202) - 57)}px; z-index:${zIndex}${containerStyle}"
     >

@@ -83,7 +83,7 @@ function blockKindFromNodeType(type: string): BlockKind {
   if (type === 'DEBUG_LOG_ACTION') {
     return 'debug';
   }
-  if (type.startsWith('CONTROL_LOOP_')) {
+  if (type.startsWith('CONTROL_LOOP_') || type === 'CONTEXT_ENTITY_EXECUTE_AS') {
     return 'control';
   }
   return 'action';

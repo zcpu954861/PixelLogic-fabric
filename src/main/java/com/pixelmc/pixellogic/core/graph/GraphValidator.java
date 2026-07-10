@@ -110,7 +110,15 @@ public final class GraphValidator {
                 case CONTROL_LOOP_FOREVER -> validateLoopForever(node, issues);
                 case CONTROL_LOOP_UNTIL -> {
                 }
-                case PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION -> validatePlayerTagConfig(node, issues);
+                case CONTEXT_ENTITY_EXECUTE_AS -> {
+                }
+                case CONTEXT_ENTITY_HAS_TAG_CONDITION -> {
+                    validateTagConfig(node, issues);
+                    validateConditionOutputMode(node, issues);
+                }
+                case CONTEXT_ENTITY_ADD_TAG_ACTION, CONTEXT_ENTITY_REMOVE_TAG_ACTION ->
+                        validateTagConfig(node, issues);
+                case PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION -> validateTagConfig(node, issues);
                 case STATE_SET_ACTION -> validateStateAction(node, issues, true);
                 case STATE_ADD_ACTION -> validateStateAction(node, issues, false);
                 case TIMER_START_ACTION -> validateTimer(node, issues);
@@ -316,7 +324,7 @@ public final class GraphValidator {
     }
 
     private void validatePlayerTagCondition(NodeDefinition node, List<ValidationIssue> issues) {
-        validatePlayerTagConfig(node, issues);
+        validateTagConfig(node, issues);
         validateConditionOutputMode(node, issues);
     }
 
@@ -421,20 +429,20 @@ public final class GraphValidator {
         }
     }
 
-    private void validatePlayerTagConfig(NodeDefinition node, List<ValidationIssue> issues) {
+    private void validateTagConfig(NodeDefinition node, List<ValidationIssue> issues) {
         String tag = node.config().getOrDefault("tag", "");
         if (tag.isBlank()) {
-            error(issues, "player_tag_missing", "玩家标签不能为空：" + node.id());
+            error(issues, "player_tag_missing", "标签不能为空：" + node.id());
             return;
         }
         if (tag.chars().anyMatch(Character::isWhitespace)) {
-            error(issues, "player_tag_invalid", "玩家标签不能包含空白字符：" + node.id());
+            error(issues, "player_tag_invalid", "标签不能包含空白字符：" + node.id());
         }
         if (tag.chars().anyMatch(Character::isISOControl)) {
-            error(issues, "player_tag_invalid", "玩家标签不能包含控制字符：" + node.id());
+            error(issues, "player_tag_invalid", "标签不能包含控制字符：" + node.id());
         }
         if (tag.length() > 64) {
-            error(issues, "player_tag_invalid", "玩家标签不能超过 64 个字符：" + node.id());
+            error(issues, "player_tag_invalid", "标签不能超过 64 个字符：" + node.id());
         }
     }
 

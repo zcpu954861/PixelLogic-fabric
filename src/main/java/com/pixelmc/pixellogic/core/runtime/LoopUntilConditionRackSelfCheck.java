@@ -93,7 +93,8 @@ public final class LoopUntilConditionRackSelfCheck {
                 BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN,
                 BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS,
                 BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION,
-                BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE
+                BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE,
+                BuiltInBlockCatalog.CONDITION_CONTEXT_ENTITY_HAS_TAG
         );
         Set<String> actualPredicates = new HashSet<>();
         BuiltInBlockCatalog.catalog().blocks().stream()
@@ -103,7 +104,7 @@ public final class LoopUntilConditionRackSelfCheck {
                     require(!item.predicateSummaryTemplate().isBlank(), "predicate should expose a capsule summary: " + item.id());
                     require(!item.predicateNegatedSummaryTemplate().isBlank(), "predicate should expose a negated capsule summary: " + item.id());
                 });
-        require(actualPredicates.equals(expectedPredicates), "v1 predicate capability set must stay limited to the five scoped blocks");
+        require(actualPredicates.equals(expectedPredicates), "predicate capability set should include contextual entity tags");
 
         GraphDefinition graph = storageGraph("loop-until-model");
         GraphDefinition loaded = GraphDocument.fromGraphDefinition(graph, "Loop Until Model").toGraphDefinition();

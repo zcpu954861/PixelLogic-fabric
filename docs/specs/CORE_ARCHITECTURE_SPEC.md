@@ -168,6 +168,8 @@ v1 node families:
 - Trigger
 - Condition
 - Action
+- Control container
+- Execution-context container
 - State
 - Timer
 - Debug
@@ -249,8 +251,10 @@ Rules:
 - It does not write state.
 - It does not perform side effects.
 - It does not emit events.
-- It returns pass or fail.
+- It returns a raw boolean and may also return a contextual condition result.
 - It chooses one outgoing slot.
+- A contextual result keeps the checked subject on both true and false evaluations; false must not degrade to a subject-less boolean.
+- `PASS_ONLY`, `FAIL_ONLY`, and `BRANCH` decide routing only and do not change the raw result or contextual subject.
 
 v1 required condition:
 
@@ -325,6 +329,10 @@ It includes:
 
 - trigger source
 - actor/player when present
+- immutable run entity reference when present
+- optional target entity reference
+- current entity context
+- current contextual condition result
 - session id when present
 - graph id
 - trace id
@@ -332,6 +340,22 @@ It includes:
 - state view
 - current node
 - current continuation depth
+
+### Contextual Condition Result and Entity Execution Context
+
+A contextual condition result is temporary runtime state for one run and its current control path. It contains enough information to identify the condition node/block, checked subject and subject kind, raw boolean, and readable fact. `condition.player.has_tag`, `condition.player.is_admin`, and `condition.context_entity.has_tag` are the first contextual conditions. Their true and false evaluations both retain the same checked object; a later ordinary condition replaces the current result, and an ordinary condition without a contextual result clears it.
+
+This state must not use a static/global last result, cross run boundaries, or be persisted in graph JSON, storage, draft, autosave, or history. Loop-until rack predicates consume the current runtime context for raw evaluation but do not overwrite the ordinary control path's current condition result.
+
+`context.entity.execute_as` is a flat single-body container with `input`, `done`, and `containerSlots=["body"]`. `entitySource` accepts exactly:
+
+- `CONDITION_SUBJECT`: the current path's latest condition subject;
+- `RUN_ENTITY`: the entity originally bound to the run;
+- `TARGET_ENTITY`: the optional target supplied by Simulation Test Context.
+
+Entry saves the previous current entity, switches to the resolved entity, executes the body, restores the previous entity on natural completion, and then follows `done`. An empty body is a valid no-op that still restores the outer context. Nested entity contexts restore in stack order. This is execute-as, not execute-at: position, dimension, rotation, and facing are unchanged and are not part of the v1 entity frame.
+
+`ExecutionCursor` and `TimerContinuation` snapshot the run entity, optional target entity, current entity, current condition result, entity-context frames, and loop frames. A delay inside any loop/context nesting therefore resumes with the same subject and current entity. Resume validates entity resolvability, condition-node identity, body membership, mixed loop/context nesting, runtime generation, cancellation, and single consumption before state is restored.
 
 ### ExecutionTrace
 
@@ -401,12 +425,13 @@ Runtime execution flow:
 3. Runtime resolves graph entry by triggerType index.
 4. Runtime loads CompiledGraph from graphId cache.
 5. Runtime executes node.
-6. Condition selects pass or fail output.
-7. Action performs controlled side effect.
-8. Runtime follows outgoing Typed Edge by nodeId and slotId index.
-9. Timer action registers continuation.
-10. Runtime appends trace step.
-11. Runtime stops on completion, budget exhaustion, error, or validation failure.
+6. Condition selects pass or fail output and replaces the current path's contextual result when applicable.
+7. Entity-context container resolves exactly one configured source, enters body, and restores the outer entity on completion.
+8. Action performs controlled side effect against its declared actor/current-entity semantics.
+9. Runtime follows outgoing Typed Edge by nodeId and slotId index.
+10. Timer action registers a continuation containing loop and entity-context state.
+11. Runtime appends trace step.
+12. Runtime stops on completion, budget exhaustion, error, or validation failure.
 ```
 
 ## Runtime Performance Requirements
@@ -469,6 +494,8 @@ The current implemented graph checkpoint uses:
 
 `demo-start-flow` is seeded on first startup. Writes use a temporary file and atomic replace where available. Graph ids are limited to `[A-Za-z0-9_-]+` so API paths cannot escape the PixelLogic storage root.
 
+Entity execution graphs persist only block id/config, typed edges, and flat container membership (`parentContainerId` / `parentSlot=body`). Runtime condition results, subject references, run/target/current entity identities, mutable simulation tags, and scope frames are ephemeral and must never enter graph or project storage.
+
 ## Validation Spec
 
 v1 validation must cover:
@@ -485,10 +512,15 @@ v1 validation must cover:
 - unknown block type
 - unknown action type
 - unknown condition type
+- unknown `entitySource`
+- invalid entity-context membership or ancestor cycle
+- container nesting above the configured maximum
 - loop risk
 - budget risk when statically obvious
 
 Unknown block or edge types fail closed.
+
+An empty `context.entity.execute_as` body is a saveable warning, not an error. Runtime source resolution remains strict even for a structurally valid graph: missing current condition subject, missing run/target entity, non-entity subject, unresolvable identity, invalid entity frame, or stale continuation fails closed and does not fall back to another entity source.
 
 The spike model uses enums for known node and edge types, then validates required slots, state config, timer duration, timer completion edge, and obvious loop risk before compilation/execution.
 
@@ -545,7 +577,7 @@ Rules:
 
 - It is bound to `127.0.0.1:18111`.
 - It serves the in-memory `demo-start-flow` only.
-- It defaults to `WebUI 模拟玩家` and may accept a per-run test actor for WebUI simulation.
+- It defaults to `WebUI 模拟玩家` and may accept a per-run test actor plus one optional simulated target entity for WebUI simulation.
 - It returns JSON success/error envelopes.
 - It exposes the current bounded simulation snapshot as `WAITING`, `COMPLETED`, `FAILED`, or `CANCELLED`; `traceId` is reused as the run identity.
 - It is not the final project/graph persistence API.
@@ -599,8 +631,12 @@ Runtime must stop safely when:
 - edge type mismatches
 - action config is invalid
 - condition config is invalid
+- configured entity source is unknown
+- the selected run, target, or condition-subject entity is missing, not an entity, or cannot be resolved
+- entity-context or mixed loop/context continuation frames are invalid
 - state type mismatches
 - execution exceeds budget
 - timer continuation target is missing
+- timer continuation generation or contextual snapshot is stale
 
 Each stop should write a trace step when possible.

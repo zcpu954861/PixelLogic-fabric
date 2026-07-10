@@ -5,7 +5,7 @@ This matrix classifies what PixelLogic should simulate in the next backend phase
 | Capability Area | Examples | Simulation Level | Should simulate in vNext? | Requires real MC? | Notes |
 | --- | --- | --- | --- | --- | --- |
 | state | `state.set`, `state.add`, state compare | `FULLY_SIMULATABLE` | yes | no | Core PixelLogic state is already simulated and should remain fully testable. |
-| timer | `timer.wait`, future named timers | `FULLY_SIMULATABLE` | yes | no | Wall-clock waits preserve loop and nested-loop continuation state; future simulation may add fast-forward. |
+| timer | `timer.wait`, future named timers | `FULLY_SIMULATABLE` | yes | no | Wall-clock waits preserve loop and nested-loop continuation state; output is optional and the WebUI polls the bounded run snapshot until terminal. |
 | control loop | `control.loop.count`, `control.loop.forever` | `FULLY_SIMULATABLE` | yes | yes, for durable server loops | Count/forever bodies resume after waits with cumulative safety caps; persistent cross-restart scheduling still requires Minecraft runtime. |
 | trace | debug steps, action summaries, branch path | `FULLY_SIMULATABLE` | yes | no | Trace is a PixelLogic output and must stay bounded. |
 | message/chat component | `action.message.chat`, rich text plain output | `APPROXIMATE_SIMULATION` | yes | yes, for real delivery | Simulation records target and plain text; real adapter later converts to Minecraft Text/tellraw-equivalent. |

@@ -315,6 +315,8 @@ The manual simulation spike uses JDK wall-clock scheduling instead of tick scann
 
 Control Flow Continuation v1 keeps cumulative steps, count/forever iteration state, and nested loop return frames in the cursor snapshot so a timer resumes after the waiting node instead of restarting or completing the containing loop.
 
+Timer output is optional. No downstream edge is a valid natural completion cursor: a top-level path completes after the wait, a loop body completes its current iteration, and nested loop frames unwind normally. Disconnected timer nodes remain valid but unreachable.
+
 ### ExecutionContext
 
 ExecutionContext represents one execution.
@@ -534,6 +536,7 @@ The first implemented API is deliberately smaller than the draft:
 GET  /api/pixellogic/status
 POST /api/pixellogic/test/reset
 POST /api/pixellogic/test/start
+GET  /api/pixellogic/test/runs/{runId}
 GET  /api/pixellogic/traces/latest
 GET  /api/pixellogic/traces
 ```
@@ -544,6 +547,7 @@ Rules:
 - It serves the in-memory `demo-start-flow` only.
 - It defaults to `WebUI 模拟玩家` and may accept a per-run test actor for WebUI simulation.
 - It returns JSON success/error envelopes.
+- It exposes the current bounded simulation snapshot as `WAITING`, `COMPLETED`, `FAILED`, or `CANCELLED`; `traceId` is reused as the run identity.
 - It is not the final project/graph persistence API.
 - It does not introduce Channel, Region, or old TZZ concepts.
 

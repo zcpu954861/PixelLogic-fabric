@@ -1,4 +1,5 @@
 import { PixelLogicApiError, api } from '../api/pixelLogicApi';
+import { startTestRunPolling, stopTestRunPolling } from '../api/testRunPolling';
 import {
   blockKindFromCatalogBlock,
   catalogBlock,
@@ -2149,6 +2150,7 @@ async function startTest(): Promise<void> {
       return;
     }
     state.simulationTestContextError = '';
+    stopTestRunPolling();
     state.simulationResult = null;
     await waitForPendingAutoSave();
     if (state.dirty || state.hasDraft) {
@@ -2166,6 +2168,27 @@ async function startTest(): Promise<void> {
     state.latestTrace = data.trace ?? null;
     state.simulationResult = data.simulation ?? null;
     state.lastAction = data.message || '测试运行已执行';
+    if (!data.runId || !data.runStatus || typeof data.terminal !== 'boolean') {
+      throw new Error('API 未返回测试运行状态。');
+    }
+    if (!data.terminal) {
+      startTestRunPolling(data.runId, {
+        onUpdate: (update) => {
+          state.apiStatus = 'online';
+          state.latestTrace = update.trace ?? state.latestTrace;
+          state.simulationResult = update.simulation ?? state.simulationResult;
+          state.lastAction = update.message || state.lastAction;
+          renderApp();
+        },
+        onFailure: (error) => {
+          const connected = error instanceof PixelLogicApiError ? error.connected : false;
+          state.apiStatus = connected ? 'online' : 'offline';
+          state.statusMessage = connected ? 'API 已连接' : 'API 未连接';
+          state.error = error instanceof Error ? error.message : '测试运行状态查询失败。';
+          renderApp();
+        },
+      });
+    }
   });
 }
 
@@ -2293,6 +2316,7 @@ export function startPixelLogicApp(): void {
     return;
   }
   renderApp();
+  window.addEventListener('pagehide', stopTestRunPolling, { once: true });
   centerView();
   void loadCatalog().then(() => loadGraph()).then(() => {
     if (state.apiStatus === 'online') {

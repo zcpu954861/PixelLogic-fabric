@@ -176,6 +176,9 @@ export type ApiResponse = {
   fingerprint?: string;
   hasDraft?: boolean;
   traceId?: string;
+  runId?: string;
+  runStatus?: 'WAITING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  terminal?: boolean;
   trace?: ApiTrace | null;
   traces?: ApiTrace[];
   simulation?: SimulationTestResult;

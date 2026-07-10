@@ -8,7 +8,7 @@
 - A wait at the end of a loop body resumes into normal iteration completion.
 - `control.loop.forever.intervalSeconds` now schedules the existing wall-clock timer between completed rounds.
 
-No WebUI, graph JSON, membership, storage, catalog form, HTTP API, or Minecraft adapter format changes are part of this checkpoint.
+The initial checkpoint did not change WebUI or HTTP API behavior. The end-to-end follow-up keeps graph JSON, membership, storage, catalog forms, and Minecraft adapters unchanged while exposing suspended-run status and bounded trace polling to the existing WebUI test-run path.
 
 ## Runtime Design
 
@@ -18,6 +18,8 @@ No WebUI, graph JSON, membership, storage, catalog form, HTTP API, or Minecraft 
 - `TimerContinuation` carries one cursor snapshot plus a unique continuation id and the runtime generation.
 - `GraphRuntime` consumes each continuation id once. Duplicate, cancelled, stale-generation, invalid-node, or invalid-membership resumes fail closed.
 - The existing scheduler remains responsible for wall-clock timing and its 128 pending-timer cap; no thread pool or polling loop was added.
+- Timer output is optional. An empty resume node means natural path completion: top-level runs complete, loop-body waits complete the current iteration, and nested waits unwind their frame stack.
+- `SimulationRunner` refreshes the existing single `lastSimulationResult` snapshot after every suspend/resume result. The API reuses `traceId` as `runId`; the WebUI uses finite `setTimeout` polling until `COMPLETED`, `FAILED`, or `CANCELLED`.
 
 ## Safety
 
@@ -39,6 +41,7 @@ No WebUI, graph JSON, membership, storage, catalog form, HTTP API, or Minecraft 
 - cancellation, stale generation, duplicate resume, and pending continuation capacity;
 - cumulative step cap across resumes;
 - ordinary timer chains and existing empty-body behavior.
+- disconnected timers, top-level terminal timers, nested tail waits, API status transitions, reset/new-run cancellation, and WebUI stale-response cleanup.
 
 ## Known Limits
 

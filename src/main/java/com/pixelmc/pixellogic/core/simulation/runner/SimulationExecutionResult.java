@@ -27,6 +27,7 @@ public record SimulationExecutionResult(
         List<SimulationStateChangeResult> stateChanges,
         Set<String> actorTags,
         boolean timerScheduled,
+        Status status,
         List<String> errors
 ) {
     public static SimulationExecutionResult from(RuntimeResult result, SimulationContext context, Set<String> initialActorTags) {
@@ -45,7 +46,46 @@ public record SimulationExecutionResult(
                 context.stateChanges(),
                 context.actor().tags(),
                 context.timerScheduled(),
+                result.suspended() ? Status.WAITING : result.success() ? Status.COMPLETED : Status.FAILED,
                 result.success() ? List.of() : List.of(result.message())
         );
+    }
+
+    public SimulationExecutionResult cancelled(String message) {
+        return new SimulationExecutionResult(
+                false,
+                traceId,
+                message,
+                actorDisplayName,
+                actorOperator,
+                playerPosition,
+                targetBlock,
+                regions,
+                initialActorTags,
+                actionResults,
+                messageResults,
+                stateChanges,
+                actorTags,
+                timerScheduled,
+                Status.CANCELLED,
+                List.of(message)
+        );
+    }
+
+    public enum Status {
+        WAITING(false),
+        COMPLETED(true),
+        FAILED(true),
+        CANCELLED(true);
+
+        private final boolean terminal;
+
+        Status(boolean terminal) {
+            this.terminal = terminal;
+        }
+
+        public boolean terminal() {
+            return terminal;
+        }
     }
 }

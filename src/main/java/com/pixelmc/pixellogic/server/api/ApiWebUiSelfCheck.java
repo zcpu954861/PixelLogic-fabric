@@ -2,6 +2,7 @@ package com.pixelmc.pixellogic.server.api;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonArray;
 import com.pixelmc.pixellogic.server.PixelLogicSpikeService;
 import com.pixelmc.pixellogic.server.storage.GraphStorageService;
 
@@ -98,6 +99,58 @@ public final class ApiWebUiSelfCheck {
             CheckedResponse traces = send(client, "GET", base + "/api/pixellogic/traces");
             require(traces.body().contains("\"traces\"") && traces.body().contains("玩家已经开始过游戏"), "traces endpoint should return recent traces");
 
+            JsonObject delayMessageGraph = delayMessageGraph(graph, "API continuation message");
+            commitGraph(client, base, delayMessageGraph);
+            send(client, "POST", base + "/api/pixellogic/test/reset");
+            JsonObject delayedStart = json(send(client, "POST", base + "/api/pixellogic/test/start"));
+            require("WAITING".equals(delayedStart.get("runStatus").getAsString())
+                            && !delayedStart.get("terminal").getAsBoolean(),
+                    "delay start should expose a non-terminal run identity");
+            String delayedRunId = delayedStart.get("runId").getAsString();
+            JsonObject delayedComplete = waitForRun(client, base, delayedRunId, 4);
+            require("COMPLETED".equals(delayedComplete.get("runStatus").getAsString())
+                            && delayedComplete.get("terminal").getAsBoolean(),
+                    "delay run should become completed through the run status endpoint");
+            require(traceMessageCount(delayedComplete, "API continuation message") == 1,
+                    "delay resume should expose the message trace exactly once");
+
+            JsonObject loopGraph = loopDelayMessageGraph(delayMessageGraph, "API loop message");
+            commitGraph(client, base, loopGraph);
+            send(client, "POST", base + "/api/pixellogic/test/reset");
+            JsonObject loopStart = json(send(client, "POST", base + "/api/pixellogic/test/start"));
+            String loopRunId = loopStart.get("runId").getAsString();
+            require("WAITING".equals(loopStart.get("runStatus").getAsString()),
+                    "loop delay should initially remain waiting");
+            JsonObject loopComplete = waitForRun(client, base, loopRunId, 6);
+            require("COMPLETED".equals(loopComplete.get("runStatus").getAsString()),
+                    "loop delay run should complete after three resumptions");
+            require(traceMessageCount(loopComplete, "API loop message") == 3,
+                    "loop delay run should expose exactly three resumed message traces");
+            require(traceMessageCount(loopComplete, "循环完成") == 1,
+                    "loop delay run should complete the loop exactly once");
+
+            commitGraph(client, base, delayMessageGraph);
+            send(client, "POST", base + "/api/pixellogic/test/reset");
+            JsonObject resetStart = json(send(client, "POST", base + "/api/pixellogic/test/start"));
+            String resetRunId = resetStart.get("runId").getAsString();
+            JsonObject resetResponse = json(send(client, "POST", base + "/api/pixellogic/test/reset"));
+            require(resetResponse.get("ok").getAsBoolean(), "reset during delay should succeed");
+            Thread.sleep(1_100L);
+            require(service.trace(resetRunId).orElseThrow().steps().stream()
+                            .noneMatch(step -> step.message().contains("API continuation message")),
+                    "reset must prevent the old delayed message from executing");
+
+            JsonObject oldStart = json(send(client, "POST", base + "/api/pixellogic/test/start"));
+            String oldRunId = oldStart.get("runId").getAsString();
+            JsonObject replacementStart = json(send(client, "POST", base + "/api/pixellogic/test/start"));
+            String replacementRunId = replacementStart.get("runId").getAsString();
+            JsonObject replacementComplete = waitForRun(client, base, replacementRunId, 4);
+            require("COMPLETED".equals(replacementComplete.get("runStatus").getAsString()),
+                    "replacement run should complete normally");
+            require(service.trace(oldRunId).orElseThrow().steps().stream()
+                            .noneMatch(step -> step.message().contains("API continuation message")),
+                    "starting a new run must prevent the old delayed message from executing");
+
             CheckedResponse invalidGraphId = send(client, "GET", base + "/api/pixellogic/graphs/../bad");
             requireJson(invalidGraphId, "invalid graph id should be JSON");
             require(invalidGraphId.body().contains("\"ok\":false") && invalidGraphId.body().contains("INVALID_GRAPH_ID"),
@@ -123,6 +176,132 @@ public final class ApiWebUiSelfCheck {
             }
         }
         throw new IllegalStateException("node not found: " + nodeId);
+    }
+
+    private static JsonObject delayMessageGraph(JsonObject source, String message) {
+        JsonObject graph = source.deepCopy();
+        keepNodes(graph, "manual-trigger", "timer-start", "welcome-message", "debug-finished");
+        setNodeConfig(graph, "timer-start", "durationSeconds", "1");
+        setNodeConfig(graph, "welcome-message", "message", message);
+        setMembership(graph, "timer-start", "", "");
+        setMembership(graph, "welcome-message", "", "");
+        setMembership(graph, "debug-finished", "", "");
+        graph.add("edges", edges(
+                edge("delay-entry", "manual-trigger", "started", "timer-start"),
+                edge("delay-message", "timer-start", "timer_completed", "welcome-message")
+        ));
+        return graph;
+    }
+
+    private static JsonObject loopDelayMessageGraph(JsonObject source, String message) {
+        JsonObject graph = source.deepCopy();
+        setNodeConfig(graph, "welcome-message", "message", message);
+        JsonArray nodes = graph.getAsJsonArray("nodes");
+        nodes.add(JsonParser.parseString("""
+                {
+                  "id":"loop",
+                  "type":"CONTROL_LOOP_COUNT",
+                  "blockId":"control.loop.count",
+                  "parentContainerId":"",
+                  "parentSlot":"",
+                  "displayName":"循环次数",
+                  "config":{"count":"3"},
+                  "position":{"x":294,"y":78},
+                  "slots":[
+                    {"id":"input","direction":"INPUT","edgeType":"CONTROL"},
+                    {"id":"done","direction":"OUTPUT","edgeType":"CONTROL"}
+                  ]
+                }
+                """).getAsJsonObject());
+        setMembership(graph, "timer-start", "loop", "body");
+        setMembership(graph, "welcome-message", "loop", "body");
+        graph.add("edges", edges(
+                edge("loop-entry", "manual-trigger", "started", "loop"),
+                edge("loop-body", "timer-start", "timer_completed", "welcome-message"),
+                edge("loop-done", "loop", "done", "debug-finished")
+        ));
+        return graph;
+    }
+
+    private static void keepNodes(JsonObject graph, String... nodeIds) {
+        JsonArray nodes = new JsonArray();
+        for (String nodeId : nodeIds) {
+            nodes.add(node(graph, nodeId).deepCopy());
+        }
+        graph.add("nodes", nodes);
+    }
+
+    private static void setMembership(JsonObject graph, String nodeId, String parentId, String parentSlot) {
+        JsonObject node = node(graph, nodeId);
+        node.addProperty("parentContainerId", parentId);
+        node.addProperty("parentSlot", parentSlot);
+    }
+
+    private static JsonObject node(JsonObject graph, String nodeId) {
+        for (var nodeElement : graph.getAsJsonArray("nodes")) {
+            JsonObject node = nodeElement.getAsJsonObject();
+            if (nodeId.equals(node.get("id").getAsString())) {
+                return node;
+            }
+        }
+        throw new IllegalStateException("node not found: " + nodeId);
+    }
+
+    private static JsonArray edges(JsonObject... edges) {
+        JsonArray result = new JsonArray();
+        for (JsonObject edge : edges) {
+            result.add(edge);
+        }
+        return result;
+    }
+
+    private static JsonObject edge(String id, String sourceNodeId, String sourceSlotId, String targetNodeId) {
+        return JsonParser.parseString("""
+                {
+                  "id":"%s",
+                  "sourceNodeId":"%s",
+                  "sourceSlotId":"%s",
+                  "targetNodeId":"%s",
+                  "targetSlotId":"input",
+                  "type":"CONTROL"
+                }
+                """.formatted(id, sourceNodeId, sourceSlotId, targetNodeId)).getAsJsonObject();
+    }
+
+    private static void commitGraph(HttpClient client, String base, JsonObject graph) throws Exception {
+        CheckedResponse draft = send(client, "PUT", base + "/api/pixellogic/graphs/demo-start-flow/draft", "{\"graph\":" + graph + "}");
+        require(draft.body().contains("\"ok\":true"), "integration graph draft should save");
+        CheckedResponse validation = send(client, "POST", base + "/api/pixellogic/graphs/demo-start-flow/validate");
+        require(validation.body().contains("\"valid\":true"), "integration graph should validate");
+        CheckedResponse commit = send(client, "POST", base + "/api/pixellogic/graphs/demo-start-flow/commit");
+        require(commit.body().contains("\"ok\":true"), "integration graph should commit");
+    }
+
+    private static JsonObject waitForRun(HttpClient client, String base, String runId, int seconds) throws Exception {
+        JsonObject response = new JsonObject();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(seconds);
+        while (System.nanoTime() < deadline) {
+            response = json(send(client, "GET", base + "/api/pixellogic/test/runs/" + runId));
+            if (response.has("terminal") && response.get("terminal").getAsBoolean()) {
+                return response;
+            }
+            Thread.sleep(50L);
+        }
+        return response;
+    }
+
+    private static int traceMessageCount(JsonObject response, String text) {
+        int count = 0;
+        for (var step : response.getAsJsonObject("trace").getAsJsonArray("steps")) {
+            if (step.getAsJsonObject().get("message").getAsString().contains(text)) {
+                count += 1;
+            }
+        }
+        return count;
+    }
+
+    private static JsonObject json(CheckedResponse response) {
+        return JsonParser.parseString(response.body()).getAsJsonObject();
     }
 
     private static CheckedResponse send(HttpClient client, String method, String uri) throws Exception {

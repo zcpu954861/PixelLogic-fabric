@@ -39,6 +39,7 @@ public final class ControlFlowContinuationSelfCheck {
             multipleDelaysResumeExactlyOnce();
             foreverLoopKeepsCapsAndInterval();
             nestedLoopsRestoreFrameStack();
+            nestedTailDelayRestoresFrameStack();
             nestedLoopsWithOuterAndInnerDelay();
             cancellationGenerationAndConsumptionAreSafe();
             pendingContinuationCapFailsClosed();
@@ -145,6 +146,18 @@ public final class ControlFlowContinuationSelfCheck {
                 "inner delay should schedule once per inner iteration");
     }
 
+    private static void nestedTailDelayRestoresFrameStack() {
+        Scenario scenario = scenario(nestedTailDelayGraph(), new RuntimeLimits(96, 8), 1L);
+        RuntimeResult initial = scenario.start();
+        require(initial.success() && initial.suspended(), "nested tail delay should suspend");
+        RuntimeResult completed = scenario.drain();
+        require(completed.success() && !completed.suspended(), "nested tail delay should complete all frames");
+        require(count(scenario.services.events, "schedule:DELAY:inner-delay") == 4,
+                "nested tail delay should run once per inner iteration");
+        require(scenario.services.debug.equals(List.of("D", "D", "done")),
+                "nested tail delay should unwind inner and outer frames in order");
+    }
+
     private static void cancellationGenerationAndConsumptionAreSafe() {
         GraphDefinition graph = ordinaryTimerGraph();
         Scenario cancelled = scenario(graph, new RuntimeLimits(32, 8), 7L);
@@ -200,6 +213,29 @@ public final class ControlFlowContinuationSelfCheck {
     }
 
     private static void ordinaryTimerAndEmptyBodiesDoNotRegress() {
+        GraphDefinition disconnectedTimer = graph(
+                "disconnected-delay",
+                List.of(trigger(), delay("delay", "")),
+                List.of()
+        );
+        require(!new GraphValidator().hasErrors(new GraphValidator().validate(disconnectedTimer)),
+                "a disconnected timer should remain a valid unreachable node");
+
+        Scenario terminalTimer = scenario(
+                graph(
+                        "terminal-delay",
+                        List.of(trigger(), delay("delay", "")),
+                        List.of(edge("trigger", "started", "delay"))
+                ),
+                new RuntimeLimits(32, 8),
+                1L
+        );
+        RuntimeResult terminalStart = terminalTimer.start();
+        require(terminalStart.success() && terminalStart.suspended(), "top-level terminal timer should suspend");
+        RuntimeResult terminalComplete = terminalTimer.drain();
+        require(terminalComplete.success() && !terminalComplete.suspended(),
+                "top-level terminal timer should naturally complete after resume");
+
         Scenario ordinary = scenario(ordinaryTimerGraph(), new RuntimeLimits(32, 8), 1L);
         ordinary.start();
         ordinary.drain();
@@ -284,6 +320,25 @@ public final class ControlFlowContinuationSelfCheck {
             edges.add(edge("A", "done", "inner"));
         }
         return graph(outerDelay ? "nested-both-delay" : "nested-delay", nodes, edges);
+    }
+
+    private static GraphDefinition nestedTailDelayGraph() {
+        return graph(
+                "nested-tail-delay",
+                List.of(
+                        trigger(),
+                        loopCount("outer", "", 2),
+                        loopCount("inner", "outer", 2),
+                        delay("inner-delay", "inner"),
+                        debug("D", "outer", "D"),
+                        debug("done", "", "done")
+                ),
+                List.of(
+                        edge("trigger", "started", "outer"),
+                        edge("outer", "done", "done"),
+                        edge("inner", "done", "D")
+                )
+        );
     }
 
     private static GraphDefinition ordinaryTimerGraph() {

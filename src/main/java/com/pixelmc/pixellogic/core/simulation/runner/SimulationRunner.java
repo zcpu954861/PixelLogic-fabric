@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 public final class SimulationRunner {
     private final RuntimeFactory runtimeFactory;
@@ -35,6 +36,14 @@ public final class SimulationRunner {
     }
 
     public SimulationExecutionResult run(SimulationExecutionRequest request) {
+        return run(request, ignored -> {
+        });
+    }
+
+    public SimulationExecutionResult run(
+            SimulationExecutionRequest request,
+            Consumer<SimulationExecutionResult> resultObserver
+    ) {
         Set<String> initialActorTags = request.actor().tags();
         SimulationContext context = new SimulationContext(
                 UUID.randomUUID().toString(),
@@ -44,7 +53,13 @@ public final class SimulationRunner {
                 request.event(),
                 request.options()
         );
-        GraphRuntime runtime = runtimeFactory.create(new SimulationRuntimeServices(delegateServices, registry, context));
+        GraphRuntime runtime = runtimeFactory.create(new SimulationRuntimeServices(
+                delegateServices,
+                registry,
+                context,
+                initialActorTags,
+                resultObserver
+        ));
         RuntimeResult result = runtime.start(new TriggerEvent(
                 request.event().triggerType(),
                 request.event().commandText(),
@@ -62,11 +77,21 @@ public final class SimulationRunner {
         private final RuntimeServices delegate;
         private final SimulationExecutionRegistry registry;
         private final SimulationContext context;
+        private final Set<String> initialActorTags;
+        private final Consumer<SimulationExecutionResult> resultObserver;
 
-        private SimulationRuntimeServices(RuntimeServices delegate, SimulationExecutionRegistry registry, SimulationContext context) {
+        private SimulationRuntimeServices(
+                RuntimeServices delegate,
+                SimulationExecutionRegistry registry,
+                SimulationContext context,
+                Set<String> initialActorTags,
+                Consumer<SimulationExecutionResult> resultObserver
+        ) {
             this.delegate = delegate;
             this.registry = registry;
             this.context = context;
+            this.initialActorTags = initialActorTags;
+            this.resultObserver = resultObserver;
         }
 
         @Override
@@ -114,6 +139,11 @@ public final class SimulationRunner {
         @Override
         public void recordTimerScheduled(String nodeId, Duration delay, TimerContinuation continuation) {
             context.markTimerScheduled();
+        }
+
+        @Override
+        public void recordRuntimeResult(RuntimeResult result) {
+            resultObserver.accept(SimulationExecutionResult.from(result, context, initialActorTags));
         }
     }
 }

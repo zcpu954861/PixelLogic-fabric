@@ -64,16 +64,16 @@ public final class GraphRuntime {
         traces.add(traceId, "trigger", "手动触发：" + event.commandText());
         if (cancelled) {
             traces.add(traceId, "trigger", "执行失败：运行实例已取消。");
-            return new RuntimeResult(false, traceId, "运行实例已取消。");
+            return recordResult(new RuntimeResult(false, traceId, "运行实例已取消。"));
         }
 
         Optional<NodeDefinition> entry = graph.entryForTrigger(event.triggerType());
         if (entry.isEmpty()) {
             traces.add(traceId, "trigger", "执行失败：找不到触发入口。");
-            return new RuntimeResult(false, traceId, "找不到触发入口。");
+            return recordResult(new RuntimeResult(false, traceId, "找不到触发入口。"));
         }
 
-        return runExecution(new ExecutionCursor(
+        return recordResult(runExecution(new ExecutionCursor(
                 traceId,
                 traceId,
                 event.playerId(),
@@ -81,36 +81,36 @@ public final class GraphRuntime {
                 0,
                 entry.get().id(),
                 List.of()
-        ));
+        )));
     }
 
     public RuntimeResult resumeTimer(TimerContinuation continuation) {
         if (continuation.generation() != generation) {
             traceIgnored(continuation, "generation 已变化");
-            return new RuntimeResult(false, continuation.traceId(), "计时器已失效。");
+            return recordResult(new RuntimeResult(false, continuation.traceId(), "计时器已失效。"));
         }
         if (cancelled) {
             traceIgnored(continuation, "运行已取消");
-            return new RuntimeResult(false, continuation.traceId(), "运行已取消。");
+            return recordResult(new RuntimeResult(false, continuation.traceId(), "运行已取消。"));
         }
         if (continuation.continuationId().isBlank() || !consumeContinuation(continuation.continuationId())) {
             traceIgnored(continuation, "continuation 已取消或消费");
-            return new RuntimeResult(false, continuation.traceId(), "continuation 已取消或消费。");
+            return recordResult(new RuntimeResult(false, continuation.traceId(), "continuation 已取消或消费。"));
         }
         if (!graph.graphId().equals(continuation.graphId())) {
             traceIgnored(continuation, "graph 已变化");
-            return new RuntimeResult(false, continuation.traceId(), "计时器所属 Graph 已变化。");
+            return recordResult(new RuntimeResult(false, continuation.traceId(), "计时器所属 Graph 已变化。"));
         }
         if (continuation.depth() > limits.maxContinuationDepth()) {
             traces.add(continuation.traceId(), continuation.sourceNodeId(), "执行失败：计时器 continuation 深度超限。");
-            return new RuntimeResult(false, continuation.traceId(), "计时器 continuation 深度超限。");
+            return recordResult(new RuntimeResult(false, continuation.traceId(), "计时器 continuation 深度超限。"));
         }
 
         ExecutionCursor cursor = continuation.cursor();
         String cursorError = validateCursor(continuation, cursor);
         if (cursorError != null) {
             traces.add(continuation.traceId(), continuation.sourceNodeId(), "执行失败：" + cursorError);
-            return new RuntimeResult(false, continuation.traceId(), cursorError);
+            return recordResult(new RuntimeResult(false, continuation.traceId(), cursorError));
         }
 
         if (continuation.reason() == TimerContinuation.Reason.LOOP_INTERVAL) {
@@ -120,7 +120,7 @@ public final class GraphRuntime {
         } else {
             traces.add(cursor.traceId(), continuation.sourceNodeId(), "计时器完成：恢复等待后的执行。");
         }
-        return runExecution(cursor);
+        return recordResult(runExecution(cursor));
     }
 
     public void cancelPendingContinuations() {
@@ -152,6 +152,7 @@ public final class GraphRuntime {
             }
             if (nodeId.isBlank()) {
                 if (frames.isEmpty()) {
+                    traces.add(traceId, "", "执行完成。");
                     return new RuntimeResult(true, traceId, "执行完成。");
                 }
 
@@ -267,9 +268,6 @@ public final class GraphRuntime {
                 try {
                     int seconds = parsePositiveInt(node.config().getOrDefault("durationSeconds", "30"), "等待时间");
                     Optional<NodeDefinition> target = graph.firstTarget(node.id(), "timer_completed");
-                    if (target.isEmpty() && frames.isEmpty()) {
-                        throw new IllegalStateException("计时器缺少完成后的目标。");
-                    }
                     String resumeNodeId = nodeWithinCurrentBody(target.map(NodeDefinition::id).orElse(""), frames);
                     traces.add(traceId, node.id(), "计时器启动：" + seconds + " 秒");
                     services.recordActionResult(node.id(), "timer", "计时器启动：" + seconds + " 秒");
@@ -499,6 +497,11 @@ public final class GraphRuntime {
         String message = exception.getMessage() == null ? fallback : exception.getMessage();
         traces.add(traceId, nodeId, "执行失败：" + message);
         return new RuntimeResult(false, traceId, message);
+    }
+
+    private RuntimeResult recordResult(RuntimeResult result) {
+        services.recordRuntimeResult(result);
+        return result;
     }
 
     private void traceIgnored(TimerContinuation continuation, String reason) {

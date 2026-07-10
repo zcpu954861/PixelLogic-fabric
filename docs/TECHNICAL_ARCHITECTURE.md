@@ -61,6 +61,8 @@ The v1 editor baseline now has spike-level safety bounds:
 - Timer continuations carry a runtime generation. Reset, committed graph reload, and server stop invalidate older generations before callbacks can resume graph execution.
 - Timer continuations also carry an immutable execution cursor with cumulative steps and loop frames; each continuation id can be consumed only once.
 - New manual test runs cancel the replaced runtime, and forever-loop iteration counts remain capped across wait resumptions.
+- The existing single simulation-result slot is refreshed after each asynchronous resume. WebUI queries it by trace/run id with one finite polling loop; late run callbacks and stale HTTP responses are ignored.
+- Timer outputs are optional: an empty continuation target represents natural path/loop-frame completion rather than an invalid node.
 - Pending timers are capped at 128 and can be cleared as a group during reset, graph install, and shutdown.
 - Trace storage remains a bounded ring buffer: 50 traces, 100 steps per trace.
 - `PixelLogicSpikeService.close()` stops timers and clears in-memory state.

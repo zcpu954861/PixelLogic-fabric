@@ -121,6 +121,7 @@ Important user semantics:
 - These context blocks edit only dimension id, block id, region name, and condition usage. Coordinates and target block facts stay in `编辑测试上下文`.
 - Spatial v3 condition blocks edit only compare mode/Y values or max distance/horizontal-only mode. They still read player/target coordinates from `编辑测试上下文` and do not write test context facts into graph JSON.
 - Y compare fields use the catalog schema with conditional field visibility: non-range modes show `目标 Y`, while `在范围内` shows `最低 Y 值` and `最高 Y 值`.
+- Container Control Flow v1 adds C-shaped control blocks. Loop nodes remain flat graph nodes, while body children store `parentContainerId` and `parentSlot=body`; internal body chains still use normal edges.
 - Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
 - Card gray type labels and the right-panel selected-block badge show the catalog top-level category, such as `条件判断`, `玩家操作`, or `消息显示`, instead of repeating the concrete block name.
 - Block card titles stay on one line. If the rendered title actually overflows, it scrolls horizontally back and forth instead of wrapping or using a fixed ellipsis.

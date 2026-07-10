@@ -31,6 +31,8 @@ public final class BuiltInBlockCatalog {
     public static final String CONDITION_PLAYER_NEAR_TARGET_BLOCK = "condition.player.near_target_block";
     public static final String ACTION_PLAYER_ADD_TAG = "action.player.add_tag";
     public static final String ACTION_PLAYER_REMOVE_TAG = "action.player.remove_tag";
+    public static final String CONTROL_LOOP_COUNT = "control.loop.count";
+    public static final String CONTROL_LOOP_FOREVER = "control.loop.forever";
     public static final String STATE_SET = "state.set";
     public static final String STATE_ADD = "state.add";
     public static final String TIMER_WAIT = "timer.wait";
@@ -87,9 +89,10 @@ public final class BuiltInBlockCatalog {
                 category("condition", "条件判断", "按状态或上下文决定走哪条分支。", 20),
                 category("player", "玩家操作", "修改当前玩家的模拟属性。", 30),
                 category("message", "消息显示", "向玩家或调试视图展示文本反馈。", 40),
-                category("state", "状态数据", "读取或修改流程运行时状态。", 50),
-                category("timer", "时间调度", "等待一段时间后继续流程。", 60),
-                category("debug", "调试诊断", "记录测试和排查信息。", 70)
+                category("control", "控制流", "包裹并重复执行一段内部逻辑。", 50),
+                category("state", "状态数据", "读取或修改流程运行时状态。", 60),
+                category("timer", "时间调度", "等待一段时间后继续流程。", 70),
+                category("debug", "调试诊断", "记录测试和排查信息。", 80)
         );
     }
 
@@ -104,6 +107,7 @@ public final class BuiltInBlockCatalog {
                 subcategory("player.tag", "player", "标签", "写入当前模拟玩家的标签。", 10),
                 subcategory("message.player", "message", "玩家消息", "面向玩家的文本反馈。", 10),
                 subcategory("message.screen", "message", "屏幕提示", "显示标题、副标题或快捷栏消息。", 20),
+                subcategory("control.loop", "control", "循环", "重复执行内部积木。", 10),
                 subcategory("state.write", "state", "写入状态", "设置或累加状态值。", 10),
                 subcategory("timer.basic", "timer", "基础等待", "等待后继续执行。", 10),
                 subcategory("debug.basic", "debug", "调试输出", "记录模拟执行信息。", 10)
@@ -452,6 +456,46 @@ public final class BuiltInBlockCatalog {
                         List.of()
                 ),
                 block(
+                        CONTROL_LOOP_COUNT,
+                        "循环次数",
+                        "重复执行内部积木指定次数，然后继续后续流程。",
+                        "control",
+                        "control.loop",
+                        "control",
+                        NodeType.CONTROL_LOOP_COUNT,
+                        Map.of("count", "3"),
+                        List.of(integer("count", "循环次数", "次", "1", "100", "1")),
+                        "循环 {count} 次后继续。",
+                        "control.loop.count",
+                        List.of("body"),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY),
+                        List.of()
+                ),
+                block(
+                        CONTROL_LOOP_FOREVER,
+                        "无限循环",
+                        "按安全模拟上限重复执行内部积木；正常情况下不继续外部链。",
+                        "control",
+                        "control.loop",
+                        "control",
+                        NodeType.CONTROL_LOOP_FOREVER,
+                        Map.of("intervalSeconds", "1"),
+                        List.of(integer("intervalSeconds", "每轮间隔", "秒", "1", "86400", "1")),
+                        "无限循环内部逻辑，每轮间隔 {intervalSeconds} 秒。",
+                        "control.loop.forever",
+                        List.of("body"),
+                        List.of(in("input")),
+                        List.of(),
+                        BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.READ_ONLY),
+                        List.of()
+                ),
+                block(
                         STATE_SET,
                         "设置状态",
                         "把一个状态写成指定值。",
@@ -567,6 +611,48 @@ public final class BuiltInBlockCatalog {
             List<BlockSafetyFlag> safetyFlags,
             List<String> aliases
     ) {
+        return block(
+                id,
+                displayName,
+                description,
+                categoryId,
+                subcategoryId,
+                nodeKind,
+                nodeType,
+                defaultConfig,
+                formSchema,
+                summaryTemplate,
+                summaryFormatter,
+                List.of(),
+                inputSlots,
+                outputSlots,
+                simulationCapability,
+                mcCapability,
+                safetyFlags,
+                aliases
+        );
+    }
+
+    private static BlockDefinition block(
+            String id,
+            String displayName,
+            String description,
+            String categoryId,
+            String subcategoryId,
+            String nodeKind,
+            NodeType nodeType,
+            Map<String, String> defaultConfig,
+            List<BlockFormFieldDefinition> formSchema,
+            String summaryTemplate,
+            String summaryFormatter,
+            List<String> containerSlots,
+            List<SlotDefinition> inputSlots,
+            List<SlotDefinition> outputSlots,
+            BlockCapabilityLevel simulationCapability,
+            BlockCapabilityLevel mcCapability,
+            List<BlockSafetyFlag> safetyFlags,
+            List<String> aliases
+    ) {
         return new BlockDefinition(
                 id,
                 1,
@@ -581,6 +667,7 @@ public final class BuiltInBlockCatalog {
                 formSchema,
                 summaryTemplate,
                 summaryFormatter,
+                containerSlots,
                 inputSlots,
                 outputSlots,
                 simulationCapability,
@@ -611,6 +698,7 @@ public final class BuiltInBlockCatalog {
                 ),
                 summaryTemplate,
                 summaryFormatter,
+                List.of(),
                 List.of(in("input")),
                 List.of(out("done")),
                 BlockCapabilityLevel.APPROXIMATE_SIMULATION,

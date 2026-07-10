@@ -39,7 +39,7 @@ It still does not implement arbitrary graph create/delete editing, Region, old T
 The v1 block catalog skeleton separates Block Catalog definitions from the current demo node families:
 
 - `core/catalog` owns the built-in registry records for categories, subcategories, concrete blocks, form fields, simulation capability, Minecraft capability, and safety flags.
-- Current concrete block ids include the demo set plus the player/message/context/spatial expansions: `trigger.manual_test`, `condition.state.equals`, `condition.player.has_tag`, `condition.player.is_admin`, `condition.player.dimension_is`, `condition.player.in_region`, `condition.player.y_compare`, `condition.target_block.is_type`, `condition.target_block.in_region`, `condition.target_block.y_compare`, `condition.player.near_target_block`, `action.player.add_tag`, `action.player.remove_tag`, `action.message.chat`, `action.message.title`, `action.message.subtitle`, `action.message.actionbar`, `state.set`, `state.add`, `timer.wait`, and `debug.log`.
+- Current concrete block ids include the demo set plus the player/message/context/spatial/control expansions: `trigger.manual_test`, `condition.state.equals`, `condition.player.has_tag`, `condition.player.is_admin`, `condition.player.dimension_is`, `condition.player.in_region`, `condition.player.y_compare`, `condition.target_block.is_type`, `condition.target_block.in_region`, `condition.target_block.y_compare`, `condition.player.near_target_block`, `control.loop.count`, `control.loop.forever`, `action.player.add_tag`, `action.player.remove_tag`, `action.message.chat`, `action.message.title`, `action.message.subtitle`, `action.message.actionbar`, `state.set`, `state.add`, `timer.wait`, and `debug.log`.
 - Graph JSON keeps legacy `node.type` and adds `blockId`; old graph documents without `blockId` infer it from `node.type`.
 - GraphRuntime still dispatches on `NodeType` in this checkpoint. The catalog is a registry and compatibility layer, not a runtime rewrite.
 - `GET /api/pixellogic/catalog` exposes the readonly catalog to the independent WebUI.
@@ -187,6 +187,14 @@ Catalog Expansion v3 adds a small spatial condition slice on the same per-run fa
 - `condition.player.near_target_block` compares player and target block distance, horizontally or in 3D.
 - Missing target block or dimension mismatch is a false condition result with trace text, not a runtime error.
 - No target-block-exists block, X/Z coordinate compare, region geometry, named scenario, persistence, or real Minecraft adapter is added.
+
+Container Control Flow v1 adds a first control-flow container slice without replacing the direct graph model:
+
+- `control.loop.count` and `control.loop.forever` are C-shaped container blocks with one `body` slot.
+- Graph JSON remains flat; body membership is stored on child nodes with `parentContainerId` and `parentSlot`.
+- Loop count runs the body a bounded fixed number of times and then continues the outer `done` edge.
+- Forever loop is simulation-safe: it stops at a finite test cap and does not expose a normal outer next edge.
+- This is not a full coroutine loop runtime, not real persistent server loops, and not a real Minecraft adapter.
 
 The condition output mode checkpoint keeps the same direct edge runtime and adds only a condition-local config:
 

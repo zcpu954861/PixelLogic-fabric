@@ -112,6 +112,14 @@ Known condition config compatibility:
   - `condition.player.near_target_block`: `maxDistance`, `horizontalOnly`.
 - These blocks read per-run `testContext.world` facts during simulation; those facts are not stored in graph JSON.
 
+Known container control-flow compatibility:
+
+- Container Control Flow v1 keeps graph draft JSON flat.
+- Loop body membership is saved on child nodes as `parentContainerId` and `parentSlot`.
+- The v1 slot is `body`; internal ordering still uses normal control `edges`.
+- Draft save, validate, commit, undo, and redo reuse the existing graph path instead of introducing nested graph blobs.
+- `control.loop.count` exposes an outer `done` output; `control.loop.forever` has no normal outer next output.
+
 ## Endpoints
 
 ```text

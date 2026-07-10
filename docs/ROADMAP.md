@@ -62,6 +62,7 @@ Long-term architecture track:
 - Admin Client Bridge design audit records the long-term direction: authorized client-hosted WebUI, local bridge transport, server-authoritative capability checks, and capability-gated future tool items.
 - Catalog Expansion v2 Context Blocks builds on `feature/v1-simulation-context-expansion` and adds read-only conditions for player dimension, player in region, target block type, and target block in region.
 - WebUI Cleanup v2 + Catalog Expansion v3 continues on `feature/v1-webui-cleanup-catalog-v3`: it splits more orchestration helpers out of `web-ui/src/ui/app.ts` and adds the read-only spatial condition blocks for player Y, target-block Y, and player near target block.
+- Container Control Flow v1 on `feature/v1-container-control-flow` adds C-shaped loop containers, flat body membership, fixed-count loop simulation, and simulation-capped forever loop behavior.
 
 ## Follow-Ups
 
@@ -76,6 +77,7 @@ P2 before broader runtime use:
 - Server HTTP API is still the current dev/local/self-check WebUI transport. The long-term recommended admin flow is client-hosted WebUI through an authorized PixelLogic client session, but that track is deferred until a future scoped prompt.
 - Context-aware condition blocks currently consume only per-run Simulation Test Context facts. Real Minecraft adapter behavior, Region old system integration, world mutation, named scenarios, and persisted test contexts remain deferred.
 - Spatial condition blocks remain intentionally small: no target-block-exists block, no X/Z coordinate compare blocks, no area geometry conditions, no world map, and no named scenario persistence.
+- Container control flow v1 is intentionally small: no loop-until, break/continue, if/else, for-each, variable loop count, persistent server loop scheduler, or real MC adapter yet.
 
 ## Loader Event Policy
 

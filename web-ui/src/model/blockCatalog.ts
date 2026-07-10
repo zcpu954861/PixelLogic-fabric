@@ -52,6 +52,8 @@ export function createCatalogNode(blockItem: CatalogBlock, id: string, position:
     displayName: blockItem.displayName,
     config: { ...blockItem.defaultConfig },
     position,
+    parentContainerId: '',
+    parentSlot: '',
     slots: [...blockItem.inputSlots, ...blockItem.outputSlots].map((slot) => ({ ...slot })),
   };
 }
@@ -61,7 +63,7 @@ export function catalogNodeIdPrefix(blockItem: CatalogBlock): string {
 }
 
 function isBlockKind(value: string): value is BlockKind {
-  return ['trigger', 'condition', 'action', 'state', 'timer', 'debug'].includes(value);
+  return ['trigger', 'condition', 'action', 'state', 'timer', 'debug', 'control'].includes(value);
 }
 
 function blockKindFromNodeType(type: string): BlockKind {
@@ -79,6 +81,9 @@ function blockKindFromNodeType(type: string): BlockKind {
   }
   if (type === 'DEBUG_LOG_ACTION') {
     return 'debug';
+  }
+  if (type.startsWith('CONTROL_LOOP_')) {
+    return 'control';
   }
   return 'action';
 }

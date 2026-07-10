@@ -19,6 +19,9 @@ export function blockKind(type: string): BlockKind {
   if (type === 'DEBUG_LOG_ACTION') {
     return 'debug';
   }
+  if (type.startsWith('CONTROL_LOOP_')) {
+    return 'control';
+  }
   return 'action';
 }
 
@@ -76,6 +79,9 @@ export function nodeTypeLabel(type: string): string {
     case 'TARGET_BLOCK_Y_COMPARE_CONDITION':
     case 'PLAYER_NEAR_TARGET_BLOCK_CONDITION':
       return '条件判断';
+    case 'CONTROL_LOOP_COUNT':
+    case 'CONTROL_LOOP_FOREVER':
+      return '控制流';
     case 'PLAYER_ADD_TAG_ACTION':
       return '添加玩家标签';
     case 'PLAYER_REMOVE_TAG_ACTION':
@@ -149,6 +155,12 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   if (blockItem.id === 'condition.player.near_target_block') {
     return playerNearTargetBlockConditionSummary(nodeItem);
   }
+  if (blockItem.id === 'control.loop.count') {
+    return `把内部积木循环 ${nodeItem.config.count || '3'} 次后继续。`;
+  }
+  if (blockItem.id === 'control.loop.forever') {
+    return `持续循环内部积木，每轮间隔 ${nodeItem.config.intervalSeconds || '1'} 秒。`;
+  }
   const template = blockItem.summaryTemplate;
   if (!template) {
     return legacyNodeTypeSummary(nodeItem);
@@ -194,6 +206,10 @@ function legacyNodeTypeSummary(nodeItem: GraphNode): string {
       return targetBlockYCompareConditionSummary(nodeItem);
     case 'PLAYER_NEAR_TARGET_BLOCK_CONDITION':
       return playerNearTargetBlockConditionSummary(nodeItem);
+    case 'CONTROL_LOOP_COUNT':
+      return `把内部积木循环 ${config.count ?? '3'} 次后继续。`;
+    case 'CONTROL_LOOP_FOREVER':
+      return `持续循环内部积木，每轮间隔 ${config.intervalSeconds ?? '1'} 秒。`;
     case 'PLAYER_ADD_TAG_ACTION':
       return `给当前玩家添加标签“${config.tag ?? '标签'}”。`;
     case 'PLAYER_REMOVE_TAG_ACTION':

@@ -1,11 +1,22 @@
 import type { BlockDrag, GraphDocument, GraphEdge, GraphNode, GraphPosition, GraphSlot, InsertCandidate, SlotJoin } from '../../model/graphTypes';
-import { activeOutputSlots } from '../../model/conditionOutputMode';
 import { edge } from '../../model/demoGraph';
-import { blockMetrics, branchForNode, connectedGraphEdges, downstreamNodeIds, fallbackPosition, inputCenterOffset, nodePosition, outputCenterOffset } from '../../model/graphLayout';
+import { blockMetrics, branchForNode, cloneGraph, connectedGraphEdges, containerBodyDropZone, containerBodyEntryAnchor, downstreamNodeIds, fallbackPosition, inputCenterOffset, nodePosition, outputCenterOffset } from '../../model/graphLayout';
+import { normalBlockHeight, normalBlockWidth } from '../../model/containerGeometry';
 import { preferredMainOutput } from './activeOutput';
-import { connectedOverlap, insertSnapX, insertSnapY, normalBlockHeight, reconnectSnapX, reconnectSnapY } from './blockConstants';
+import { connectedOverlap, insertSnapX, insertSnapY, linkSnapX, linkSnapY, reconnectSnapX, reconnectSnapY } from './blockConstants';
+import {
+  canAssignContainerMembership,
+  draggedGroupBounds,
+  makeContainerBodyGap,
+  makeContainerBodyStartGap,
+  shiftForContainerSizeChanges,
+  syncDraggedContainerMembership,
+} from './containerPlacement';
 
 export function connectedActionText(candidate: InsertCandidate | null): string {
+  if (candidate?.kind === 'container') {
+    return '已放入容器内部，正在自动保存。';
+  }
   if (candidate?.kind === 'append') {
     return '已连接到链尾，正在自动保存。';
   }
@@ -24,54 +35,189 @@ export function findInsertCandidate(baseGraph: GraphDocument, drag: BlockDrag): 
   }
 
   const rootInputY = inputCenterOffset(graph, rootNode);
+  const dragCenter = draggedGroupCenter(graph, drag) ?? {
+    x: rootPosition.x + blockMetrics(graph, rootNode).width / 2,
+    y: rootPosition.y + blockMetrics(graph, rootNode).height / 2,
+  };
+  const rootInputAnchor = rootInputY === null ? null : {
+    x: rootPosition.x,
+    y: rootPosition.y + rootInputY,
+  };
   const group = new Set(drag.groupIds);
-  let best: { candidate: InsertCandidate; score: number } | null = null;
-
-  if (rootInputY !== null) {
-    const rootAnchor = { x: rootPosition.x, y: rootPosition.y + rootInputY };
-    for (const join of drag.joins) {
-      const edgeItem = graph.edges.find((graphEdge) => graphEdge.id === join.id);
-      if (!edgeItem) {
-        continue;
-      }
-      const score = snapScore(rootAnchor, join);
-      if (score === null) {
-        continue;
-      }
-      if (!best || score < best.score) {
-        const check = canInsertIntoEdge(graph, edgeItem, drag);
-        if (!check.valid && (group.has(edgeItem.sourceNodeId) || group.has(edgeItem.targetNodeId))) {
-          continue;
-        }
-        best = { candidate: { kind: 'insert', edge: edgeItem, join, valid: check.valid, message: check.message }, score };
-      }
-    }
-
-    for (const candidate of appendCandidates(graph, drag)) {
-      const score = candidateSnapScore(graph, drag, candidate, rootAnchor);
-      if (score === null) {
-        continue;
-      }
-      if (!best || score < best.score) {
-        best = { candidate, score };
-      }
-    }
-  }
-
+  const stableGraph = graphWithDragStartPositions(baseGraph, drag);
   const tailAnchor = draggedTailAnchor(graph, drag);
+  const containerCandidate = findContainerCandidate(
+    stableGraph,
+    drag,
+    dragCenter,
+  );
+  if (containerCandidate) {
+    if (!containerCandidate.valid) {
+      return containerCandidate;
+    }
+    const containerId = containerCandidate.containerNodeId;
+    const internalEdge = closestEdgeCandidate(graph, drag, dragCenter, (edgeItem) => edgeInScope(graph, edgeItem, containerId));
+    if (internalEdge?.valid) {
+      return internalEdge;
+    }
+    if (rootInputAnchor) {
+      const internalAppend = closestCandidate(
+        appendCandidates(graph, drag).filter((candidate) => nodeInScope(graph, candidate.sourceNodeId, containerId)),
+        (candidate) => candidateSnapScore(graph, drag, candidate, rootInputAnchor),
+      );
+      if (internalAppend) {
+        return internalAppend;
+      }
+    }
+    if (tailAnchor) {
+      const internalAttach = closestCandidate(
+        attachCandidates(graph, drag).filter((candidate) =>
+          nodeInScope(graph, candidate.targetNodeId, containerId)
+          && isContainerBodyHead(graph, candidate.targetNodeId, containerId),
+        ),
+        (candidate) => bodyHeadDropScore(graph, candidate, dragCenter)
+          ?? candidateSnapScore(graph, drag, candidate, tailAnchor),
+      );
+      if (internalAttach) {
+        return internalAttach;
+      }
+    }
+    const hasBodyContent = graph.nodes.some((nodeItem) =>
+      !group.has(nodeItem.id) && (nodeItem.parentContainerId ?? '') === containerId,
+    );
+    if (!hasBodyContent) {
+      return containerCandidate;
+    }
+    return internalEdge ?? {
+      ...containerCandidate,
+      valid: false,
+      message: '请靠近循环内部的连接线或链尾再松手。',
+    };
+  }
+
   if (tailAnchor) {
-    for (const candidate of attachCandidates(graph, drag)) {
-      const score = candidateSnapScore(graph, drag, candidate, tailAnchor);
-      if (score === null) {
-        continue;
-      }
-      if (!best || score < best.score) {
-        best = { candidate, score };
-      }
+    const bodyHeadAttach = closestCandidate(
+      attachCandidates(graph, drag).filter((candidate) => {
+        const target = graph.nodes.find((nodeItem) => nodeItem.id === candidate.targetNodeId);
+        const containerId = target?.parentContainerId ?? '';
+        return Boolean(containerId) && isContainerBodyHead(graph, candidate.targetNodeId, containerId);
+      }),
+      (candidate) => bodyHeadDropScore(graph, candidate, dragCenter)
+        ?? candidateSnapScore(graph, drag, candidate, tailAnchor),
+    );
+    if (bodyHeadAttach) {
+      const target = stableGraph.nodes.find((nodeItem) => nodeItem.id === bodyHeadAttach.targetNodeId);
+      const check = canAssignContainerMembership(stableGraph, group, target?.parentContainerId ?? '');
+      return check.valid ? bodyHeadAttach : { ...bodyHeadAttach, valid: false, message: check.message };
     }
   }
 
-  return best?.candidate ?? null;
+  const externalEdge = closestEdgeCandidate(graph, drag, dragCenter, (edgeItem) => edgeInScope(graph, edgeItem, ''));
+  if (externalEdge?.valid) {
+    return externalEdge;
+  }
+  if (rootInputAnchor) {
+    const appendCandidate = closestCandidate(
+      appendCandidates(graph, drag).filter((candidate) => nodeInScope(graph, candidate.sourceNodeId, '')),
+      (candidate) => candidateSnapScore(graph, drag, candidate, rootInputAnchor),
+    );
+    if (appendCandidate) {
+      return appendCandidate;
+    }
+  }
+
+  if (tailAnchor) {
+    const attachCandidate = closestCandidate(
+      attachCandidates(graph, drag).filter((candidate) => nodeInScope(graph, candidate.targetNodeId, '')),
+      (candidate) => candidateSnapScore(graph, drag, candidate, tailAnchor),
+    );
+    if (attachCandidate) {
+      return attachCandidate;
+    }
+  }
+
+  return externalEdge;
+}
+
+function closestEdgeCandidate(
+  graph: GraphDocument,
+  drag: BlockDrag,
+  anchor: GraphPosition,
+  include: (edgeItem: GraphEdge) => boolean,
+): Extract<InsertCandidate, { kind: 'insert' }> | null {
+  const group = new Set(drag.groupIds);
+  let valid: { candidate: Extract<InsertCandidate, { kind: 'insert' }>; score: number } | null = null;
+  let invalid: { candidate: Extract<InsertCandidate, { kind: 'insert' }>; score: number } | null = null;
+  for (const join of drag.joins) {
+    const edgeItem = graph.edges.find((graphEdge) => graphEdge.id === join.id);
+    if (!edgeItem || !include(edgeItem)) {
+      continue;
+    }
+    const score = insertSnapScore(graph, edgeItem, anchor, join);
+    if (score === null) {
+      continue;
+    }
+    const check = canInsertIntoEdge(graph, edgeItem, drag);
+    if (!check.valid && (group.has(edgeItem.sourceNodeId) || group.has(edgeItem.targetNodeId))) {
+      continue;
+    }
+    const scored = {
+      candidate: { kind: 'insert', edge: edgeItem, join, valid: check.valid, message: check.message } as const,
+      score,
+    };
+    if (check.valid ? !valid || score < valid.score : !invalid || score < invalid.score) {
+      if (check.valid) {
+        valid = scored;
+      } else {
+        invalid = scored;
+      }
+    }
+  }
+  return valid?.candidate ?? invalid?.candidate ?? null;
+}
+
+function nodeInScope(graph: GraphDocument, nodeId: string, containerId: string): boolean {
+  return (graph.nodes.find((nodeItem) => nodeItem.id === nodeId)?.parentContainerId ?? '') === containerId;
+}
+
+function edgeInScope(graph: GraphDocument, edgeItem: GraphEdge, containerId: string): boolean {
+  return nodeInScope(graph, edgeItem.sourceNodeId, containerId)
+    && nodeInScope(graph, edgeItem.targetNodeId, containerId);
+}
+
+function isContainerBodyHead(graph: GraphDocument, nodeId: string, containerId: string): boolean {
+  return !connectedGraphEdges(graph).some((graphEdge) =>
+    graphEdge.targetNodeId === nodeId && nodeInScope(graph, graphEdge.sourceNodeId, containerId),
+  );
+}
+
+function bodyHeadDropScore(
+  graph: GraphDocument,
+  candidate: Extract<InsertCandidate, { kind: 'attach' }>,
+  dragCenter: GraphPosition,
+): number | null {
+  const target = graph.nodes.find((nodeItem) => nodeItem.id === candidate.targetNodeId);
+  const targetInputY = target ? inputCenterOffset(graph, target) : null;
+  if (!target || targetInputY === null) {
+    return null;
+  }
+  const targetPosition = nodePosition(graph, target.id);
+  const dx = Math.abs(dragCenter.x - targetPosition.x);
+  const dy = Math.abs(dragCenter.y - (targetPosition.y + targetInputY));
+  return dx <= normalBlockWidth / 2 + linkSnapX && dy <= normalBlockHeight / 2 + linkSnapY
+    ? dx + dy * 1.35
+    : null;
+}
+
+function closestCandidate<T extends InsertCandidate>(candidates: T[], scoreFor: (candidate: T) => number | null): T | null {
+  let closest: { candidate: T; score: number } | null = null;
+  for (const candidate of candidates) {
+    const score = scoreFor(candidate);
+    if (score !== null && (!closest || score < closest.score)) {
+      closest = { candidate, score };
+    }
+  }
+  return closest?.candidate ?? null;
 }
 
 export function graphWithPreviewPositions(graph: GraphDocument, drag: BlockDrag): GraphDocument {
@@ -84,6 +230,16 @@ export function graphWithPreviewPositions(graph: GraphDocument, drag: BlockDrag)
   };
 }
 
+function graphWithDragStartPositions(graph: GraphDocument, drag: BlockDrag): GraphDocument {
+  return {
+    ...graph,
+    nodes: graph.nodes.map((nodeItem) => {
+      const position = drag.startPositions.get(nodeItem.id);
+      return position ? { ...nodeItem, position } : nodeItem;
+    }),
+  };
+}
+
 export function snapScore(anchor: GraphPosition, join: SlotJoin): number | null {
   const center = { x: join.x + join.width / 2, y: join.y + 15 };
   const dx = Math.abs(anchor.x - center.x);
@@ -91,10 +247,46 @@ export function snapScore(anchor: GraphPosition, join: SlotJoin): number | null 
   return dx <= insertSnapX && dy <= insertSnapY ? dx + dy * 1.35 : null;
 }
 
+function insertSnapScore(graph: GraphDocument, edgeItem: GraphEdge, anchor: GraphPosition, join: SlotJoin): number | null {
+  const source = graph.nodes.find((nodeItem) => nodeItem.id === edgeItem.sourceNodeId);
+  const target = graph.nodes.find((nodeItem) => nodeItem.id === edgeItem.targetNodeId);
+  if (source && target && edgeTouchesControlBoundary(source, target)) {
+    return snapScoreWithin(anchor, join, linkSnapX + 24, linkSnapY + 14);
+  }
+  const snapY = source && target && nodesShareContainerBody(source, target)
+    ? insertSnapY + normalBlockHeight
+    : insertSnapY;
+  return snapScoreWithin(anchor, join, insertSnapX, snapY);
+}
+
+function edgeTouchesControlBoundary(source: GraphNode, target: GraphNode): boolean {
+  return isControlLoopNode(source) || isControlLoopNode(target);
+}
+
+function isControlLoopNode(nodeItem: GraphNode): boolean {
+  return Boolean(nodeItem.blockId?.startsWith('control.loop.') || nodeItem.type.startsWith('CONTROL_LOOP_'));
+}
+
+function nodesShareContainerBody(source: GraphNode, target: GraphNode): boolean {
+  return Boolean(source.parentContainerId && source.parentContainerId === target.parentContainerId);
+}
+
 export function candidateSnapScore(graph: GraphDocument, drag: BlockDrag, candidate: InsertCandidate, anchor: GraphPosition): number | null {
-  return isReconnectCandidate(graph, drag, candidate)
-    ? snapScoreWithin(anchor, candidate.join, reconnectSnapX, reconnectSnapY)
-    : snapScore(anchor, candidate.join);
+  if (isReconnectCandidate(graph, drag, candidate)) {
+    return snapScoreWithin(anchor, candidate.join, reconnectSnapX, reconnectSnapY);
+  }
+  if (candidate.kind === 'append' && isContainerBodyAppend(graph, candidate)) {
+    return snapScoreWithin(anchor, candidate.join, linkSnapX + 72, linkSnapY + 36);
+  }
+  if (candidate.kind === 'append' || candidate.kind === 'attach') {
+    return snapScoreWithin(anchor, candidate.join, linkSnapX, linkSnapY);
+  }
+  return snapScore(anchor, candidate.join);
+}
+
+function isContainerBodyAppend(graph: GraphDocument, candidate: Extract<InsertCandidate, { kind: 'append' }>): boolean {
+  const source = graph.nodes.find((nodeItem) => nodeItem.id === candidate.sourceNodeId);
+  return Boolean(source?.parentContainerId);
 }
 
 export function snapScoreWithin(anchor: GraphPosition, join: SlotJoin, snapX: number, snapY: number): number | null {
@@ -105,6 +297,9 @@ export function snapScoreWithin(anchor: GraphPosition, join: SlotJoin, snapX: nu
 }
 
 export function isReconnectCandidate(graph: GraphDocument, drag: BlockDrag, candidate: InsertCandidate): boolean {
+  if (candidate.kind === 'container') {
+    return false;
+  }
   if (candidate.kind === 'append') {
     const root = graph.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
     const rootInput = root?.slots.find((slot) => slot.direction === 'INPUT');
@@ -126,7 +321,7 @@ export function isReconnectCandidate(graph: GraphDocument, drag: BlockDrag, cand
   return false;
 }
 
-export function appendCandidates(graph: GraphDocument, drag: BlockDrag): InsertCandidate[] {
+export function appendCandidates(graph: GraphDocument, drag: BlockDrag): Array<Extract<InsertCandidate, { kind: 'append' }>> {
   const group = new Set(drag.groupIds);
   const root = graph.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
   const rootInput = root?.slots.find((slot) => slot.direction === 'INPUT');
@@ -141,10 +336,11 @@ export function appendCandidates(graph: GraphDocument, drag: BlockDrag): InsertC
     }
     const sourcePosition = source.position ?? fallbackPosition(source.id);
     const sourceSize = blockMetrics(graph, source);
-    return activeOutputSlots(source)
+    const output = preferredMainOutput(source);
+    return (output ? [output] : [])
       .filter((slot) => slot.edgeType === rootInput.edgeType)
       .filter((slot) => !connectedEdges.some((edgeItem) => edgeItem.sourceNodeId === source.id && edgeItem.sourceSlotId === slot.id))
-      .map((slot): InsertCandidate => ({
+      .map((slot): Extract<InsertCandidate, { kind: 'append' }> => ({
         kind: 'append',
         sourceNodeId: source.id,
         sourceSlotId: slot.id,
@@ -181,7 +377,7 @@ export function draggedTailAnchor(graph: GraphDocument, drag: BlockDrag): GraphP
   };
 }
 
-export function attachCandidates(graph: GraphDocument, drag: BlockDrag): InsertCandidate[] {
+export function attachCandidates(graph: GraphDocument, drag: BlockDrag): Array<Extract<InsertCandidate, { kind: 'attach' }>> {
   const group = new Set(drag.groupIds);
   const tail = draggedTailOutput(graph, group);
   if (!tail) {
@@ -189,7 +385,7 @@ export function attachCandidates(graph: GraphDocument, drag: BlockDrag): InsertC
   }
 
   const connectedEdges = connectedGraphEdges(graph);
-  return graph.nodes.flatMap((target) => {
+  return graph.nodes.flatMap((target): Array<Extract<InsertCandidate, { kind: 'attach' }>> => {
     if (group.has(target.id)) {
       return [];
     }
@@ -199,7 +395,7 @@ export function attachCandidates(graph: GraphDocument, drag: BlockDrag): InsertC
       .filter((slot) => slot.direction === 'INPUT')
       .filter((slot) => slot.edgeType === tail.slot.edgeType)
       .filter((slot) => !connectedEdges.some((edgeItem) => edgeItem.targetNodeId === target.id && edgeItem.targetSlotId === slot.id))
-      .map((slot): InsertCandidate => ({
+      .map((slot): Extract<InsertCandidate, { kind: 'attach' }> => ({
         kind: 'attach',
         sourceNodeId: tail.nodeId,
         sourceSlotId: tail.slot.id,
@@ -223,6 +419,25 @@ export function attachCandidates(graph: GraphDocument, drag: BlockDrag): InsertC
 
 export function snapDraggedGroupToCandidate(graph: GraphDocument, drag: BlockDrag): void {
   const candidate = drag.candidate;
+  if (!candidate?.valid) {
+    return;
+  }
+  if (candidate?.kind === 'container') {
+    const container = graph.nodes.find((nodeItem) => nodeItem.id === candidate.containerNodeId);
+    const root = graph.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
+    const rootPosition = drag.previewPositions.get(drag.rootId);
+    const rootInputY = root ? inputCenterOffset(graph, root) : null;
+    if (!container || !rootPosition || rootInputY === null) {
+      return;
+    }
+    const entryAnchor = containerBodyEntryAnchor(graph, container);
+    const dx = Math.round(entryAnchor.x) - rootPosition.x;
+    const dy = Math.round(entryAnchor.y - rootInputY) - rootPosition.y;
+    drag.previewPositions = new Map(
+      Array.from(drag.previewPositions, ([nodeId, position]) => [nodeId, { x: position.x + dx, y: position.y + dy }]),
+    );
+    return;
+  }
   if (candidate?.kind === 'attach') {
     snapDraggedGroupTailToTarget(graph, drag, candidate);
     return;
@@ -256,12 +471,26 @@ export function snapDraggedGroupTailToTarget(graph: GraphDocument, drag: BlockDr
   const tailNode = tail ? graph.nodes.find((nodeItem) => nodeItem.id === tail.nodeId) : null;
   const target = graph.nodes.find((nodeItem) => nodeItem.id === candidate.targetNodeId);
   const tailPosition = tail ? drag.previewPositions.get(tail.nodeId) : null;
+  const root = graph.nodes.find((nodeItem) => nodeItem.id === drag.rootId);
+  const rootPosition = drag.previewPositions.get(drag.rootId);
+  const rootInputY = root ? inputCenterOffset(graph, root) : null;
   const targetInputY = target ? inputCenterOffset(graph, target) : null;
-  if (!tail || !tailNode || !target || !tailPosition || targetInputY === null) {
+  if (!tail || !tailNode || !target || !tailPosition || !rootPosition || rootInputY === null || targetInputY === null) {
     return;
   }
 
   const targetPosition = target.position ?? fallbackPosition(target.id);
+  const parent = target.parentContainerId ? graph.nodes.find((nodeItem) => nodeItem.id === target.parentContainerId) : null;
+  if (parent && isContainerBodyHead(graph, target.id, parent.id)) {
+    const entryAnchor = containerBodyEntryAnchor(graph, parent);
+    const dx = Math.round(entryAnchor.x) - rootPosition.x;
+    const dy = Math.round(entryAnchor.y - rootInputY) - rootPosition.y;
+    drag.previewPositions = new Map(
+      Array.from(drag.previewPositions, ([nodeId, position]) => [nodeId, { x: position.x + dx, y: position.y + dy }]),
+    );
+    return;
+  }
+
   const tailSize = blockMetrics(graph, tailNode);
   const snappedTail = {
     x: Math.round(targetPosition.x),
@@ -333,6 +562,10 @@ export function insertDraggedGroup(graph: GraphDocument, drag: BlockDrag): boole
   }
 
   const group = new Set(drag.groupIds);
+  if (candidate.kind === 'container') {
+    assignContainerMembership(graph, group, candidate.containerNodeId, candidate.slotId);
+    return true;
+  }
   if (candidate.kind === 'attach') {
     const tail = draggedTailOutput(graph, group);
     const target = graph.nodes.find((nodeItem) => nodeItem.id === candidate.targetNodeId);
@@ -340,6 +573,12 @@ export function insertDraggedGroup(graph: GraphDocument, drag: BlockDrag): boole
     if (!tail || !target || !targetSlot || tail.slot.edgeType !== targetSlot.edgeType) {
       return false;
     }
+    assignContainerMembership(
+      graph,
+      group,
+      target.parentContainerId ?? '',
+      target.parentContainerId ? target.parentSlot || 'body' : '',
+    );
     graph.edges = graph.edges.filter((graphEdge) =>
       !(graphEdge.targetNodeId === candidate.targetNodeId && graphEdge.targetSlotId === candidate.targetSlotId && !group.has(graphEdge.sourceNodeId)),
     );
@@ -354,6 +593,16 @@ export function insertDraggedGroup(graph: GraphDocument, drag: BlockDrag): boole
   }
 
   if (candidate.kind === 'append') {
+    const source = graph.nodes.find((nodeItem) => nodeItem.id === candidate.sourceNodeId);
+    if (!source) {
+      return false;
+    }
+    assignContainerMembership(
+      graph,
+      group,
+      source.parentContainerId ?? '',
+      source.parentContainerId ? source.parentSlot || 'body' : '',
+    );
     graph.edges = graph.edges.filter((graphEdge) =>
       !(graphEdge.targetNodeId === drag.rootId && graphEdge.targetSlotId === rootInput.id && !group.has(graphEdge.sourceNodeId)),
     );
@@ -362,9 +611,18 @@ export function insertDraggedGroup(graph: GraphDocument, drag: BlockDrag): boole
   }
 
   const tail = draggedTailOutput(graph, group);
-  if (!tail) {
+  const source = graph.nodes.find((nodeItem) => nodeItem.id === candidate.edge.sourceNodeId);
+  const target = graph.nodes.find((nodeItem) => nodeItem.id === candidate.edge.targetNodeId);
+  if (!tail || !source || !target || (source.parentContainerId ?? '') !== (target.parentContainerId ?? '')) {
     return false;
   }
+
+  assignContainerMembership(
+    graph,
+    group,
+    source.parentContainerId ?? '',
+    source.parentContainerId ? source.parentSlot || 'body' : '',
+  );
 
   graph.edges = graph.edges.filter((graphEdge) =>
     graphEdge.id !== candidate.edge.id
@@ -373,6 +631,115 @@ export function insertDraggedGroup(graph: GraphDocument, drag: BlockDrag): boole
   graph.edges.push(edge(nextEdgeId(graph), candidate.edge.sourceNodeId, candidate.edge.sourceSlotId, drag.rootId, rootInput.id));
   graph.edges.push(edge(nextEdgeId(graph), tail.nodeId, tail.slot.id, candidate.edge.targetNodeId, candidate.edge.targetSlotId));
   return true;
+}
+
+export type DragDropResult = {
+  graph: GraphDocument;
+  inserted: boolean;
+  movedOutOfContainer: boolean;
+};
+
+export function computeDragDrop(baseGraph: GraphDocument, drag: BlockDrag): DragDropResult {
+  const placementDrag = { ...drag, previewPositions: new Map(drag.previewPositions) };
+  snapDraggedGroupToCandidate(baseGraph, placementDrag);
+
+  const graph = cloneGraph(baseGraph);
+  graph.nodes = graph.nodes.map((nodeItem) => {
+    const position = placementDrag.previewPositions.get(nodeItem.id);
+    return position ? { ...nodeItem, position } : nodeItem;
+  });
+  const group = new Set(drag.groupIds);
+  const connectedEdgeIds = new Set(connectedGraphEdges(graph).map((graphEdge) => graphEdge.id));
+  graph.edges = graph.edges.filter((graphEdge) =>
+    (!group.has(graphEdge.sourceNodeId) && !group.has(graphEdge.targetNodeId))
+    || connectedEdgeIds.has(graphEdge.id),
+  );
+
+  const inserted = placementDrag.candidate?.valid ? insertDraggedGroup(graph, placementDrag) : false;
+  if (inserted) {
+    applyCandidatePlacementGap(graph, placementDrag);
+  }
+  const movedOutOfContainer = !inserted && syncDraggedContainerMembership(graph, placementDrag);
+  shiftForContainerSizeChanges(baseGraph, graph, group);
+  return { graph, inserted, movedOutOfContainer };
+}
+
+function applyCandidatePlacementGap(graph: GraphDocument, drag: BlockDrag): void {
+  const candidate = drag.candidate;
+  if (candidate?.kind === 'container') {
+    makeContainerBodyGap(graph, drag, candidate.containerNodeId);
+  } else if (candidate?.kind === 'attach') {
+    const target = graph.nodes.find((nodeItem) => nodeItem.id === candidate.targetNodeId);
+    if (target?.parentContainerId) {
+      makeContainerBodyStartGap(graph, drag, candidate.targetNodeId);
+    }
+  } else if (candidate?.kind === 'insert') {
+    makeInsertionGap(graph, drag);
+  }
+}
+
+function findContainerCandidate(
+  graph: GraphDocument,
+  drag: BlockDrag,
+  anchor: GraphPosition,
+): Extract<InsertCandidate, { kind: 'container' }> | null {
+  const group = new Set(drag.groupIds);
+  const container = smallestContainerAtPoint(graph, anchor, (nodeItem) =>
+    !group.has(nodeItem.id) && isControlLoopNode(nodeItem),
+  );
+  if (!container) {
+    return null;
+  }
+  const rect = containerBodyDropZone(graph, container);
+  const check = canAssignContainerMembership(graph, group, container.id);
+  return {
+    kind: 'container',
+    containerNodeId: container.id,
+    slotId: 'body',
+    join: {
+      id: `container:${container.id}:body`,
+      from: container.id,
+      to: drag.rootId,
+      branch: 'main',
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      tone: 'normal',
+    },
+    valid: check.valid,
+    message: check.message,
+  };
+}
+
+function assignContainerMembership(graph: GraphDocument, group: Set<string>, containerNodeId: string, slotId: string): void {
+  graph.edges = graph.edges.filter((graphEdge) =>
+    !group.has(graphEdge.targetNodeId) || group.has(graphEdge.sourceNodeId),
+  );
+  graph.nodes = graph.nodes.map((nodeItem) => {
+    if (!group.has(nodeItem.id) || (nodeItem.parentContainerId && group.has(nodeItem.parentContainerId))) {
+      return nodeItem;
+    }
+    return { ...nodeItem, parentContainerId: containerNodeId, parentSlot: slotId };
+  });
+}
+
+function pointInsideRect(point: GraphPosition, rect: { x: number; y: number; width: number; height: number }): boolean {
+  return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
+}
+
+function smallestContainerAtPoint(graph: GraphDocument, point: GraphPosition, include: (nodeItem: GraphNode) => boolean): GraphNode | null {
+  return graph.nodes
+    .filter((nodeItem) => include(nodeItem) && pointInsideRect(point, containerBodyDropZone(graph, nodeItem)))
+    .sort((left, right) => rectArea(containerBodyDropZone(graph, left)) - rectArea(containerBodyDropZone(graph, right)))[0] ?? null;
+}
+
+function rectArea(rect: { width: number; height: number }): number {
+  return rect.width * rect.height;
+}
+
+function draggedGroupCenter(graph: GraphDocument, drag: BlockDrag): GraphPosition | null {
+  const bounds = draggedGroupBounds(graph, drag);
+  return bounds ? { x: (bounds.left + bounds.right) / 2, y: (bounds.top + bounds.bottom) / 2 } : null;
 }
 
 export function makeInsertionGap(graph: GraphDocument, drag: BlockDrag): void {

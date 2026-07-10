@@ -71,6 +71,16 @@ Still not implemented:
 - The graph stores only config such as `compareMode`, Y values, `maxDistance`, `horizontalOnly`, and `outputMode`.
 - No target-block-exists block, X/Z coordinate compare, region geometry, world map, named scenario, persistence, MC adapter, or Admin Client Bridge implementation is added.
 
+## Implementation Checkpoint: Container Control Flow v1
+
+`feature/v1-container-control-flow` keeps loops inside the existing graph/runtime boundary:
+
+- Loop container membership is graph metadata, not a nested JSON runtime model.
+- Loop count reuses normal node execution for body chains and then continues the outer `done` slot.
+- Forever loop is simulation-first and capped; it does not use `while(true)` or a same-call infinite loop.
+- Timer continuation inside loop bodies remains a later scoped runtime problem.
+- No real MC adapter, persistent server loop scheduler, Channel, SignalBridge, Relay, break/continue, or if/else is added.
+
 ## Goals
 
 PixelLogic will grow from the current seven demo blocks into many concrete catalog blocks. The simulation backend exists so new blocks can be configured, validated, executed in a controlled test context, traced, and reviewed before every block has a real Minecraft adapter.

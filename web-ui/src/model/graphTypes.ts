@@ -1,7 +1,7 @@
 import type { SimulationTestContext, SimulationTestResult } from './simulationTestContext';
 
 export type ApiStatus = 'checking' | 'online' | 'offline';
-export type BlockKind = 'trigger' | 'condition' | 'action' | 'state' | 'timer' | 'debug';
+export type BlockKind = 'trigger' | 'condition' | 'action' | 'state' | 'timer' | 'debug' | 'control';
 export type Branch = 'main' | 'pass' | 'fail';
 
 export type ApiTraceStep = {
@@ -45,6 +45,8 @@ export type GraphNode = {
   displayName: string;
   config: Record<string, string>;
   position?: GraphPosition;
+  parentContainerId?: string;
+  parentSlot?: string;
   slots: GraphSlot[];
 };
 
@@ -94,6 +96,7 @@ export type CatalogBlock = {
   formSchema: CatalogFormField[];
   summaryTemplate: string;
   summaryFormatter: string;
+  containerSlots: string[];
   inputSlots: GraphSlot[];
   outputSlots: GraphSlot[];
   simulationCapability: string;
@@ -241,6 +244,7 @@ export type SlotBlock = {
   inputY: number | null;
   outputOffsets: Record<string, number>;
   selected?: boolean;
+  hasChildren?: boolean;
 };
 
 export type BlockMetrics = {
@@ -269,6 +273,13 @@ export type SlotJoin = {
 export type InsertCandidate = {
   kind: 'insert';
   edge: GraphEdge;
+  join: SlotJoin;
+  valid: boolean;
+  message: string;
+} | {
+  kind: 'container';
+  containerNodeId: string;
+  slotId: string;
   join: SlotJoin;
   valid: boolean;
   message: string;

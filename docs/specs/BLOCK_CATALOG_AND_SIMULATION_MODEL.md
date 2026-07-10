@@ -140,6 +140,17 @@ This checkpoint still does not add a real Minecraft adapter, draft simulation, n
 - Dimension mismatch and missing target block evaluate false with readable trace text.
 - This checkpoint does not add target-block-exists, X/Z coordinate compare blocks, region geometry blocks, actions, selectors, world mutation, named scenarios, persistence, full world simulation, or a real Minecraft adapter.
 
+## Implementation Checkpoint: Container Control Flow v1
+
+`feature/v1-container-control-flow` adds the first C-shaped container block foundation:
+
+- `control.loop.count`: repeats one body chain a fixed integer number of times.
+- `control.loop.forever`: repeats one body chain in a simulation-capped safe loop and does not expose an outer next edge.
+- Block definitions can declare `containerSlots`, currently only `body`.
+- Graph nodes remain flat; child membership uses `parentContainerId` and `parentSlot`.
+- WebUI renders control blocks as C-shaped containers and computes height from body contents.
+- This checkpoint does not add loop-until, break, continue, if/else, for-each, variable counts, real MC adapter, or a full Scratch-like scripting IDE.
+
 ## Implementation Checkpoint: Maintainability Cleanup v1
 
 `feature/v1-maintainability-cleanup` keeps the catalog model but removes frontend duplication:

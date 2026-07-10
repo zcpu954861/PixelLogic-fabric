@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
 
 public final class GraphValidator {
     private static final int MAX_REGION_NAME_LENGTH = 64;
+    private static final int MAX_CONTAINER_DEPTH = 4;
     private static final Pattern NAMESPACED_ID = Pattern.compile("^[a-z0-9_.-]+:[a-z0-9_./-]+$");
     private static final Set<String> Y_COMPARE_MODES = Set.of("AT_OR_ABOVE", "AT_OR_BELOW", "EQUAL", "BETWEEN");
 
@@ -82,6 +83,7 @@ public final class GraphValidator {
         validateSingleOutgoingPerSlot(graph, issues);
 
         validateNodes(graph, nodes, issues);
+        validateContainerMembership(graph, nodes, issues);
         detectCycle(graph, issues);
         return issues;
     }
@@ -103,6 +105,8 @@ public final class GraphValidator {
                 case TARGET_BLOCK_TYPE_CONDITION -> validateTargetBlockTypeCondition(node, issues);
                 case TARGET_BLOCK_IN_REGION_CONDITION -> validateRegionCondition(node, issues);
                 case PLAYER_NEAR_TARGET_BLOCK_CONDITION -> validateNearTargetBlockCondition(node, issues);
+                case CONTROL_LOOP_COUNT -> validateLoopCount(node, issues);
+                case CONTROL_LOOP_FOREVER -> validateLoopForever(node, issues);
                 case PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION -> validatePlayerTagConfig(node, issues);
                 case STATE_SET_ACTION -> validateStateAction(node, issues, true);
                 case STATE_ADD_ACTION -> validateStateAction(node, issues, false);
@@ -111,6 +115,51 @@ public final class GraphValidator {
                 }
             }
         }
+    }
+
+    private void validateContainerMembership(GraphDefinition graph, Map<String, NodeDefinition> nodes, List<ValidationIssue> issues) {
+        for (NodeDefinition node : graph.nodes()) {
+            if (node.parentContainerId().isBlank() && node.parentSlot().isBlank()) {
+                continue;
+            }
+            NodeDefinition parent = nodes.get(node.parentContainerId());
+            if (parent == null) {
+                error(issues, "container_parent_missing", "容器父积木不存在：" + node.id());
+                continue;
+            }
+            BlockDefinition parentBlock = BuiltInBlockCatalog.block(parent.blockId()).orElse(null);
+            if (parentBlock == null || !parentBlock.containerSlots().contains(node.parentSlot())) {
+                error(issues, "container_slot_invalid", "容器槽位不存在：" + node.id() + "." + node.parentSlot());
+            }
+            if (containerDepth(node, nodes, new HashSet<>()) > MAX_CONTAINER_DEPTH) {
+                error(issues, "container_depth_exceeded", "容器嵌套不能超过 " + MAX_CONTAINER_DEPTH + " 层：" + node.id());
+            }
+        }
+
+        for (NodeDefinition node : graph.nodes()) {
+            BlockDefinition block = BuiltInBlockCatalog.block(node.blockId()).orElse(null);
+            if (block == null || block.containerSlots().isEmpty()) {
+                continue;
+            }
+            for (String slot : block.containerSlots()) {
+                boolean hasChild = graph.nodes().stream().anyMatch(child ->
+                        child.parentContainerId().equals(node.id()) && child.parentSlot().equals(slot));
+                if (!hasChild) {
+                    warning(issues, "container_body_empty", "容器内部为空：" + node.id());
+                }
+            }
+        }
+    }
+
+    private int containerDepth(NodeDefinition node, Map<String, NodeDefinition> nodes, Set<String> visiting) {
+        if (node.parentContainerId().isBlank()) {
+            return 0;
+        }
+        if (!visiting.add(node.id())) {
+            return MAX_CONTAINER_DEPTH + 1;
+        }
+        NodeDefinition parent = nodes.get(node.parentContainerId());
+        return parent == null ? 0 : 1 + containerDepth(parent, nodes, visiting);
     }
 
     private void validateCatalogBlock(NodeDefinition node, List<ValidationIssue> issues) {
@@ -257,6 +306,20 @@ public final class GraphValidator {
             error(issues, "condition_horizontal_only_invalid", "只计算水平距离必须是是或否：" + node.id());
         }
         validateConditionOutputMode(node, issues);
+    }
+
+    private void validateLoopCount(NodeDefinition node, List<ValidationIssue> issues) {
+        Integer count = parseIntegerConfig(node, "count", "循环次数必须是整数", issues);
+        if (count != null && (count < 1 || count > 100)) {
+            error(issues, "loop_count_range", "循环次数必须在 1 到 100 之间：" + node.id());
+        }
+    }
+
+    private void validateLoopForever(NodeDefinition node, List<ValidationIssue> issues) {
+        Integer interval = parseIntegerConfig(node, "intervalSeconds", "每轮间隔必须是整数秒", issues);
+        if (interval != null && interval < 1) {
+            error(issues, "loop_interval_invalid", "每轮间隔必须大于 0 秒：" + node.id());
+        }
     }
 
     private Integer parseIntegerConfig(NodeDefinition node, String key, String message, List<ValidationIssue> issues) {
@@ -440,5 +503,9 @@ public final class GraphValidator {
 
     private void error(List<ValidationIssue> issues, String code, String message) {
         issues.add(new ValidationIssue(ValidationIssue.Severity.ERROR, code, message));
+    }
+
+    private void warning(List<ValidationIssue> issues, String code, String message) {
+        issues.add(new ValidationIssue(ValidationIssue.Severity.WARNING, code, message));
     }
 }

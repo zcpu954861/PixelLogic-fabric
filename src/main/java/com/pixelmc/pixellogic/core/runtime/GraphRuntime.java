@@ -18,6 +18,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public final class GraphRuntime {
+    private static final int FOREVER_SIMULATION_ITERATION_CAP = 20;
+
     private final CompiledGraph graph;
     private final InMemoryStateStore stateStore;
     private final BoundedTraceBuffer traces;
@@ -149,6 +151,8 @@ public final class GraphRuntime {
             case STATE_ADD_ACTION -> executeStateAdd(node, context);
             case TIMER_START_ACTION -> executeTimer(node, context);
             case DEBUG_LOG_ACTION -> executeDebug(node, context);
+            case CONTROL_LOOP_COUNT -> executeLoopCount(node, context);
+            case CONTROL_LOOP_FOREVER -> executeLoopForever(node, context);
             case PLAYER_HAS_TAG_CONDITION,
                  PLAYER_IS_ADMIN_CONDITION,
                  PLAYER_DIMENSION_CONDITION,
@@ -162,6 +166,64 @@ public final class GraphRuntime {
                  PLAYER_REMOVE_TAG_ACTION ->
                     throw new IllegalStateException("缺少模拟执行器：" + node.type());
         };
+    }
+
+    private String executeLoopCount(NodeDefinition node, ExecutionContext context) {
+        int count = parsePositiveInt(node.config().getOrDefault("count", "3"), "循环次数");
+        Optional<NodeDefinition> bodyEntry = graph.bodyEntry(node.id(), "body");
+        traces.add(context.traceId(), node.id(), "进入循环次数：共 " + count + " 次。");
+        if (bodyEntry.isEmpty()) {
+            traces.add(context.traceId(), node.id(), "循环内部为空，直接继续外部流程。");
+            return "done";
+        }
+        for (int iteration = 1; iteration <= count; iteration += 1) {
+            traces.add(context.traceId(), node.id(), "第 " + iteration + " 次循环开始。");
+            if (!runBody(bodyEntry.get(), node, context)) {
+                return null;
+            }
+            traces.add(context.traceId(), node.id(), "第 " + iteration + " 次循环结束。");
+        }
+        traces.add(context.traceId(), node.id(), "循环完成，继续外部链。");
+        return "done";
+    }
+
+    private String executeLoopForever(NodeDefinition node, ExecutionContext context) {
+        int intervalSeconds = parsePositiveInt(node.config().getOrDefault("intervalSeconds", "1"), "每轮间隔");
+        Optional<NodeDefinition> bodyEntry = graph.bodyEntry(node.id(), "body");
+        traces.add(context.traceId(), node.id(), "进入无限循环：每轮间隔 " + intervalSeconds + " 秒。");
+        if (bodyEntry.isEmpty()) {
+            traces.add(context.traceId(), node.id(), "无限循环内部为空，已停止模拟。");
+            return null;
+        }
+        for (int iteration = 1; iteration <= FOREVER_SIMULATION_ITERATION_CAP; iteration += 1) {
+            traces.add(context.traceId(), node.id(), "第 " + iteration + " 轮开始。");
+            if (!runBody(bodyEntry.get(), node, context)) {
+                return null;
+            }
+            traces.add(context.traceId(), node.id(), "第 " + iteration + " 轮结束。");
+        }
+        traces.add(context.traceId(), node.id(), "已达到测试模拟循环上限，已停止继续模拟。");
+        return null;
+    }
+
+    private boolean runBody(NodeDefinition startNode, NodeDefinition containerNode, ExecutionContext context) {
+        NodeDefinition current = startNode;
+        while (current != null) {
+            if (context.nextStep() > limits.maxStepsPerExecution()) {
+                traces.add(context.traceId(), current.id(), "执行失败：超过最大执行步数。");
+                throw new IllegalStateException("超过最大执行步数。");
+            }
+            String outputSlot = executeNode(current, context);
+            if (outputSlot == null) {
+                return false;
+            }
+            Optional<NodeDefinition> next = graph.firstTarget(current.id(), outputSlot);
+            if (next.isEmpty() || !graph.isInBody(next.get(), containerNode.id(), "body")) {
+                return true;
+            }
+            current = next.get();
+        }
+        return true;
     }
 
     private String executeCondition(NodeDefinition node, ExecutionContext context) {
@@ -274,6 +336,14 @@ public final class GraphRuntime {
             case INTEGER -> StateValue.integer(Integer.parseInt(raw));
             case STRING -> StateValue.string(raw);
         };
+    }
+
+    private int parsePositiveInt(String raw, String label) {
+        int value = Integer.parseInt(raw);
+        if (value <= 0) {
+            throw new IllegalArgumentException(label + "必须大于 0。");
+        }
+        return value;
     }
 
     private boolean parseBooleanConfig(String raw, String configKey) {

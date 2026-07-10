@@ -10,6 +10,7 @@ import { normalBlockHeight } from './blockConstants';
 
 export function buildBlocks(graph: GraphDocument, catalog: BlockCatalog, selectedNodeId: string): SlotBlock[] {
   const metricsCache = new Map<string, BlockMetrics>();
+  const occupiedContainers = new Set(graph.nodes.map((nodeItem) => nodeItem.parentContainerId).filter(Boolean));
   return graph.nodes.map((nodeItem) => {
     const kind = blockKind(nodeItem.type);
     const position = nodeItem.position ?? fallbackPosition(nodeItem.id);
@@ -28,6 +29,7 @@ export function buildBlocks(graph: GraphDocument, catalog: BlockCatalog, selecte
       inputY: size.inputY,
       outputOffsets: size.outputOffsets,
       selected: nodeItem.id === selectedNodeId,
+      hasChildren: occupiedContainers.has(nodeItem.id),
     };
   });
 }

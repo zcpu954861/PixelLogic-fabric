@@ -109,6 +109,10 @@ export function showPlacementPreview(preview: PlacementPreview): void {
   previewLayoutSignature = layoutSignature;
   clearPreviewTransforms();
 
+  const blockElements = new Map(
+    Array.from(document.querySelectorAll<HTMLElement>('.flow-world [data-block]'))
+      .flatMap((element) => element.dataset.block ? [[element.dataset.block, element] as const] : []),
+  );
   const baseById = new Map(visualBlocks(preview.baseBlocks).map((block) => [block.id, block]));
   const placementById = new Map(visualBlocks(preview.placementBlocks).map((block) => [block.id, block]));
   if (!prefersReducedMotion()) {
@@ -117,7 +121,7 @@ export function showPlacementPreview(preview: PlacementPreview): void {
         return;
       }
       const baseBlock = baseById.get(nodeId);
-      const element = blockElement(nodeId);
+      const element = blockElements.get(nodeId);
       if (!baseBlock || !element) {
         return;
       }
@@ -156,10 +160,10 @@ export function showPlacementPreview(preview: PlacementPreview): void {
       worldEl,
       placementBlock,
     );
-    placeShellBehindContainer(shell, nodeId);
+    placeShellBehindContainer(shell, blockElements.get(nodeId));
     animateArtifactResize(shell, baseBlock, placementBlock);
     previewShells.set(nodeId, shell);
-    const target = blockElement(nodeId);
+    const target = blockElements.get(nodeId);
     if (target) {
       target.classList.add('is-container-previewed');
       previewShellTargets.set(nodeId, target);
@@ -290,8 +294,8 @@ function animateArtifactResize(element: HTMLElement, from: SlotBlock, to: SlotBl
   ]);
 }
 
-function placeShellBehindContainer(shell: HTMLElement, nodeId: string): void {
-  const targetZIndex = Number.parseInt(blockElement(nodeId)?.style.zIndex ?? '', 10);
+function placeShellBehindContainer(shell: HTMLElement, target: HTMLElement | undefined): void {
+  const targetZIndex = Number.parseInt(target?.style.zIndex ?? '', 10);
   if (Number.isFinite(targetZIndex)) {
     shell.style.zIndex = `${Math.max(1, targetZIndex - 1)}`;
   }
@@ -373,11 +377,6 @@ function animationOptions(duration: number): KeyframeAnimationOptions {
 
 function cancelElementAnimations(element: HTMLElement): void {
   element.getAnimations().forEach((animation) => animation.cancel());
-}
-
-function blockElement(nodeId: string): HTMLElement | null {
-  return Array.from(document.querySelectorAll<HTMLElement>('.flow-world [data-block]'))
-    .find((element) => element.dataset.block === nodeId) ?? null;
 }
 
 function flowWorldScale(): number {

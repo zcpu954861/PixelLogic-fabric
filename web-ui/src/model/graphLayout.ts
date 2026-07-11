@@ -201,14 +201,23 @@ export function nodePosition(graph: GraphDocument, nodeId: string): GraphPositio
   return nodeItem.position ?? fallbackPosition(nodeId);
 }
 
-export function blockVisualRect(graph: GraphDocument, nodeItem: GraphNode): { x: number; y: number; width: number; height: number } {
-  const position = nodePosition(graph, nodeItem.id);
+export function blockVisualRect(graph: GraphDocument, nodeItem: GraphNode, position = nodePosition(graph, nodeItem.id)): { x: number; y: number; width: number; height: number } {
   const metrics = blockMetrics(graph, nodeItem);
   return {
     x: position.x + metrics.visualBounds.x,
     y: position.y + metrics.visualBounds.y,
     width: metrics.visualBounds.width,
     height: metrics.visualBounds.height,
+  };
+}
+
+export function graphWithNodePositions(graph: GraphDocument, positions: Map<string, GraphPosition>): GraphDocument {
+  return {
+    ...graph,
+    nodes: graph.nodes.map((nodeItem) => {
+      const position = positions.get(nodeItem.id);
+      return position ? { ...nodeItem, position } : nodeItem;
+    }),
   };
 }
 
@@ -369,33 +378,57 @@ export function normalizeConditionBranchLayout(graph: GraphDocument): GraphDocum
 }
 
 export function connectedGraphEdges(graph: GraphDocument): GraphEdge[] {
-  return activeGraphEdges(graph).filter((graphEdge) => isVisuallyConnectedEdge(graph, graphEdge));
+  const nodeById = new Map(graph.nodes.map((nodeItem) => [nodeItem.id, nodeItem]));
+  const metricsCache = new Map<string, BlockMetrics>();
+  return graph.edges.filter((graphEdge) => {
+    const source = nodeById.get(graphEdge.sourceNodeId);
+    return Boolean(source && isActiveOutputSlot(source, graphEdge.sourceSlotId)
+      && isVisuallyConnectedEdgeWithLookup(graph, graphEdge, nodeById, metricsCache));
+  });
 }
 
 export function activeGraphEdges(graph: GraphDocument): GraphEdge[] {
+  const nodeById = new Map(graph.nodes.map((nodeItem) => [nodeItem.id, nodeItem]));
   return graph.edges.filter((graphEdge) => {
-    const source = graph.nodes.find((nodeItem) => nodeItem.id === graphEdge.sourceNodeId);
+    const source = nodeById.get(graphEdge.sourceNodeId);
     return source ? isActiveOutputSlot(source, graphEdge.sourceSlotId) : false;
   });
 }
 
 export function isVisuallyConnectedEdge(graph: GraphDocument, graphEdge: GraphEdge): boolean {
-  const source = graph.nodes.find((nodeItem) => nodeItem.id === graphEdge.sourceNodeId);
-  const target = graph.nodes.find((nodeItem) => nodeItem.id === graphEdge.targetNodeId);
+  return isVisuallyConnectedEdgeWithLookup(
+    graph,
+    graphEdge,
+    new Map(graph.nodes.map((nodeItem) => [nodeItem.id, nodeItem])),
+    new Map(),
+  );
+}
+
+function isVisuallyConnectedEdgeWithLookup(
+  graph: GraphDocument,
+  graphEdge: GraphEdge,
+  nodeById: Map<string, GraphNode>,
+  metricsCache: Map<string, BlockMetrics>,
+): boolean {
+  const source = nodeById.get(graphEdge.sourceNodeId);
+  const target = nodeById.get(graphEdge.targetNodeId);
   if (!source || !target) {
     return false;
   }
 
-  const targetInputY = inputCenterOffset(graph, target);
+  const targetInputY = target.slots.some((slot) => slot.direction === 'INPUT')
+    ? blockMetrics(graph, target, metricsCache).inputY
+    : null;
   if (targetInputY === null) {
     return false;
   }
 
   const sourcePosition = source.position ?? fallbackPosition(source.id);
   const targetPosition = target.position ?? fallbackPosition(target.id);
-  const sourceSize = blockMetrics(graph, source);
+  const sourceSize = blockMetrics(graph, source, metricsCache);
   const expectedTargetX = sourcePosition.x + sourceSize.width - connectedOverlap;
-  const expectedTargetInputY = sourcePosition.y + outputCenterOffset(graph, source, graphEdge.sourceSlotId);
+  const expectedTargetInputY = sourcePosition.y
+    + (sourceSize.outputOffsets[graphEdge.sourceSlotId] ?? normalBlockHeight / 2);
   return Math.abs(targetPosition.x - expectedTargetX) <= visualConnectXTolerance
     && Math.abs(targetPosition.y + targetInputY - expectedTargetInputY) <= visualConnectYTolerance;
 }

@@ -60,6 +60,7 @@ import {
   computeDragDrop,
   findInsertCandidate,
 } from './canvas/dragInsert';
+import { ActiveDragPreviewCache } from './canvas/dragPreviewCache';
 import { renderCatalogLibrary } from './catalog/catalogLibrary';
 import { updateBlockOverflowMotion } from './canvas/cardOverflow';
 import {
@@ -118,6 +119,7 @@ let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let panOffset = { x: 0, y: 0 };
 let activeBlockDrag: BlockDrag | null = null;
+const dragPreviewCache = new ActiveDragPreviewCache();
 let activeInsertDecorationKey = '';
 let lastBlockClick: { nodeId: string; time: number } | null = null;
 let graphVersion = 0;
@@ -203,6 +205,7 @@ function renderApp(): void {
   }
 
   cancelInteractionAnimations();
+  dragPreviewCache.clear();
   clearPlacementPreview(false);
   clearCatalogDragGhost();
   activeInsertDecorationKey = '';
@@ -759,6 +762,7 @@ function bindInteractions(): void {
 
 function beginBlockPointerDown(event: PointerEvent, nodeId: string, viewport: HTMLElement): void {
   cancelInteractionAnimations();
+  dragPreviewCache.clear();
   clearPlacementPreview(false);
   clearCatalogDragGhost();
   const graph = currentGraph();
@@ -860,6 +864,7 @@ function endBlockDrag(event: PointerEvent, viewport: HTMLElement): void {
   }
 
   const result = computeDragDrop(currentGraph(), drag);
+  dragPreviewCache.clear();
   const { inserted, movedOutOfContainer } = result;
   const actionText = inserted
     ? connectedActionText(drag.candidate)
@@ -1130,14 +1135,24 @@ function renderInsertPreview(drag: BlockDrag): void {
   }
   if (candidate.valid) {
     const graph = currentGraph();
-    const placement = computeDragDrop(graph, drag).graph;
+    const catalog = activeCatalog();
+    const preview = dragPreviewCache.getOrCompute(graph, graphVersion, catalog, state.selectedNodeId, drag, () => {
+      const placementGraph = computeDragDrop(graph, drag).graph;
+      return {
+        placementGraph,
+        baseBlocks: buildBlocks(graph, catalog, state.selectedNodeId),
+        placementBlocks: buildBlocks(placementGraph, catalog, state.selectedNodeId),
+        draggedNodeIds: candidate.kind === 'condition-slot' ? new Set([drag.rootId]) : new Set(drag.groupIds),
+      };
+    });
     showPlacementPreview({
       key: `${drag.rootId}:${candidate.kind}:${candidate.join.id}`,
-      baseBlocks: buildBlocks(graph, activeCatalog(), state.selectedNodeId),
-      placementBlocks: buildBlocks(placement, activeCatalog(), state.selectedNodeId),
-      draggedNodeIds: candidate.kind === 'condition-slot' ? new Set([drag.rootId]) : new Set(drag.groupIds),
+      baseBlocks: preview.baseBlocks,
+      placementBlocks: preview.placementBlocks,
+      draggedNodeIds: preview.draggedNodeIds,
     });
   } else {
+    dragPreviewCache.clear();
     clearPlacementPreview();
   }
   document.querySelector<HTMLElement>(`[data-block="${candidate.join.from}"]`)?.classList.add('is-related');
@@ -1146,6 +1161,7 @@ function renderInsertPreview(drag: BlockDrag): void {
 }
 
 function clearInsertPreview(): void {
+  dragPreviewCache.clear();
   clearInsertDecorations();
   clearPlacementPreview();
 }

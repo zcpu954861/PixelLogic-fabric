@@ -288,30 +288,30 @@ function renderApp(): void {
           <b>${selectedNode ? escapeHtml(nodeCategoryLabel(selectedNode, activeCatalog())) : '未选中'}</b>
         </div>
         ${selectedNode ? renderNodeInfo(selectedNode, graph, state.selectedNodeId, activeCatalog()) : '<section class="info-card">单击积木选中，拖动积木移动，双击积木编辑。</section>'}
-        ${renderSimulationTestResultSummary(state.simulationResult)}
+        <div data-test-result-view>${renderSimulationTestResultSummary(state.simulationResult)}</div>
         <section class="preview-card">
           <b>API 状态</b>
-          <p>${escapeHtml(state.statusMessage)}</p>
+          <p data-api-status-message>${escapeHtml(state.statusMessage)}</p>
         </section>
         <section class="validation-card">
           <b>最后动作</b>
           <p data-last-action>${escapeHtml(state.lastAction)}</p>
         </section>
-        ${state.error ? `<section class="api-error" role="alert">${escapeHtml(state.error)}</section>` : ''}
+        <div data-api-error-view>${state.error ? `<section class="api-error" role="alert">${escapeHtml(state.error)}</section>` : ''}</div>
       </aside>
 
       <footer class="bottom-dock" aria-label="验证问题和执行记录">
         <section>
           <div class="panel-title"><span>自动检查</span><b data-validation-title>${validationTitle(state, autoSaveInFlight)}</b></div>
           <ul class="issue-list" data-issue-list>
-            <li><span class="${state.apiStatus === 'online' ? 'ok' : 'warn'}"></span>${escapeHtml(state.statusMessage)}</li>
+            <li data-api-validation-status><span class="${state.apiStatus === 'online' ? 'ok' : 'warn'}"></span>${escapeHtml(state.statusMessage)}</li>
             ${uncommittedNotice(state) ? `<li><span class="warn"></span>${escapeHtml(uncommittedNotice(state))}</li>` : ''}
             ${validationItems}
           </ul>
         </section>
         <section data-trace-scroll>
-          <div class="panel-title"><span>执行记录</span><b>${state.latestTrace ? escapeHtml(shortTraceId(state.latestTrace.id)) : '无'}</b></div>
-          <ol class="trace-list">
+          <div class="panel-title"><span>执行记录</span><b data-trace-id>${state.latestTrace ? escapeHtml(shortTraceId(state.latestTrace.id)) : '无'}</b></div>
+          <ol class="trace-list" data-trace-list>
             ${renderTrace(state.latestTrace)}
           </ol>
         </section>
@@ -2429,14 +2429,14 @@ async function startTest(): Promise<void> {
           state.latestTrace = update.trace ?? state.latestTrace;
           state.simulationResult = update.simulation ?? state.simulationResult;
           state.lastAction = update.message || state.lastAction;
-          renderApp();
+          refreshTestExecutionView();
         },
         onFailure: (error) => {
           const connected = error instanceof PixelLogicApiError ? error.connected : false;
           state.apiStatus = connected ? 'online' : 'offline';
           state.statusMessage = connected ? 'API 已连接' : 'API 未连接';
           state.error = error instanceof Error ? error.message : '测试运行状态查询失败。';
-          renderApp();
+          refreshTestExecutionView();
         },
       });
     }
@@ -2563,6 +2563,45 @@ function apiStatusText(): string {
     return 'API 未连接';
   }
   return '连接中';
+}
+
+function refreshTestExecutionView(): void {
+  const traceScroll = captureTraceScrollSnapshot();
+  const resultView = document.querySelector<HTMLElement>('[data-test-result-view]');
+  const apiStatus = document.querySelector<HTMLElement>('[data-api-status]');
+  const apiStatusMessage = document.querySelector<HTMLElement>('[data-api-status-message]');
+  const validationStatus = document.querySelector<HTMLElement>('[data-api-validation-status]');
+  const lastAction = document.querySelector<HTMLElement>('[data-last-action]');
+  const errorView = document.querySelector<HTMLElement>('[data-api-error-view]');
+  const traceId = document.querySelector<HTMLElement>('[data-trace-id]');
+  const traceList = document.querySelector<HTMLElement>('[data-trace-list]');
+
+  if (resultView) {
+    resultView.innerHTML = renderSimulationTestResultSummary(state.simulationResult);
+  }
+  if (apiStatus) {
+    apiStatus.className = `api-pill ${state.apiStatus}`;
+    apiStatus.textContent = apiStatusText();
+  }
+  if (apiStatusMessage) {
+    apiStatusMessage.textContent = state.statusMessage;
+  }
+  if (validationStatus) {
+    validationStatus.innerHTML = `<span class="${state.apiStatus === 'online' ? 'ok' : 'warn'}"></span>${escapeHtml(state.statusMessage)}`;
+  }
+  if (lastAction) {
+    lastAction.textContent = state.lastAction;
+  }
+  if (errorView) {
+    errorView.innerHTML = state.error ? `<section class="api-error" role="alert">${escapeHtml(state.error)}</section>` : '';
+  }
+  if (traceId) {
+    traceId.textContent = state.latestTrace ? shortTraceId(state.latestTrace.id) : '无';
+  }
+  if (traceList) {
+    traceList.innerHTML = renderTrace(state.latestTrace);
+  }
+  restoreTraceScrollSnapshot(traceScroll);
 }
 
 function apiBusyAttr(): string {

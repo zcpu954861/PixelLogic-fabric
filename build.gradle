@@ -58,6 +58,7 @@ def selfChecks = [
 	controlFlowContinuationSelfCheck: 'com.pixelmc.pixellogic.core.runtime.ControlFlowContinuationSelfCheck',
 	loopUntilConditionRackSelfCheck: 'com.pixelmc.pixellogic.core.runtime.LoopUntilConditionRackSelfCheck',
 	entityExecutionContextSelfCheck: 'com.pixelmc.pixellogic.core.runtime.EntityExecutionContextSelfCheck',
+	catalogValidationCleanupSelfCheck: 'com.pixelmc.pixellogic.core.catalog.CatalogValidationCleanupSelfCheck',
 ]
 
 selfChecks.each { taskName, mainClassName ->

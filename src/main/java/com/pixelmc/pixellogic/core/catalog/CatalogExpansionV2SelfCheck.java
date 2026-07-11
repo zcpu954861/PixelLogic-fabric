@@ -100,7 +100,7 @@ public final class CatalogExpansionV2SelfCheck {
         require(valid(targetBlockRegionGraph(Map.of("outputMode", "PASS_ONLY", "regionName", "出生区"), List.of(), true)),
                 "unconnected condition output should still validate");
         require(hasIssue(targetBlockRegionGraph(Map.of("outputMode", "BOGUS", "regionName", "出生区"), List.of(), true),
-                        "condition_output_mode_invalid"),
+                        "config_option_invalid"),
                 "invalid outputMode should fail validation");
     }
 

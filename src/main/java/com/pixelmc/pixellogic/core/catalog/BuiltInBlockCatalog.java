@@ -6,7 +6,6 @@ import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.model.SlotDefinition;
 import com.pixelmc.pixellogic.core.model.SlotDirection;
 
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -49,7 +48,33 @@ public final class BuiltInBlockCatalog {
     private static final Map<String, String> ALIASES = CATALOG.blocks().stream()
             .flatMap(block -> block.aliases().stream().map(alias -> Map.entry(alias, block.id())))
             .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
-    private static final Map<NodeType, String> BLOCK_ID_BY_NODE_TYPE = blockIdByNodeType();
+    private static final Map<NodeType, String> BLOCK_ID_BY_NODE_TYPE = Map.ofEntries(
+            Map.entry(NodeType.MANUAL_TRIGGER, TRIGGER_MANUAL_TEST),
+            Map.entry(NodeType.STATE_COMPARE_CONDITION, CONDITION_STATE_EQUALS),
+            Map.entry(NodeType.MESSAGE_ACTION, ACTION_MESSAGE_CHAT),
+            Map.entry(NodeType.PLAYER_HAS_TAG_CONDITION, CONDITION_PLAYER_HAS_TAG),
+            Map.entry(NodeType.PLAYER_IS_ADMIN_CONDITION, CONDITION_PLAYER_IS_ADMIN),
+            Map.entry(NodeType.PLAYER_DIMENSION_CONDITION, CONDITION_PLAYER_DIMENSION_IS),
+            Map.entry(NodeType.PLAYER_IN_REGION_CONDITION, CONDITION_PLAYER_IN_REGION),
+            Map.entry(NodeType.PLAYER_Y_COMPARE_CONDITION, CONDITION_PLAYER_Y_COMPARE),
+            Map.entry(NodeType.TARGET_BLOCK_TYPE_CONDITION, CONDITION_TARGET_BLOCK_IS_TYPE),
+            Map.entry(NodeType.TARGET_BLOCK_IN_REGION_CONDITION, CONDITION_TARGET_BLOCK_IN_REGION),
+            Map.entry(NodeType.TARGET_BLOCK_Y_COMPARE_CONDITION, CONDITION_TARGET_BLOCK_Y_COMPARE),
+            Map.entry(NodeType.PLAYER_NEAR_TARGET_BLOCK_CONDITION, CONDITION_PLAYER_NEAR_TARGET_BLOCK),
+            Map.entry(NodeType.PLAYER_ADD_TAG_ACTION, ACTION_PLAYER_ADD_TAG),
+            Map.entry(NodeType.PLAYER_REMOVE_TAG_ACTION, ACTION_PLAYER_REMOVE_TAG),
+            Map.entry(NodeType.CONTROL_LOOP_COUNT, CONTROL_LOOP_COUNT),
+            Map.entry(NodeType.CONTROL_LOOP_FOREVER, CONTROL_LOOP_FOREVER),
+            Map.entry(NodeType.CONTROL_LOOP_UNTIL, CONTROL_LOOP_UNTIL),
+            Map.entry(NodeType.CONTEXT_ENTITY_EXECUTE_AS, CONTEXT_ENTITY_EXECUTE_AS),
+            Map.entry(NodeType.CONTEXT_ENTITY_HAS_TAG_CONDITION, CONDITION_CONTEXT_ENTITY_HAS_TAG),
+            Map.entry(NodeType.CONTEXT_ENTITY_ADD_TAG_ACTION, ACTION_CONTEXT_ENTITY_ADD_TAG),
+            Map.entry(NodeType.CONTEXT_ENTITY_REMOVE_TAG_ACTION, ACTION_CONTEXT_ENTITY_REMOVE_TAG),
+            Map.entry(NodeType.STATE_SET_ACTION, STATE_SET),
+            Map.entry(NodeType.STATE_ADD_ACTION, STATE_ADD),
+            Map.entry(NodeType.TIMER_START_ACTION, TIMER_WAIT),
+            Map.entry(NodeType.DEBUG_LOG_ACTION, DEBUG_LOG)
+    );
 
     private BuiltInBlockCatalog() {
     }
@@ -71,17 +96,15 @@ public final class BuiltInBlockCatalog {
         return canonical.isBlank() ? blockIdFor(type) : canonical;
     }
 
+    public static boolean isConditionBlock(String blockId) {
+        return block(blockId).map(definition -> "condition".equals(definition.nodeKind())).orElse(false);
+    }
+
     private static String canonicalBlockId(String blockId) {
         if (blockId == null || blockId.isBlank()) {
             return "";
         }
         return ALIASES.getOrDefault(blockId, blockId);
-    }
-
-    private static Map<NodeType, String> blockIdByNodeType() {
-        EnumMap<NodeType, String> result = new EnumMap<>(NodeType.class);
-        CATALOG.blocks().forEach(block -> result.putIfAbsent(block.nodeType(), block.id()));
-        return Map.copyOf(result);
     }
 
     private static List<BlockCategoryDefinition> categories() {

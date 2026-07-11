@@ -7,13 +7,11 @@ import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
-import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.model.SlotDefinition;
 import com.pixelmc.pixellogic.core.model.SlotDirection;
 import com.pixelmc.pixellogic.core.model.StateScope;
-import com.pixelmc.pixellogic.core.model.StateValueType;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,7 +25,6 @@ public final class GraphValidator {
     private static final int MAX_REGION_NAME_LENGTH = 64;
     private static final int MAX_CONTAINER_DEPTH = 4;
     private static final Pattern NAMESPACED_ID = Pattern.compile("^[a-z0-9_.-]+:[a-z0-9_./-]+$");
-    private static final Set<String> Y_COMPARE_MODES = Set.of("AT_OR_ABOVE", "AT_OR_BELOW", "EQUAL", "BETWEEN");
 
     public List<ValidationIssue> validate(GraphDefinition graph) {
         List<ValidationIssue> issues = new ArrayList<>();
@@ -98,30 +95,30 @@ public final class GraphValidator {
             validateCatalogBlock(node, issues);
             switch (node.type()) {
                 case STATE_COMPARE_CONDITION -> validateCondition(node, issues);
-                case PLAYER_HAS_TAG_CONDITION -> validatePlayerTagCondition(node, issues);
-                case PLAYER_IS_ADMIN_CONDITION -> validateConditionOutputMode(node, issues);
+                case PLAYER_HAS_TAG_CONDITION -> validateTagConfig(node, issues);
+                case PLAYER_IS_ADMIN_CONDITION -> {
+                }
                 case PLAYER_DIMENSION_CONDITION -> validatePlayerDimensionCondition(node, issues);
                 case PLAYER_IN_REGION_CONDITION -> validateRegionCondition(node, issues);
                 case PLAYER_Y_COMPARE_CONDITION, TARGET_BLOCK_Y_COMPARE_CONDITION -> validateYCompareCondition(node, issues);
                 case TARGET_BLOCK_TYPE_CONDITION -> validateTargetBlockTypeCondition(node, issues);
                 case TARGET_BLOCK_IN_REGION_CONDITION -> validateRegionCondition(node, issues);
-                case PLAYER_NEAR_TARGET_BLOCK_CONDITION -> validateNearTargetBlockCondition(node, issues);
-                case CONTROL_LOOP_COUNT -> validateLoopCount(node, issues);
-                case CONTROL_LOOP_FOREVER -> validateLoopForever(node, issues);
+                case PLAYER_NEAR_TARGET_BLOCK_CONDITION, CONTROL_LOOP_COUNT, CONTROL_LOOP_FOREVER -> {
+                }
                 case CONTROL_LOOP_UNTIL -> {
                 }
                 case CONTEXT_ENTITY_EXECUTE_AS -> {
                 }
                 case CONTEXT_ENTITY_HAS_TAG_CONDITION -> {
                     validateTagConfig(node, issues);
-                    validateConditionOutputMode(node, issues);
                 }
                 case CONTEXT_ENTITY_ADD_TAG_ACTION, CONTEXT_ENTITY_REMOVE_TAG_ACTION ->
                         validateTagConfig(node, issues);
                 case PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION -> validateTagConfig(node, issues);
-                case STATE_SET_ACTION -> validateStateAction(node, issues, true);
-                case STATE_ADD_ACTION -> validateStateAction(node, issues, false);
-                case TIMER_START_ACTION -> validateTimer(node, issues);
+                case STATE_SET_ACTION -> validateStateSetValue(node, issues);
+                case STATE_ADD_ACTION -> validateStateAddType(node, issues);
+                case TIMER_START_ACTION -> {
+                }
                 case MANUAL_TRIGGER, COMMAND_TRIGGER, MESSAGE_ACTION, DEBUG_LOG_ACTION -> {
                 }
             }
@@ -314,86 +311,44 @@ public final class GraphValidator {
     }
 
     private void validateCondition(NodeDefinition node, List<ValidationIssue> issues) {
-        validateStateConfig(node, issues);
         if (!"BOOLEAN".equals(node.config().get("valueType"))) {
             error(issues, "condition_state_type_invalid", "State Compare Condition 当前只支持 BOOLEAN：" + node.id());
         }
-        validateBooleanConfig(node, "expected", issues);
-        validateBooleanConfig(node, "missing", issues);
-        validateConditionOutputMode(node, issues);
-    }
-
-    private void validatePlayerTagCondition(NodeDefinition node, List<ValidationIssue> issues) {
-        validateTagConfig(node, issues);
-        validateConditionOutputMode(node, issues);
     }
 
     private void validatePlayerDimensionCondition(NodeDefinition node, List<ValidationIssue> issues) {
         validateNamespacedConfig(node, "dimensionId", "condition_dimension_id_invalid", "维度 ID 必须类似 minecraft:overworld：", issues);
-        validateConditionOutputMode(node, issues);
     }
 
     private void validateTargetBlockTypeCondition(NodeDefinition node, List<ValidationIssue> issues) {
         validateNamespacedConfig(node, "blockId", "condition_block_id_invalid", "方块 ID 必须类似 minecraft:stone：", issues);
-        validateConditionOutputMode(node, issues);
     }
 
     private void validateRegionCondition(NodeDefinition node, List<ValidationIssue> issues) {
         validateRegionNameConfig(node, issues);
-        validateConditionOutputMode(node, issues);
     }
 
     private void validateYCompareCondition(NodeDefinition node, List<ValidationIssue> issues) {
         String mode = node.config().getOrDefault("compareMode", "");
-        if (!Y_COMPARE_MODES.contains(mode)) {
-            error(issues, "condition_y_compare_mode_invalid", "判断方式不合法：" + node.id());
-        } else if ("BETWEEN".equals(mode)) {
-            Integer min = parseIntegerConfig(node, "minY", "高度范围的最小值无效", issues);
-            Integer max = parseIntegerConfig(node, "maxY", "高度范围的最大值无效", issues);
+        if ("BETWEEN".equals(mode)) {
+            Integer min = parseOptionalInteger(node.config().get("minY"));
+            Integer max = parseOptionalInteger(node.config().get("maxY"));
+            if (node.config().getOrDefault("minY", "").isBlank() || node.config().getOrDefault("maxY", "").isBlank()) {
+                error(issues, "condition_y_value_invalid", "高度范围不能为空：" + node.id());
+            }
             if (min != null && max != null && min > max) {
                 error(issues, "condition_y_range_invalid", "高度范围的最小值不能大于最大值：" + node.id());
             }
-        } else {
-            parseIntegerConfig(node, "targetY", "目标 Y 必须是整数", issues);
+        } else if (Set.of("AT_OR_ABOVE", "AT_OR_BELOW", "EQUAL").contains(mode)
+                && node.config().getOrDefault("targetY", "").isBlank()) {
+            error(issues, "condition_y_value_invalid", "目标 Y 不能为空：" + node.id());
         }
-        validateConditionOutputMode(node, issues);
     }
 
-    private void validateNearTargetBlockCondition(NodeDefinition node, List<ValidationIssue> issues) {
+    private Integer parseOptionalInteger(String value) {
         try {
-            double maxDistance = Double.parseDouble(node.config().getOrDefault("maxDistance", ""));
-            if (maxDistance <= 0) {
-                error(issues, "condition_max_distance_invalid", "最大距离必须大于 0：" + node.id());
-            }
+            return value == null || value.isBlank() ? null : Integer.parseInt(value);
         } catch (NumberFormatException exception) {
-            error(issues, "condition_max_distance_invalid", "最大距离必须大于 0：" + node.id());
-        }
-        String horizontalOnly = node.config().getOrDefault("horizontalOnly", "");
-        if (!"true".equals(horizontalOnly) && !"false".equals(horizontalOnly)) {
-            error(issues, "condition_horizontal_only_invalid", "只计算水平距离必须是是或否：" + node.id());
-        }
-        validateConditionOutputMode(node, issues);
-    }
-
-    private void validateLoopCount(NodeDefinition node, List<ValidationIssue> issues) {
-        Integer count = parseIntegerConfig(node, "count", "循环次数必须是整数", issues);
-        if (count != null && (count < 1 || count > 100)) {
-            error(issues, "loop_count_range", "循环次数必须在 1 到 100 之间：" + node.id());
-        }
-    }
-
-    private void validateLoopForever(NodeDefinition node, List<ValidationIssue> issues) {
-        Integer interval = parseIntegerConfig(node, "intervalSeconds", "每轮间隔必须是整数秒", issues);
-        if (interval != null && interval < 1) {
-            error(issues, "loop_interval_invalid", "每轮间隔必须大于 0 秒：" + node.id());
-        }
-    }
-
-    private Integer parseIntegerConfig(NodeDefinition node, String key, String message, List<ValidationIssue> issues) {
-        try {
-            return Integer.parseInt(node.config().getOrDefault(key, ""));
-        } catch (NumberFormatException exception) {
-            error(issues, "condition_y_value_invalid", message + "：" + node.id());
             return null;
         }
     }
@@ -446,33 +401,9 @@ public final class GraphValidator {
         }
     }
 
-    private void validateConditionOutputMode(NodeDefinition node, List<ValidationIssue> issues) {
-        if (!ConditionOutputMode.isValid(node.config().get(ConditionOutputMode.CONFIG_KEY))) {
-            error(issues, "condition_output_mode_invalid", "条件用途无效：" + node.id());
-        }
-    }
-
-    private void validateBooleanConfig(NodeDefinition node, String key, List<ValidationIssue> issues) {
-        String value = node.config().get(key);
-        if (!"true".equals(value) && !"false".equals(value)) {
-            error(issues, "condition_boolean_invalid", "条件布尔配置必须是 true 或 false：" + node.id() + "." + key);
-        }
-    }
-
-    private void validateStateAction(NodeDefinition node, List<ValidationIssue> issues, boolean allowAnyType) {
-        validateStateConfig(node, issues);
-        if (allowAnyType) {
-            validateStateSetValue(node, issues);
-        }
-        if (!allowAnyType && !"INTEGER".equals(node.config().get("valueType"))) {
+    private void validateStateAddType(NodeDefinition node, List<ValidationIssue> issues) {
+        if (!"INTEGER".equals(node.config().get("valueType"))) {
             error(issues, "state_add_type", "State Add 只能用于 INTEGER：" + node.id());
-        }
-        if (!allowAnyType) {
-            try {
-                Integer.parseInt(node.config().getOrDefault("amount", ""));
-            } catch (NumberFormatException exception) {
-                error(issues, "state_add_amount_invalid", "State Add 数值无效：" + node.id());
-            }
         }
     }
 
@@ -492,29 +423,6 @@ public final class GraphValidator {
             } catch (NumberFormatException exception) {
                 error(issues, "state_set_value_invalid", "INTEGER 值无效：" + node.id());
             }
-        }
-    }
-
-    private void validateStateConfig(NodeDefinition node, List<ValidationIssue> issues) {
-        try {
-            StateScope.valueOf(node.config().getOrDefault("scope", ""));
-            StateValueType.valueOf(node.config().getOrDefault("valueType", ""));
-        } catch (IllegalArgumentException exception) {
-            error(issues, "state_scope_or_type_invalid", "状态 scope/type 无效：" + node.id());
-        }
-        if (node.config().getOrDefault("key", "").isBlank()) {
-            error(issues, "state_key_missing", "状态 key 缺失：" + node.id());
-        }
-    }
-
-    private void validateTimer(NodeDefinition node, List<ValidationIssue> issues) {
-        try {
-            int seconds = Integer.parseInt(node.config().getOrDefault("durationSeconds", "0"));
-            if (seconds <= 0) {
-                error(issues, "timer_duration_invalid", "计时器时间必须大于 0 秒：" + node.id());
-            }
-        } catch (NumberFormatException exception) {
-            error(issues, "timer_duration_invalid", "计时器时间无效：" + node.id());
         }
     }
 

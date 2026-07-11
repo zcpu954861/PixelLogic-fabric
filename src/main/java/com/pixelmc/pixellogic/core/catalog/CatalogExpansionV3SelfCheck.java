@@ -84,23 +84,23 @@ public final class CatalogExpansionV3SelfCheck {
 
     private static void checkValidation() {
         require(hasIssue(playerYGraph(Map.of("outputMode", "PASS_ONLY", "compareMode", "BOGUS", "targetY", "64"), List.of(), true),
-                        "condition_y_compare_mode_invalid"),
+                        "config_option_invalid"),
                 "invalid compare mode should fail validation");
         require(hasIssue(playerYGraph(Map.of("outputMode", "PASS_ONLY", "compareMode", "BETWEEN", "minY", "80", "maxY", "60"), List.of(), true),
                         "condition_y_range_invalid"),
                 "minY greater than maxY should fail validation");
         require(hasIssue(nearGraph(Map.of("outputMode", "PASS_ONLY", "maxDistance", "0", "horizontalOnly", "true"), List.of(), true),
-                        "condition_max_distance_invalid"),
+                        "config_number_range"),
                 "maxDistance <= 0 should fail validation");
         require(hasIssue(nearGraph(Map.of("outputMode", "PASS_ONLY", "maxDistance", "5", "horizontalOnly", "maybe"), List.of(), true),
-                        "condition_horizontal_only_invalid"),
+                        "config_option_invalid"),
                 "horizontalOnly should be boolean");
         require(valid(playerYGraph(Map.of("outputMode", "PASS_ONLY", "compareMode", "AT_OR_ABOVE", "targetY", "64"), List.of(), false)),
                 "loose condition input should still validate");
         require(valid(targetYGraph(Map.of("outputMode", "PASS_ONLY", "compareMode", "AT_OR_ABOVE", "targetY", "64"), List.of(), true)),
                 "unconnected condition output should still validate");
         require(hasIssue(nearGraph(Map.of("outputMode", "BOGUS", "maxDistance", "5", "horizontalOnly", "true"), List.of(), true),
-                        "condition_output_mode_invalid"),
+                        "config_option_invalid"),
                 "invalid outputMode should fail validation");
     }
 

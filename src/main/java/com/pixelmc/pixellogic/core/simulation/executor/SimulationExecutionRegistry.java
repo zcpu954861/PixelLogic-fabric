@@ -28,7 +28,9 @@ public final class SimulationExecutionRegistry {
     public SimulationExecutionRegistry(List<SimulationBlockExecutor> executors) {
         EnumMap<NodeType, SimulationBlockExecutor> mapped = new EnumMap<>(NodeType.class);
         for (SimulationBlockExecutor executor : executors) {
-            mapped.put(executor.nodeType(), executor);
+            if (mapped.putIfAbsent(executor.nodeType(), executor) != null) {
+                throw new IllegalArgumentException("重复的模拟执行器：" + executor.nodeType());
+            }
         }
         this.executors = Map.copyOf(mapped);
     }

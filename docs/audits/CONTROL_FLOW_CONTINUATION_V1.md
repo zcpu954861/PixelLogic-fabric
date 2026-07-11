@@ -47,6 +47,6 @@ The initial checkpoint did not change WebUI or HTTP API behavior. The end-to-end
 
 - Pending continuations do not survive a server restart.
 - Waiting for events is not implemented.
-- `break`, `continue`, `loop until`, variable loop counts, and parallel branches are not implemented.
+- `control.loop.until` now reuses this continuation model and its condition rack; `break`, `continue`, variable loop counts, and parallel branches remain unimplemented.
 - Forever loops remain simulation-first and stop after 20 rounds.
 - Real Minecraft execution remains a future adapter boundary.

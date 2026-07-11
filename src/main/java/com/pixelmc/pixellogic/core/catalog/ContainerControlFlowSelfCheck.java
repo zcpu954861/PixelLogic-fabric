@@ -93,9 +93,6 @@ public final class ContainerControlFlowSelfCheck {
             require(foreverTimers.isEmpty(), "forever continuation queue should stop within the simulation cap");
             require(foreverTraces.get(foreverResult.traceId()).map(trace -> trace.containsMessage("已达到测试模拟循环上限")).orElse(false),
                     "forever loop should stop at simulation cap");
-
-            BlockCatalogSelfCheck.main(new String[0]);
-            CatalogExpansionV3SelfCheck.main(new String[0]);
         });
     }
 

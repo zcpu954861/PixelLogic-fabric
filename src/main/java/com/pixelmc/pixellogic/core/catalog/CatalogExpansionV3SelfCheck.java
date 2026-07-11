@@ -26,7 +26,6 @@ import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
 import com.pixelmc.pixellogic.core.trace.BoundedTraceBuffer;
 import com.pixelmc.pixellogic.core.trace.ExecutionTrace;
-import com.pixelmc.pixellogic.server.api.SimulationContextExpansionSelfCheck;
 
 import java.time.Duration;
 import java.util.List;
@@ -50,7 +49,6 @@ public final class CatalogExpansionV3SelfCheck {
             checkPlayerYCompare();
             checkTargetBlockYCompare();
             checkNearTargetBlock();
-            checkRegressions();
         });
     }
 
@@ -190,20 +188,6 @@ public final class CatalogExpansionV3SelfCheck {
         );
         require(disabled.result().success(), "disabled target block near check should not throw");
         require(disabled.trace().containsMessage("未设置目标方块"), "disabled target near should be traced");
-    }
-
-    private static void checkRegressions() {
-        runSimulationContextExpansionSelfCheck();
-        CatalogExpansionV2SelfCheck.main(new String[0]);
-        TextComponentEditorSelfCheck.main(new String[0]);
-    }
-
-    private static void runSimulationContextExpansionSelfCheck() {
-        try {
-            SimulationContextExpansionSelfCheck.main(new String[0]);
-        } catch (Exception exception) {
-            throw new IllegalStateException("simulationContextExpansionSelfCheck failed", exception);
-        }
     }
 
     private static GraphDefinition playerYGraph(Map<String, String> config, List<EdgeDefinition> conditionEdges, boolean connectInput) {

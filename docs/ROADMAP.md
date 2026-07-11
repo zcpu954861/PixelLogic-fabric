@@ -1,92 +1,66 @@
-# Roadmap
+# PixelLogic Roadmap
 
-## Base Version Branch
+## 当前主线 baseline
 
-`mc-1.21.11`
+当前版本分支是 `mc-1.21.11`。版本开发不从 `main` 或 `master` 开始。
 
-Version development happens on `mc-<minecraft-version>` branches, not on `main` or `master`.
+主线 HEAD `e78b190` 已包含：
 
-## Project Metadata
+- Direct Edge / Graph 主模型、草稿保存/校验/提交、自动保存与 undo/redo；
+- Catalog、Form Schema、Simulation Backend、Condition Output Modes；
+- Simulation Test Context、Text Component Editor；
+- Container Control Flow 与交互动画；
+- 可跨 `timer.wait` 恢复的 Control Flow Continuation；
+- Loop Until + Condition Rack；
+- Contextual Entity Execution；
+- 独立 Vanilla TypeScript WebUI 和有界 trace/runtime 安全机制。
 
-- License: `Apache-2.0`
+这些能力仍以 simulation-first 为边界；真实 Minecraft adapter 尚未接入。
 
-## Active Baseline
+## 当前治理堆叠
 
-`mc-1.21.11` now contains the v1 editor baseline: graph draft/save/load, modal editing, humanized forms, auto save/validate/apply, undo/redo, slot-flow drag/insert, WebUI structure split, lifecycle/capacity safety cleanup, catalog expansion v1, and Apache-2.0 metadata.
+治理分支从 `mc-1.21.11` 的 Contextual Entity Execution baseline 向前堆叠，尚未合并主线：
 
-## Next
+1. Polling Interaction Safety Hotfix；
+2. Runtime / API Safety Hardening；
+3. Cleanup A — 低风险删除与构建收缩；
+4. UI Polish v1；
+5. Drag Performance v1；
+6. Catalog / Validation Cleanup v1；
+7. Cleanup E — 文档与 Self-check 收缩（当前阶段）。
 
-Active scoped work:
+本轮治理完成后先做总收口，再决定是否合入 `mc-1.21.11`；当前不发布、不 tag。
 
-- `feature/v1-loop-until-condition-rack` adds `control.loop.until`, typed stable condition slots, a predicate-capability rack, AND plus per-slot NOT, pre-check execution, existing continuation reuse, and a 20-round simulation cap. The first capsule set is limited to player tag/admin/dimension/region and target-block-type conditions.
+## 近期候选方向
 
-Near-term track:
+以下是候选方向，不是已承诺功能：
 
-1. Move more current demo block behavior toward per-block simulation executors only when it reduces real duplication.
-2. Build the next catalog expansion on the Simulation Context Expansion v1 branch when adding position, target-block, or region-aware blocks.
-3. Keep WebUI category navigation data-driven; the current demo categories are not permanent product categories.
-4. Continue graph/editor/runtime improvements only where they support the current visual editor and simulation loop.
-5. Keep Region, old TZZ migration, Channel core, and full professional graph editor behavior out of v1 until the direct graph runtime baseline is stable.
+- 基于官方 loader/Minecraft 事件的真实实体检测和事件上下文；
+- 在现有 condition rack 中增加经过明确产品确认的 predicate capsule；
+- 为真实 Minecraft adapter 建立权限、执行上下文和行为对照前置；
+- 评估执行位置上下文，当前仍暂缓实现。
 
-Long-term architecture track:
+新增方向继续复用 Catalog、GraphValidator、SimulationExecutionRegistry、Direct Edge runtime 和现有 WebUI editor，不另建平行模型。
 
-- Admin Client Bridge / Authorized Tool Session.
-- Client-hosted WebUI.
-- Capability-gated tool items.
-- These are not current active implementation items; future prompts should scope them only after prerequisite Simulation Backend, catalog, graph, runtime, and editor capabilities are mature.
+## 真实 Minecraft 接入前置条件
 
-## Completed Checkpoints
+- 先确认目标 loader 与 Minecraft 版本是否已有官方事件；
+- loader 差异留在 adapter 层，core/simulation 不引用 Minecraft 类；
+- Catalog block 的 simulation 与真实执行语义必须有明确对照；
+- 服务端继续权威校验权限、Graph、上下文和执行结果；
+- 在真实服务器 smoke 前保留 simulation self-check 和 fail-closed 路径。
 
-- Bootstrap Fabric + independent WebUI environment.
-- Slot-based horizontal WebUI design prototype preserved on `design/webui-slot-block-flow`.
-- v1 product/core specs added on `docs/v1-product-core-spec`.
-- Manual simulation runtime spike uses `/pixellogic` command root, in-memory state, bounded trace, wall-clock in-memory timer, and no Channel core model.
-- User manual Minecraft smoke passed for `/pixellogic status`, reset, pass branch, timer completion, trace, and second-run fail branch.
-- API-backed WebUI test-run integration connects localhost JSON endpoints to the slot-based WebUI trace panel.
-- Graph draft/validate/commit checkpoint stores `demo-start-flow` as committed JSON, saves drafts separately, validates before commit, and keeps test-run on committed graph.
-- Graph Draft UX simplification hides draft/validate/commit and reset internals from normal users: `保存` performs save/validate/commit, and `测试运行` automatically resets before starting.
-- Block editor modal UX moves selected-block fields out of the right panel: clicking a block opens an animated editor with unsaved-close confirmation.
-- Block editor humanized form UX hides internal enum strings from normal UI, uses Chinese labels and compact controls, and keeps graph JSON/runtime semantics unchanged.
-- Slot flow drag/insert UX adds block-library creation, free drag, downstream chain drag, Condition branch drag, insert-into-connection, minimal disconnect/delete actions, position metadata persistence, and trace display polish.
-- WebUI structure split moves the large frontend entry and stylesheet into responsibility-based TypeScript and CSS modules without changing behavior.
-- Apache-2.0 license metadata and full `LICENSE` text are included on `mc-1.21.11`.
-- v1 editor baseline health audit completed with no P0/P1.
-- Lifecycle/capacity safety cleanup is merged into `mc-1.21.11` with state/timer/trace/undo/autosave/API lifecycle bounds.
-- Block Catalog / Simulation Model docs define the next direction: concrete catalog blocks, registry-driven categories, and simulation executors separated from future Minecraft executors.
-- Block Catalog skeleton branch adds the Java built-in catalog registry, `blockId` compatibility, readonly catalog API, catalog-driven WebUI library, and `blockCatalogSelfCheck` for the current seven demo blocks.
-- Catalog form schema + rich text field branch adopts `formSchema` as the editor main path for the current seven demo blocks, adds catalog summaries, upgrades message text to a structured rich text component MVP, and restores modal-local draft + manual save semantics for configuration edits.
-- Simulation Backend boundary docs define the next backend direction: simulated actor/world/inventory/container/event abstractions, a logical receiver runner, per-block simulation executors, capability matrix, and maintenance rules against mega files.
-- Simulation Backend skeleton branch adds minimal `core/simulation` context/event/runner/result/executor code, routes manual/WebUI test-run through `SimulationRunner`, and registers the first simulation-backed player tag condition/action blocks.
-- Condition output mode branch adds `满足时继续` / `不满足时继续` / `分成两路`, makes unconnected condition outputs end gracefully, allows unconnected condition inputs during editing, moves `condition.player.has_tag` to 条件判断 / 玩家条件, and keeps the demo graph as explicit dual-branch.
-- Simulation Test Context MVP lets WebUI test runs send a temporary simulated player display name, tags, and administrator flag; results show initial/final tags without writing the context into graph JSON or saving scenarios.
-- Simulation Context Expansion v1 extends that temporary test context with player position, optional target block, and simple region facts for future block expansion, still without named scenarios, graph writes, or a real MC adapter.
-- Catalog Expansion v1 adds `玩家是否拥有标签`, `玩家是否为管理员`, `移除玩家标签`, and the title/subtitle/actionbar message blocks; message color and formatting toolbar remains a follow-up.
-- Maintainability Cleanup v1 reduces frontend catalog duplication, extracts slot-flow/catalog rendering helpers from `app.ts`, consolidates self-check support, and removes runtime future-switch naming noise without changing product behavior.
-- Text Component Editor v1 adds the shared rich text component editor for message/title/subtitle/actionbar fields.
-- Admin Client Bridge design audit records the long-term direction: authorized client-hosted WebUI, local bridge transport, server-authoritative capability checks, and capability-gated future tool items.
-- Catalog Expansion v2 Context Blocks builds on `feature/v1-simulation-context-expansion` and adds read-only conditions for player dimension, player in region, target block type, and target block in region.
-- WebUI Cleanup v2 + Catalog Expansion v3 continues on `feature/v1-webui-cleanup-catalog-v3`: it splits more orchestration helpers out of `web-ui/src/ui/app.ts` and adds the read-only spatial condition blocks for player Y, target-block Y, and player near target block.
-- Container Control Flow v1 on `feature/v1-container-control-flow` adds C-shaped loop containers, flat body membership, fixed-count loop simulation, and simulation-capped forever loop behavior.
+## 明确暂缓
 
-## Follow-Ups
+- If/Else Container、OR/逻辑条件组、break/continue、for-each；
+- 完整事件总线或对普通用户暴露 Channel；
+- Admin Client Bridge / Authorized Tool Session 的实现；
+- Region 旧系统、旧 TZZ adapter、多 loader 同时接入；
+- 完整专业脚本 IDE、大规模框架重写、Canvas/WebGL 全量迁移；
+- named simulation scenario、持久化测试上下文和完整 Minecraft 世界模拟。
 
-P2 before broader runtime use:
+## 历史来源
 
-- The current simulation runtime now has a small `SimulationRunner` wrapper, but most demo behavior still lives in `GraphRuntime`; move behavior out gradually only when the executor split is useful.
-- `web-ui/src/ui/app.ts` remains the composition root and largest frontend file; keep extracting cohesive helpers only when new work would otherwise make it larger.
-- Rich text message blocks now have the v1 shared text component editor with selected-text color and formatting controls; hover/click events, translate/score/nbt, variables, and a real Minecraft Text adapter remain future work.
-- Pending timers now have a spike-level max pending count plus reset/commit/stop cleanup. Broader runtime still needs a real capacity/backpressure policy.
-- In-memory state now has a spike-level cap and reset/stop cleanup. Broader runtime still needs durable lifecycle and persistence policy before non-spike use.
-- Draft saves return fingerprints but do not yet enforce `expectedFingerprint`; add optimistic conflict handling before multi-user or multi-tab editing.
-- Server HTTP API is still the current dev/local/self-check WebUI transport. The long-term recommended admin flow is client-hosted WebUI through an authorized PixelLogic client session, but that track is deferred until a future scoped prompt.
-- Context-aware condition blocks currently consume only per-run Simulation Test Context facts. Real Minecraft adapter behavior, Region old system integration, world mutation, named scenarios, and persisted test contexts remain deferred.
-- Spatial condition blocks remain intentionally small: no target-block-exists block, no X/Z coordinate compare blocks, no area geometry conditions, no world map, and no named scenario persistence.
-- Loop control remains intentionally bounded: no OR/condition groups, asynchronous predicates, break/continue, if/else, for-each, variable loop count, persistent server loop scheduler, or real MC adapter yet.
-- The editor still has no copy, duplicate, or graph-import UI. Future fragment import/copy must remap node, edge, container, and dynamic condition-slot identities together.
-
-## Loader Event Policy
-
-- Check official Fabric/Minecraft event APIs before any trigger work.
-- Reuse official events when possible.
-- Keep Fabric/Forge/NeoForge differences in adapters.
-- Delay unsafe triggers instead of forcing Mixin/tick scans too early.
+- 当前行为和边界：`docs/specs/`、`docs/api/`、仍保留的阶段文档与架构 audit；
+- 具体实现：对应提交和分支的 Git 历史；
+- 已完成 checkpoint 的命令输出和 merge readiness 记录：Git 历史，不再在 ROADMAP 中重复维护。

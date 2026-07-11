@@ -62,9 +62,21 @@ try {
   );
   assert.match(addSimulationTargetEntityTag(context, '').error, /标签不能为空/);
 
+  context = {
+    ...context,
+    actor: { ...context.actor, tags: ['actor-tag'] },
+    world: {
+      ...context.world,
+      regions: [{ name: 'arena', dimensionId: 'minecraft:overworld', minX: 0, minY: 0, minZ: 0, maxX: 10, maxY: 10, maxZ: 10 }],
+    },
+  };
   const cloned = cloneSimulationTestContext(context);
+  cloned.actor.tags.push('actor-clone-only');
   cloned.world.targetEntity.tags.push('clone-only');
+  cloned.world.regions[0].name = 'changed';
+  assert.deepEqual(context.actor.tags, ['actor-tag'], 'actor tags must be deep-cloned');
   assert.deepEqual(context.world.targetEntity.tags, ['boss'], 'target entity tags must be deep-cloned');
+  assert.equal(context.world.regions[0].name, 'arena', 'regions must be deep-cloned');
   assert.deepEqual(simulationTestPayload(context).testContext.world.targetEntity, context.world.targetEntity);
 
   const modal = renderSimulationTestContextModal(context, { closing: false, error: '', steady: true });

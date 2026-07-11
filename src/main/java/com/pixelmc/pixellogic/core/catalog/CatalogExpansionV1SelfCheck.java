@@ -17,11 +17,9 @@ import com.pixelmc.pixellogic.core.runtime.RuntimeLimits;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationActor;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationWorld;
-import com.pixelmc.pixellogic.core.simulation.event.SimulationEvent;
 import com.pixelmc.pixellogic.core.simulation.executor.SimulationExecutionRegistry;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionRequest;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionResult;
-import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunOptions;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunner;
 import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
@@ -189,10 +187,11 @@ public final class CatalogExpansionV1SelfCheck {
         );
         return runner.run(new SimulationExecutionRequest(
                 graph.id(),
-                SimulationEvent.manual(TRIGGER_TYPE, "/pixellogic test start", "catalog-expansion"),
+                TRIGGER_TYPE,
+                "/pixellogic test start",
                 actor,
                 SimulationWorld.overworld(),
-                SimulationRunOptions.realTime(),
+                "catalog-expansion",
                 0L
         ));
     }

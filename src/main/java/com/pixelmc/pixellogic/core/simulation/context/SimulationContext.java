@@ -1,10 +1,8 @@
 package com.pixelmc.pixellogic.core.simulation.context;
 
-import com.pixelmc.pixellogic.core.simulation.event.SimulationEvent;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationActionResult;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationMessageResult;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationStateChangeResult;
-import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunOptions;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,8 +14,6 @@ public final class SimulationContext {
     private final long generation;
     private final SimulationActor actor;
     private final SimulationWorld world;
-    private final SimulationEvent event;
-    private final SimulationRunOptions options;
     private final List<SimulationActionResult> actionResults = new ArrayList<>();
     private final List<SimulationMessageResult> messageResults = new ArrayList<>();
     private final List<SimulationStateChangeResult> stateChanges = new ArrayList<>();
@@ -27,16 +23,12 @@ public final class SimulationContext {
             String runId,
             long generation,
             SimulationActor actor,
-            SimulationWorld world,
-            SimulationEvent event,
-            SimulationRunOptions options
+            SimulationWorld world
     ) {
         this.runId = runId == null || runId.isBlank() ? UUID.randomUUID().toString() : runId;
         this.generation = generation;
         this.actor = actor;
         this.world = world;
-        this.event = event;
-        this.options = options;
     }
 
     public String runId() {
@@ -71,14 +63,6 @@ public final class SimulationContext {
             return Optional.of(actor);
         }
         return targetEntity().filter(entity -> entity.id().toString().equals(referenceId));
-    }
-
-    public SimulationEvent event() {
-        return event;
-    }
-
-    public SimulationRunOptions options() {
-        return options;
     }
 
     public synchronized void addActionResult(SimulationActionResult result) {

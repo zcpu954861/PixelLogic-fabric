@@ -11,10 +11,7 @@ export function renderEditorModal(
   catalog: BlockCatalog,
   options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string; steady: boolean; simulationTestContext: SimulationTestContext; graph: GraphDocument; rackChildEditing?: boolean },
 ): string {
-  const officialName = nodeOfficialLabel(nodeItem, catalog);
-  const customName = nodeItem.displayName.trim();
-  const titleName = customName && customName !== officialName ? customName : '未命名';
-  const title = `${titleName}(${officialName})`;
+  const title = blockEditorTitle(nodeItem, catalog);
   const modalIssue = options.modalIssue;
   const rackCapsule = Boolean(conditionRackParent(options.graph, nodeItem));
 
@@ -35,6 +32,7 @@ export function renderEditorModal(
           </section>
           ${renderNodeEditor(nodeItem, catalog, options.simulationTestContext, rackCapsule)}
           ${renderConditionRackEditor(nodeItem, options.graph, catalog)}
+          <p class="editor-save-note">拖拽和连接会自动保存；此处字段修改需点击“保存修改”。</p>
           ${options.error || options.hasValidation ? `
             <section class="editor-issues" role="${options.error ? 'alert' : 'status'}">
               <b>${options.error ? '保存提示' : '检查结果'}</b>
@@ -44,7 +42,7 @@ export function renderEditorModal(
         </div>
         <footer class="editor-actions">
           <button type="button" class="ghost-button" data-modal-action="cancel">${options.rackChildEditing ? '返回条件架' : '关闭'}</button>
-          <button type="button" class="run-button" data-modal-action="save">${options.rackChildEditing ? '保存条件并返回' : '保存'}</button>
+          <button type="button" class="run-button" data-modal-action="save">保存修改</button>
         </footer>
         <div class="unsaved-confirm" data-unsaved-confirm hidden>
           <section role="alertdialog" aria-modal="true" aria-labelledby="unsaved-confirm-title">
@@ -67,4 +65,10 @@ export function renderEditorModal(
       </section>
     </div>
   `;
+}
+
+export function blockEditorTitle(nodeItem: GraphNode, catalog: BlockCatalog): string {
+  const officialName = nodeOfficialLabel(nodeItem, catalog);
+  const customName = nodeItem.displayName.trim();
+  return `${customName && customName !== officialName ? customName : '未命名'}(${officialName})`;
 }

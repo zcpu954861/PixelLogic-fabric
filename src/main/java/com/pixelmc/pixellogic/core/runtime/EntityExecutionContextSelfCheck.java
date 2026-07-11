@@ -23,11 +23,9 @@ import com.pixelmc.pixellogic.core.simulation.context.SimulationContext;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationEntity;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationPosition;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationWorld;
-import com.pixelmc.pixellogic.core.simulation.event.SimulationEvent;
 import com.pixelmc.pixellogic.core.simulation.executor.SimulationExecutionRegistry;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionRequest;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionResult;
-import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunOptions;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunner;
 import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
@@ -733,9 +731,7 @@ public final class EntityExecutionContextSelfCheck {
                 UUID.randomUUID().toString(),
                 1L,
                 actor,
-                world,
-                SimulationEvent.manual("manual.test.start", "", "entity-context-self-check"),
-                SimulationRunOptions.realTime()
+                world
         );
     }
 
@@ -865,10 +861,11 @@ public final class EntityExecutionContextSelfCheck {
         private SimulationExecutionResult start() {
             SimulationExecutionResult result = runner.run(new SimulationExecutionRequest(
                     "self-check",
-                    SimulationEvent.manual("manual.test.start", "", "entity-context-self-check"),
+                    "manual.test.start",
+                    "",
                     actor,
                     world,
-                    SimulationRunOptions.realTime(),
+                    "entity-context-self-check",
                     1L
             ), latest::set);
             latest.set(result);

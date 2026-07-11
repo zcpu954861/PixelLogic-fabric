@@ -66,6 +66,9 @@ The v1 editor baseline now has spike-level safety bounds:
 - Pending timers are capped at 128 and can be cleared as a group during reset, graph install, and shutdown.
 - Trace storage remains a bounded ring buffer: 50 traces, 100 steps per trace.
 - `PixelLogicSpikeService.close()` stops timers and clears in-memory state.
+- Local API server-thread tasks have atomic queued/running/completed/cancelled states. A queued task that exceeds the wait boundary is cancelled and skipped; an already-running task gets a second finite completion window and is never reported as definitely unexecuted.
+- API and service close fences reject new operations and prevent queued work from crossing the service mutation boundary. Existing generation and scheduler guards still discard late timer/continuation callbacks.
+- INTEGER state addition uses `Math.addExact`; overflow leaves the previous value unchanged and reaches the normal Chinese runtime failure trace/result path.
 
 These bounds are intentionally small and local to the spike. Before broader runtime use, state ownership, lifecycle, persistence, and per-scope capacity policy still need a product decision.
 

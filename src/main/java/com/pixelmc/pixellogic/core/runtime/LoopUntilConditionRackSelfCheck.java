@@ -24,9 +24,7 @@ import com.pixelmc.pixellogic.core.simulation.context.SimulationContext;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationPosition;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationRegionFact;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationWorld;
-import com.pixelmc.pixellogic.core.simulation.event.SimulationEvent;
 import com.pixelmc.pixellogic.core.simulation.executor.SimulationExecutionRegistry;
-import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunOptions;
 import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
 import com.pixelmc.pixellogic.core.trace.BoundedTraceBuffer;
@@ -722,9 +720,7 @@ public final class LoopUntilConditionRackSelfCheck {
                 UUID.randomUUID().toString(),
                 0,
                 actor,
-                world,
-                SimulationEvent.manual("manual", "/pixellogic test start", "loop-until-self-check"),
-                SimulationRunOptions.realTime()
+                world
         );
     }
 
@@ -769,8 +765,7 @@ public final class LoopUntilConditionRackSelfCheck {
         @Override
         public java.util.Optional<RuntimeNodeExecutionResult> executeSimulationNode(
                 NodeDefinition node,
-                UUID playerId,
-                String sessionId
+                RuntimeExecutionContext runtimeContext
         ) {
             return registry.execute(node, context, this);
         }
@@ -778,8 +773,7 @@ public final class LoopUntilConditionRackSelfCheck {
         @Override
         public java.util.Optional<RuntimePredicateResult> evaluatePredicate(
                 NodeDefinition node,
-                UUID playerId,
-                String sessionId
+                RuntimeExecutionContext runtimeContext
         ) {
             return registry.evaluatePredicate(node, context, this);
         }

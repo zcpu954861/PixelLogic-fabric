@@ -5,7 +5,7 @@ import { escapeHtml } from '../../utils/dom';
 import { nodeConfigItems } from '../editor/formControls';
 import { rackAwareNodeSummary, slotLabel } from '../humanize/labels';
 
-export function renderNodeInfo(nodeItem: GraphNode, graph: GraphDocument, selectedNodeId: string, catalog: BlockCatalog): string {
+export function renderNodeInfo(nodeItem: GraphNode, graph: GraphDocument, _selectedNodeId: string, catalog: BlockCatalog): string {
   const configItems = nodeConfigItems(nodeItem, catalog, Boolean(conditionRackParent(graph, nodeItem)));
   return `
     <section class="info-card">
@@ -22,7 +22,7 @@ export function renderNodeInfo(nodeItem: GraphNode, graph: GraphDocument, select
         </dl>
       ` : '<p>该积木当前没有额外配置。</p>'}
     </section>
-    ${renderConnectionInfo(nodeItem, graph, selectedNodeId)}
+    ${renderConnectionInfo(nodeItem, graph)}
     <section class="info-card">
       <b>提示</b>
       <p>单击选中，拖动移动积木和后续链条，双击打开编辑窗口。</p>
@@ -30,7 +30,7 @@ export function renderNodeInfo(nodeItem: GraphNode, graph: GraphDocument, select
   `;
 }
 
-function renderConnectionInfo(nodeItem: GraphNode, graph: GraphDocument, selectedNodeId: string): string {
+function renderConnectionInfo(nodeItem: GraphNode, graph: GraphDocument): string {
   const edges = connectedGraphEdges(graph);
   const incoming = edges.filter((graphEdge) => graphEdge.targetNodeId === nodeItem.id);
   const outgoing = edges.filter((graphEdge) => graphEdge.sourceNodeId === nodeItem.id);

@@ -11,7 +11,7 @@ The WebUI is an independent Vite + TypeScript project.
 - Graph API-backed draft save, draft validation, and commit for `demo-start-flow`.
 - App shell communicates the product direction: cards, slots, direct execution trace, and readable user actions.
 
-## Future Block Catalog
+## Block Catalog
 
 The left library is now driven by the Block Catalog skeleton. The current top-level entries (`触发事件 / 条件判断块(胶囊) / 玩家操作 / 消息显示 / 控制流 / 执行上下文 / 状态数据 / 时间调度 / 调试诊断`) are catalog data, not hard-coded frontend node families.
 
@@ -22,12 +22,12 @@ Current behavior:
 - clicking a concrete block creates a graph node with `blockId`, `nodeType`, default config, and slots from catalog data;
 - API catalog failures show a minimal offline catalog placeholder while the normal Chinese API disconnected error explains that the full catalog is unavailable;
 - technical block ids are not primary user-facing copy.
+- catalog entries support live drag ghosts and placement previews before pointer release.
 
 Still future:
 
 - search, tags, recent blocks, and common recommendations;
 - richer per-block summary templates shared with backend trace formatting;
-- drag-from-library placement.
 
 Users should drag concrete blocks such as `发送聊天消息`, `状态等于`, or `等待一段时间`, not a generic `动作` or `条件` block that hides many unrelated modes in one form.
 
@@ -125,7 +125,7 @@ Important user semantics:
 - Container Control Flow v1 adds C-shaped control blocks. Loop nodes remain flat graph nodes, while body children store `parentContainerId` and `parentSlot=body`; internal body chains still use normal edges.
 - Entity Execution Context v1 reuses that same C-shaped body model. `context.entity.execute_as` edits one catalog-backed `entitySource` field with user-facing choices `当前条件对象`, `运行实体`, and `目标实体`; the graph stores only the enum value and body membership, never a runtime subject or mutable entity state.
 - Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
-- Card gray type labels and the right-panel selected-block badge show the catalog top-level category, such as `条件判断`, `玩家操作`, or `消息显示`, instead of repeating the concrete block name.
+- Card type labels and the right-panel selected-block badge show the catalog top-level category, such as `条件判断块(胶囊)`, `玩家操作`, or `消息显示`, instead of repeating the concrete block name.
 - Block card titles stay on one line. If the rendered title actually overflows, it scrolls horizontally back and forth instead of wrapping or using a fixed ellipsis.
 - Block card summaries reserve about three lines. If the rendered summary actually overflows, it scrolls vertically back and forth; short summaries and summaries that fit in three lines do not animate.
 - The block editor title uses `未命名(官方积木名)` when the current display name still equals the catalog name, and `自定义名称(官方积木名)` after the user renames it.
@@ -187,6 +187,8 @@ Undo/redo restores stable slot and node identities exactly. The current WebUI ha
 
 Static WebUI checks cover pure geometry, complete bounds, predicate-only drop rules, deep cloning, accessible NOT markup, rack-aware drag/ghost grouping, and reduced-motion structure. They are not browser E2E tests.
 
+Rack rows, capsules, toggles, selection, hit testing, nesting, and canvas bounds all consume the same complete geometry bounds; the rack is not a DOM-only overlay.
+
 ## Entity Execution Context
 
 `context.entity.execute_as` uses the existing container geometry, layout, drag insertion, ghost, and interaction-animation systems. A shared `isBodyContainerNode` classification covers loop and entity-context nodes so empty-body insertion, multi-node body chains, nested loop/context layouts, descendant dragging, and container growth use one `body` anchor contract. The `执行上下文` catalog category and purple styling distinguish the block visually without introducing a second C-shape geometry.
@@ -223,6 +225,8 @@ Current responsibility boundaries:
 - `ui/humanize/`: labels and trace message humanization.
 - `ui/validation/`: validation/draft status copy.
 - `styles/`: split CSS modules imported by `styles/index.css`.
+
+Active test-run polling uses bounded `setTimeout` scheduling. Poll updates only run status, trace, validation, and result DOM that changed; it does not replace the canvas, modal, drag state, history, or autosave state. Trace refresh preserves the user's scroll position unless it was already following the bottom.
 
 ## Boundary
 

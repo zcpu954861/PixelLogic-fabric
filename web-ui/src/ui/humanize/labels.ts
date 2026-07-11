@@ -281,10 +281,6 @@ export function scopeLabel(value = 'PLAYER'): string {
   return stateScopeOptions().find((option) => option.value === value)?.label ?? value;
 }
 
-export function valueTypeLabel(value = 'BOOLEAN'): string {
-  return valueTypeOptions().find((option) => option.value === value)?.label ?? value;
-}
-
 export function booleanLabel(value = 'false'): string {
   return booleanOptions().find((option) => option.value === value)?.label ?? value;
 }

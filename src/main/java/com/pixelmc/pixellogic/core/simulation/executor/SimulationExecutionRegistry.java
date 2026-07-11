@@ -28,7 +28,9 @@ public final class SimulationExecutionRegistry {
     public SimulationExecutionRegistry(List<SimulationBlockExecutor> executors) {
         EnumMap<NodeType, SimulationBlockExecutor> mapped = new EnumMap<>(NodeType.class);
         for (SimulationBlockExecutor executor : executors) {
-            mapped.put(executor.nodeType(), executor);
+            if (mapped.putIfAbsent(executor.nodeType(), executor) != null) {
+                throw new IllegalArgumentException("重复的模拟执行器：" + executor.nodeType());
+            }
         }
         this.executors = Map.copyOf(mapped);
     }
@@ -210,7 +212,7 @@ public final class SimulationExecutionRegistry {
         public RuntimePredicateResult evaluatePredicate(NodeDefinition node, SimulationContext context, RuntimeServices services) {
             String regionName = config(node, "regionName", "");
             Optional<SimulationRegionFact> region = context.world().findRegion(regionName);
-            boolean passed = region.isPresent() && context.world().isPositionInsideRegion(context.actorPosition(), region.get());
+            boolean passed = region.isPresent() && region.get().contains(context.actorPosition());
             String detail = region.isEmpty()
                     ? "未找到测试区域「" + regionName + "」。"
                     : context.actor().displayName() + (passed ? " 在" : " 不在") + "测试区域「" + regionName + "」内。";
@@ -284,7 +286,7 @@ public final class SimulationExecutionRegistry {
             SimulationBlockFact target = context.world().targetBlock();
             Optional<SimulationRegionFact> region = context.world().findRegion(regionName);
             boolean passed = target.enabled() && region.isPresent()
-                    && context.world().isPositionInsideRegion(target.position(), region.get());
+                    && region.get().contains(target.position());
             ConditionOutputMode mode = ConditionOutputMode.fromConfig(node.config());
             String detail;
             if (!target.enabled()) {

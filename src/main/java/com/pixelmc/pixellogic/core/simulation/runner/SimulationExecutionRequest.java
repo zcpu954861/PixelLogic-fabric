@@ -2,16 +2,14 @@ package com.pixelmc.pixellogic.core.simulation.runner;
 
 import com.pixelmc.pixellogic.core.simulation.context.SimulationActor;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationWorld;
-import com.pixelmc.pixellogic.core.simulation.event.SimulationEvent;
-
-import java.util.UUID;
 
 public record SimulationExecutionRequest(
         String graphId,
-        SimulationEvent event,
+        String triggerType,
+        String commandText,
         SimulationActor actor,
         SimulationWorld world,
-        SimulationRunOptions options,
+        String sessionId,
         long generation
 ) {
     public SimulationExecutionRequest {
@@ -19,28 +17,10 @@ public record SimulationExecutionRequest(
             throw new IllegalArgumentException("simulation actor is required");
         }
         graphId = graphId == null || graphId.isBlank() ? "demo-start-flow" : graphId;
-        event = event == null ? SimulationEvent.manual("manual.test.start", "", "manual-session") : event;
+        triggerType = triggerType == null || triggerType.isBlank() ? "manual.test.start" : triggerType;
+        commandText = commandText == null ? "" : commandText;
         world = world == null ? SimulationWorld.overworld() : world;
-        options = options == null ? SimulationRunOptions.realTime() : options;
-    }
-
-    public static SimulationExecutionRequest manual(
-            String graphId,
-            String triggerType,
-            String commandText,
-            UUID playerId,
-            String playerName,
-            String sessionId,
-            long generation
-    ) {
-        return manual(
-                graphId,
-                triggerType,
-                commandText,
-                SimulationActor.player(playerId, playerName),
-                sessionId,
-                generation
-        );
+        sessionId = sessionId == null || sessionId.isBlank() ? "manual-session" : sessionId;
     }
 
     public static SimulationExecutionRequest manual(
@@ -54,22 +34,12 @@ public record SimulationExecutionRequest(
     ) {
         return new SimulationExecutionRequest(
                 graphId,
-                SimulationEvent.manual(triggerType, commandText, sessionId),
+                triggerType,
+                commandText,
                 actor,
                 world,
-                SimulationRunOptions.realTime(),
+                sessionId,
                 generation
         );
-    }
-
-    public static SimulationExecutionRequest manual(
-            String graphId,
-            String triggerType,
-            String commandText,
-            SimulationActor actor,
-            String sessionId,
-            long generation
-    ) {
-        return manual(graphId, triggerType, commandText, actor, SimulationWorld.overworld(), sessionId, generation);
     }
 }

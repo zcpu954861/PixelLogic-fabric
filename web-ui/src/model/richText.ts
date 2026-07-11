@@ -91,10 +91,6 @@ export function richTextColorCss(color: RichTextColor | undefined): string | und
   return minecraftColors.find((item) => item.value === color)?.css;
 }
 
-export function richTextConfig(plainText: string): string {
-  return serializeRichText({ segments: [{ text: plainText ?? '', style: {} }] });
-}
-
 export function richTextPlainText(raw = ''): string {
   return normalizeRichText(raw).plainText;
 }
@@ -127,38 +123,6 @@ export function normalizeRichText(raw = ''): RichTextConfig {
 
 export function serializeRichText(config: { segments: RichTextSegment[] }): string {
   return JSON.stringify(configFromSegments(config.segments));
-}
-
-export function updateRichTextPlainText(raw: string, nextPlainText: string): string {
-  const config = normalizeRichText(raw);
-  const previous = config.plainText;
-  const next = nextPlainText ?? '';
-  if (previous === next) {
-    return serializeRichText(config);
-  }
-
-  let prefix = 0;
-  while (prefix < previous.length && prefix < next.length && previous[prefix] === next[prefix]) {
-    prefix += 1;
-  }
-
-  let suffix = 0;
-  while (
-    suffix < previous.length - prefix
-    && suffix < next.length - prefix
-    && previous[previous.length - 1 - suffix] === next[next.length - 1 - suffix]
-  ) {
-    suffix += 1;
-  }
-
-  const oldEnd = previous.length - suffix;
-  const inserted = next.slice(prefix, next.length - suffix);
-  const segments = [
-    ...sliceSegments(config.segments, 0, prefix),
-    ...(inserted ? [{ text: inserted, style: styleAt(config.segments, prefix) }] : []),
-    ...sliceSegments(config.segments, oldEnd, previous.length),
-  ];
-  return serializeRichText({ segments });
 }
 
 export function applyRichTextStyle(
@@ -239,18 +203,6 @@ function sliceSegments(segments: RichTextSegment[], start: number, end: number):
     }
   }
   return result;
-}
-
-function styleAt(segments: RichTextSegment[], index: number): RichTextStyle {
-  let cursor = 0;
-  for (const segment of segments) {
-    const next = cursor + segment.text.length;
-    if (index <= next) {
-      return { ...segment.style };
-    }
-    cursor = next;
-  }
-  return segments.length > 0 ? { ...segments[segments.length - 1].style } : {};
 }
 
 function mergeSegments(segments: RichTextSegment[]): RichTextSegment[] {

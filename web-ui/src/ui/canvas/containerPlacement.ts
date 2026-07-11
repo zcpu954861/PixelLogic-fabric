@@ -2,11 +2,13 @@ import { containerGeometry, normalBlockWidth } from '../../model/containerGeomet
 import {
   activeGraphEdges,
   blockMetrics,
+  blockVisualRect,
   containerBodyRect,
   conditionSlotRects,
   containerDescendantNodeIds,
   downstreamNodeIds,
   fallbackPosition,
+  graphWithNodePositions,
   nodePosition,
 } from '../../model/graphLayout';
 import type { BlockDrag, GraphDocument, GraphNode } from '../../model/graphTypes';
@@ -107,7 +109,7 @@ export function shiftForContainerSizeChanges(beforeGraph: GraphDocument, graph: 
 
 export function syncDraggedContainerMembership(graph: GraphDocument, drag: BlockDrag): boolean {
   const group = new Set(drag.groupIds);
-  const containerGraph = graphWithDragStartPositions(graph, drag);
+  const containerGraph = graphWithNodePositions(graph, drag.startPositions);
   const parentIdsToClear = new Set<string>();
 
   graph.nodes.forEach((nodeItem) => {
@@ -116,7 +118,7 @@ export function syncDraggedContainerMembership(graph: GraphDocument, drag: Block
     }
     const parentId = nodeItem.parentContainerId;
     const parent = parentId ? containerGraph.nodes.find((item) => item.id === parentId) : null;
-    const rect = nodeRect(graph, nodeItem, drag.previewPositions.get(nodeItem.id));
+    const rect = blockVisualRect(graph, nodeItem, drag.previewPositions.get(nodeItem.id));
     const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
     const membershipRect = parent && (nodeItem.parentSlot || 'body') !== 'body'
       ? conditionSlotRects(containerGraph, parent, nodeItem.parentSlot || '')?.row ?? null
@@ -167,29 +169,8 @@ export function draggedGroupBounds(
   }, null);
 }
 
-function graphWithDragStartPositions(graph: GraphDocument, drag: BlockDrag): GraphDocument {
-  return {
-    ...graph,
-    nodes: graph.nodes.map((nodeItem) => {
-      const position = drag.startPositions.get(nodeItem.id);
-      return position ? { ...nodeItem, position } : nodeItem;
-    }),
-  };
-}
-
 function shouldCheckDraggedContainerMembership(nodeItem: GraphNode, group: Set<string>): boolean {
   return group.has(nodeItem.id) && Boolean(nodeItem.parentContainerId) && !group.has(nodeItem.parentContainerId ?? '');
-}
-
-function nodeRect(graph: GraphDocument, nodeItem: GraphNode, previewPosition?: { x: number; y: number }): { x: number; y: number; width: number; height: number } {
-  const position = previewPosition ?? nodePosition(graph, nodeItem.id);
-  const size = blockMetrics(graph, nodeItem);
-  return {
-    x: position.x + size.visualBounds.x,
-    y: position.y + size.visualBounds.y,
-    width: size.visualBounds.width,
-    height: size.visualBounds.height,
-  };
 }
 
 function pointInsideRect(point: { x: number; y: number }, rect: { x: number; y: number; width: number; height: number }): boolean {

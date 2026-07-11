@@ -12,6 +12,38 @@ import {
   type SimulationTestResult,
 } from '../../model/simulationTestContext';
 import { escapeAttr, escapeHtml, shortTraceId } from '../../utils/dom';
+import type { ApiTrace } from '../../model/graphTypes';
+
+type SimulationDisclosure = 'player' | 'entity' | 'block' | 'regions';
+const openSimulationDisclosures = new Set<SimulationDisclosure>();
+let simulationResultDetailsOpen = false;
+
+export function prepareSimulationDisclosures(context: SimulationTestContext): void {
+  openSimulationDisclosures.clear();
+  openSimulationDisclosures.add('player');
+  if (context.world.targetEntity.enabled) openSimulationDisclosures.add('entity');
+  if (context.world.targetBlock.enabled) openSimulationDisclosures.add('block');
+  if (context.world.regions.length > 0) openSimulationDisclosures.add('regions');
+}
+
+export function bindSimulationDisclosures(): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-sim-disclosure]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const id = button.dataset.simDisclosure as SimulationDisclosure;
+      const content = document.getElementById(`sim-disclosure-${id}`);
+      const expanded = button.getAttribute('aria-expanded') !== 'true';
+      button.setAttribute('aria-expanded', String(expanded));
+      if (content) content.hidden = !expanded;
+      expanded ? openSimulationDisclosures.add(id) : openSimulationDisclosures.delete(id);
+    });
+  });
+}
+
+export function bindSimulationResultDetails(): void {
+  document.querySelector<HTMLDetailsElement>('[data-sim-result-details]')?.addEventListener('toggle', (event) => {
+    simulationResultDetailsOpen = (event.currentTarget as HTMLDetailsElement).open;
+  });
+}
 
 export function renderTestRunControl(menuOpen: boolean, busyAttr: string): string {
   return `
@@ -51,7 +83,6 @@ export function renderSimulationTestContextModal(
             <p>${escapeHtml(context.actor.displayName || 'WebUI 模拟玩家')} · ${escapeHtml(formatSimulationPosition(context.world.playerPosition))} · 目标实体 ${escapeHtml(formatSimulationTargetEntity(context.world.targetEntity))} · 目标方块 ${escapeHtml(formatSimulationTargetBlock(context.world.targetBlock))} · 区域 ${escapeHtml(formatSimulationRegions(context.world.regions))}</p>
           </section>
           ${renderPlayerSection(context, tags)}
-          ${renderPositionSection(context.world.playerPosition)}
           ${renderTargetEntitySection(context.world.targetEntity)}
           ${renderTargetBlockSection(context.world.targetBlock)}
           ${renderRegionSection(context.world.regions)}
@@ -64,7 +95,7 @@ export function renderSimulationTestContextModal(
         </div>
         <footer class="editor-actions">
           <button type="button" class="ghost-button" data-sim-modal-action="cancel">关闭</button>
-          <button type="button" class="run-button" data-sim-modal-action="save">保存</button>
+          <button type="button" class="run-button" data-sim-modal-action="save">保存修改</button>
         </footer>
         <div class="unsaved-confirm" data-sim-unsaved-confirm hidden>
           <section role="alertdialog" aria-modal="true" aria-labelledby="sim-unsaved-confirm-title">
@@ -82,9 +113,9 @@ export function renderSimulationTestContextModal(
 
 function renderTargetEntitySection(target: SimulationTargetEntity): string {
   const tags = normalizeSimulationTags(target.tags);
-  return `
-    <section class="editor-section">
-      <b>测试目标实体</b>
+  return renderDisclosure('entity', '测试目标实体', target.enabled
+    ? `${target.displayName || '未命名实体'} · ${target.entityTypeId} · ${tags.length} 个标签`
+    : '未启用', `
       <div class="field-grid">
         <div class="field-row">
           <span>启用目标实体</span>
@@ -119,23 +150,34 @@ function renderTargetEntitySection(target: SimulationTargetEntity): string {
           </div>
         </div>
       </div>
-    </section>
-  `;
+  `);
 }
 
-export function renderSimulationTestResultSummary(result: SimulationTestResult | null): string {
+export function renderSimulationTestResultSummary(result: SimulationTestResult | null, trace: ApiTrace | null = null): string {
   return `
     <section class="simulation-card sim-result-card">
       <div class="panel-title"><span>测试上下文结果</span><b>${result ? escapeHtml(shortTraceId(result.traceId)) : '未运行'}</b></div>
-      ${renderSimulationResult(result)}
+      <p class="run-conclusion" role="status">${escapeHtml(buildRunConclusion(result, trace))}</p>
+      ${result ? `<details class="sim-result-details" data-sim-result-details${simulationResultDetailsOpen ? ' open' : ''}>
+        <summary>实体与状态结果</summary>
+        ${renderSimulationResult(result)}
+      </details>` : ''}
     </section>
   `;
 }
 
+export function buildRunConclusion(result: SimulationTestResult | null, trace: ApiTrace | null): string {
+  if (!result) return '尚未运行：点击“测试运行”查看本次流程结论。';
+  const latest = trace?.steps.at(-1)?.message?.trim();
+  if (result.status === 'WAITING') return `运行等待中：${result.message || latest || '等待后续执行。'}`;
+  if (result.status === 'CANCELLED') return `运行已取消：${result.message || '新的测试运行替换了旧运行。'}`;
+  const detail = [result.message, latest && latest !== result.message ? `最近一步：${latest}` : ''].filter(Boolean).join(' ');
+  if (result.status === 'FAILED' || !result.success) return `运行失败：${detail || '流程未能完成。'}`;
+  return `运行完成：${detail || '流程已自然结束。'}`;
+}
+
 function renderPlayerSection(context: SimulationTestContext, tags: string[]): string {
-  return `
-    <section class="editor-section">
-      <b>测试玩家</b>
+  return renderDisclosure('player', '测试玩家', `${context.actor.displayName || 'WebUI 模拟玩家'} · ${tags.length} 个标签`, `
       <div class="field-grid">
         <label class="field-row">
           玩家名
@@ -167,8 +209,8 @@ function renderPlayerSection(context: SimulationTestContext, tags: string[]): st
         </div>
         <button type="button" class="ghost-button sim-reset" data-sim-draft-action="reset">恢复默认</button>
       </div>
-    </section>
-  `;
+      ${renderPositionSection(context.world.playerPosition)}
+  `);
 }
 
 function renderPositionSection(position: SimulationPosition): string {
@@ -187,9 +229,7 @@ function renderPositionSection(position: SimulationPosition): string {
 }
 
 function renderTargetBlockSection(target: SimulationTargetBlock): string {
-  return `
-    <section class="editor-section">
-      <b>目标方块</b>
+  return renderDisclosure('block', '目标方块', `${target.blockId} · ${target.enabled ? '已启用' : '未启用'}`, `
       <div class="field-grid">
         <div class="field-row">
           <span>启用目标方块</span>
@@ -208,15 +248,13 @@ function renderTargetBlockSection(target: SimulationTargetBlock): string {
         </label>
         ${renderCoordinateInputs('sim-target-field', target)}
       </div>
-    </section>
-  `;
+  `);
 }
 
 function renderRegionSection(regions: SimulationRegionFact[]): string {
-  return `
-    <section class="editor-section">
+  return renderDisclosure('regions', '测试区域', `${regions.length} 个`, `
       <div class="sim-section-title">
-        <b>测试区域</b>
+        <span class="field-hint">区域事实仅用于本次测试。</span>
         <button type="button" class="tiny-button" data-sim-region-action="add">添加区域</button>
       </div>
       ${regions.length > 0 ? `
@@ -224,8 +262,17 @@ function renderRegionSection(regions: SimulationRegionFact[]): string {
           ${regions.map(renderRegionItem).join('')}
         </div>
       ` : '<p class="field-hint">可选。用于后续区域类积木的模拟事实。</p>'}
-    </section>
-  `;
+  `);
+}
+
+function renderDisclosure(id: SimulationDisclosure, title: string, summary: string, content: string): string {
+  const expanded = openSimulationDisclosures.has(id);
+  return `<section class="sim-disclosure">
+    <button type="button" class="sim-disclosure-toggle" data-sim-disclosure="${id}" aria-expanded="${expanded}" aria-controls="sim-disclosure-${id}">
+      <span><b>${escapeHtml(title)}</b><small>${escapeHtml(summary)}</small></span><i aria-hidden="true"></i>
+    </button>
+    <div class="sim-disclosure-content" id="sim-disclosure-${id}"${expanded ? '' : ' hidden'}>${content}</div>
+  </section>`;
 }
 
 function renderRegionItem(region: SimulationRegionFact, index: number): string {

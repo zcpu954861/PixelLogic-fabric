@@ -85,7 +85,7 @@ export function applyConditionSlotDrop(
   return true;
 }
 
-export function placeCatalogNodeInConditionSlot(graph: GraphDocument, nodeItem: GraphNode, hit: ConditionSlotHit): void {
+export function placeCatalogNodeInConditionSlot(nodeItem: GraphNode, hit: ConditionSlotHit): void {
   nodeItem.parentContainerId = hit.container.id;
   nodeItem.parentSlot = hit.slotId;
   nodeItem.position = { x: hit.capsule.x, y: hit.capsule.y };

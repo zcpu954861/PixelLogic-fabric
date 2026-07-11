@@ -102,10 +102,4 @@ PixelLogic is licensed under the Apache License 2.0.
 
 ## External Project Memory
 
-Project memory lives in Obsidian at:
-
-```text
-E:\minecraftserver\fabricmod\pixel-logic-docs
-```
-
-Before future implementation work, read the relevant Obsidian notes first. Do not copy the vault into this repo.
+Extended design notes live outside this repository; automation constraints are documented in `AGENTS.md`.

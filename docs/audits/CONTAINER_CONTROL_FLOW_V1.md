@@ -45,9 +45,9 @@
 - max depth: 4 nested container levels.
 - empty body: warning, not a save blocker.
 
-## Non-goals
+## Follow-up Scope
 
-- loop until: not implemented.
+- loop until: delivered later by `LOOP_UNTIL_CONDITION_RACK_V1.md` using the same container body model plus a typed predicate rack.
 - break/continue: not implemented.
 - if/else: not implemented.
 - variable count: not implemented.
@@ -57,5 +57,5 @@
 
 - Control Flow Continuation v1 now preserves count/forever loop progress, nested return frames, cumulative steps, and the forever cap across `timer.wait` resumes.
 - Continuations remain in-memory and do not survive server restart; waiting for events and break/continue are still out of scope.
-- Catalog drag from the left library creates the block on pointer release; it does not render a live ghost preview yet.
+- Catalog drag and active-chain insertion now render live ghost/placement previews without mutating the graph before pointer release.
 - Copy/duplicate behavior is not added because the editor has no existing copy command.

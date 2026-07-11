@@ -310,19 +310,20 @@ select {
   background: #fff8e9;
 }
 
-.draft-actions {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-
-.draft-actions button {
-  width: 100%;
-}
-
 .field-hint {
   margin: 0;
   color: var(--muted);
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.editor-save-note {
+  margin: 0;
+  padding: 9px 11px;
+  border-left: 3px solid #2d6f9f;
+  background: #f3f8fc;
+  color: #40534a;
+  font-size: 0.82rem;
   font-weight: 800;
   line-height: 1.45;
 }

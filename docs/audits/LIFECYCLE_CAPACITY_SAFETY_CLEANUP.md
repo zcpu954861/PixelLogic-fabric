@@ -36,6 +36,9 @@ Date: 2026-06-30
 - stale response guard: stale draft/validate/commit responses are ignored if graph version or save sequence no longer match.
 - invalid graph fail-closed: existing `GraphStorageService.commitDraft` behavior remains; invalid drafts do not replace committed graph or runtime.
 - server stop cleanup: service close invalidates timers, stops scheduler callbacks, and clears in-memory state.
+- API task lifecycle: server-thread work transitions atomically through `QUEUED`, `RUNNING`, `COMPLETED`, or `CANCELLED`. A queued timeout cancels before execution; a running timeout never claims the operation was not executed.
+- close fence: API and service close reject new work, queued tasks recheck the fence before side effects, and service mutations serialize with close at their existing operation boundary.
+- integer arithmetic: INTEGER state addition uses checked arithmetic; overflow fails before the state map is changed and its Chinese diagnostic flows into runtime result/trace output.
 
 ## Validation
 
@@ -46,6 +49,7 @@ Date: 2026-06-30
   - `ManualSimulationSelfCheck` covers state cap/owner clear, trace bounds, timer capacity, timer clear, and stale timer generation.
   - `GraphStorageSelfCheck` covers invalid draft fail-closed and reset invalidating pending timer callbacks.
   - `ApiWebUiSelfCheck` still covers localhost JSON API, reset/start/trace, graph draft/validate/commit, and JSON error shape.
+  - `RuntimeApiSafetySelfCheck` covers real save/commit/reset/start timeout cancellation, task start/cancel races, close fences, pending timer shutdown, checked INTEGER overflow, original-value preservation, and runtime trace diagnostics.
 
 ## Known Limitations
 

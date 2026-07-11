@@ -1,5 +1,6 @@
 package com.pixelmc.pixellogic.core.runtime;
 
+import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.graph.CompiledGraph;
 import com.pixelmc.pixellogic.core.model.ConditionSlotDefinition;
 import com.pixelmc.pixellogic.core.model.EntitySource;
@@ -426,7 +427,7 @@ public final class GraphRuntime {
             } catch (RuntimeException exception) {
                 return fail(traceId, node.id(), exception, "运行时错误。");
             }
-            if (node.type().name().contains("CONDITION")) {
+            if (BuiltInBlockCatalog.isConditionBlock(node.blockId())) {
                 context.currentCondition(execution.conditionResult());
             }
             String outputSlot = execution.outputSlot();

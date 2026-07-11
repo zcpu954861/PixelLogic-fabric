@@ -30,7 +30,11 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -51,11 +55,22 @@ public final class PixelLogicApiServer implements AutoCloseable {
     private final PixelLogicSpikeService service;
     private final Executor serverThreadExecutor;
     private final HttpServer server;
+    private final long queuedTimeoutMillis;
+    private final long runningTimeoutMillis;
+    private final AtomicBoolean closed = new AtomicBoolean();
 
-    private PixelLogicApiServer(PixelLogicSpikeService service, Executor serverThreadExecutor, HttpServer server) {
+    private PixelLogicApiServer(
+            PixelLogicSpikeService service,
+            Executor serverThreadExecutor,
+            HttpServer server,
+            long queuedTimeoutMillis,
+            long runningTimeoutMillis
+    ) {
         this.service = service;
         this.serverThreadExecutor = serverThreadExecutor;
         this.server = server;
+        this.queuedTimeoutMillis = queuedTimeoutMillis;
+        this.runningTimeoutMillis = runningTimeoutMillis;
     }
 
     public static PixelLogicApiServer start(PixelLogicSpikeService service, Executor serverThreadExecutor) throws IOException {
@@ -69,7 +84,31 @@ public final class PixelLogicApiServer implements AutoCloseable {
             int port
     ) throws IOException {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress(InetAddress.getByName(host), port), 0);
-        PixelLogicApiServer apiServer = new PixelLogicApiServer(service, serverThreadExecutor, httpServer);
+        return start(service, serverThreadExecutor, httpServer, 5_000L, 5_000L);
+    }
+
+    static PixelLogicApiServer start(
+            PixelLogicSpikeService service,
+            Executor serverThreadExecutor,
+            String host,
+            int port,
+            long queuedTimeoutMillis,
+            long runningTimeoutMillis
+    ) throws IOException {
+        HttpServer httpServer = HttpServer.create(new InetSocketAddress(InetAddress.getByName(host), port), 0);
+        return start(service, serverThreadExecutor, httpServer, queuedTimeoutMillis, runningTimeoutMillis);
+    }
+
+    private static PixelLogicApiServer start(
+            PixelLogicSpikeService service,
+            Executor serverThreadExecutor,
+            HttpServer httpServer,
+            long queuedTimeoutMillis,
+            long runningTimeoutMillis
+    ) {
+        PixelLogicApiServer apiServer = new PixelLogicApiServer(
+                service, serverThreadExecutor, httpServer, queuedTimeoutMillis, runningTimeoutMillis
+        );
         httpServer.createContext("/api", apiServer::handle);
         httpServer.setExecutor(null);
         httpServer.start();
@@ -231,24 +270,82 @@ public final class PixelLogicApiServer implements AutoCloseable {
     }
 
     private ApiResponse onServerThread(Callable<ApiResponse> action) {
-        CompletableFuture<ApiResponse> future = new CompletableFuture<>();
-        serverThreadExecutor.execute(() -> {
+        if (closed.get() || service.isClosed()) {
+            return error(503, "SERVICE_CLOSED", "PixelLogic 服务已关闭，操作未执行。");
+        }
+        ServerThreadTask task = new ServerThreadTask(action);
+        serverThreadExecutor.execute(task);
+        try {
+            return task.future.get(queuedTimeoutMillis, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException exception) {
+            if (task.cancel()) {
+                return error(503, "SERVER_THREAD_TIMEOUT", "等待服务器线程超时，操作未执行。");
+            }
             try {
-                future.complete(action.call());
+                return task.future.get(runningTimeoutMillis, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException runningTimeout) {
+                return error(503, "SERVER_THREAD_RUNNING", "操作已经开始，但尚未完成，请确认最终状态。");
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return error(503, "SERVER_THREAD_INTERRUPTED", "等待服务器线程时被中断，操作状态未知。");
+            } catch (ExecutionException impossible) {
+                return error(500, "SERVER_THREAD_FAILED", "API 执行失败。");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            task.cancel();
+            return error(503, "SERVER_THREAD_INTERRUPTED", "等待服务器线程时被中断。");
+        } catch (ExecutionException impossible) {
+            return error(500, "SERVER_THREAD_FAILED", "API 执行失败。");
+        }
+    }
+
+    final class ServerThreadTask implements Runnable {
+        final AtomicReference<TaskState> state = new AtomicReference<>(TaskState.QUEUED);
+        final CompletableFuture<ApiResponse> future = new CompletableFuture<>();
+        private final Callable<ApiResponse> action;
+
+        ServerThreadTask(Callable<ApiResponse> action) {
+            this.action = action;
+        }
+
+        @Override
+        public void run() {
+            if ((closed.get() || service.isClosed()) && cancel()) {
+                future.complete(error(503, "SERVICE_CLOSED", "PixelLogic 服务已关闭，操作未执行。"));
+                return;
+            }
+            if (!state.compareAndSet(TaskState.QUEUED, TaskState.RUNNING)) {
+                return;
+            }
+            if (closed.get() || service.isClosed()) {
+                complete(error(503, "SERVICE_CLOSED", "PixelLogic 服务已关闭，操作未执行。"));
+                return;
+            }
+            try {
+                complete(action.call());
             } catch (IllegalArgumentException exception) {
-                future.complete(error(400, "BAD_REQUEST", exception.getMessage()));
+                complete(error(400, "BAD_REQUEST", exception.getMessage()));
             } catch (IllegalStateException exception) {
-                future.complete(error(409, "CONFLICT", exception.getMessage()));
+                complete(error(409, "CONFLICT", exception.getMessage()));
             } catch (Exception exception) {
                 String message = exception.getMessage() == null ? "API 执行失败。" : exception.getMessage();
-                future.complete(error(500, "SERVER_THREAD_FAILED", message));
+                complete(error(500, "SERVER_THREAD_FAILED", message));
             }
-        });
-        try {
-            return future.get(5, TimeUnit.SECONDS);
-        } catch (Exception exception) {
-            return error(503, "SERVER_THREAD_TIMEOUT", "等待服务器线程超时。");
         }
+
+        boolean cancel() {
+            return state.compareAndSet(TaskState.QUEUED, TaskState.CANCELLED);
+        }
+
+        private void complete(ApiResponse response) {
+            state.set(TaskState.COMPLETED);
+            future.complete(response);
+        }
+    }
+
+    enum TaskState {
+        QUEUED, RUNNING, COMPLETED, CANCELLED
     }
 
     private static GraphDocument parseGraphDocument(String body) {
@@ -343,10 +440,12 @@ public final class PixelLogicApiServer implements AutoCloseable {
 
     @Override
     public void close() {
-        server.stop(0);
+        if (closed.compareAndSet(false, true)) {
+            server.stop(0);
+        }
     }
 
-    private record ApiResponse(int status, String body) {
+    record ApiResponse(int status, String body) {
     }
 
     private record TraceView(String id, boolean truncated, List<TraceStepView> steps) {

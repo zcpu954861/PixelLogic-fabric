@@ -3,6 +3,8 @@
   align-items: stretch;
   gap: 10px;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   padding: 12px;
 }
 
@@ -14,6 +16,57 @@
   border-radius: 8px;
   background: var(--panel);
   padding: 10px 12px;
+}
+
+.trace-details {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.trace-details > summary {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.trace-details > section {
+  position: absolute;
+  inset: 42px 0 0;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+@media (max-width: 980px) {
+  .bottom-dock {
+    overflow: visible;
+  }
+
+  .trace-details {
+    height: auto;
+  }
+
+  .trace-details > section {
+    position: static;
+    height: auto;
+    max-height: 220px;
+  }
 }
 
 .issue-list,

@@ -316,33 +316,6 @@ export function conditionSlotRects(
   } : null;
 }
 
-export function connectedComponentNodeIds(graph: GraphDocument, rootId: string, omittedEdgeId: string): string[] {
-  const neighbors = new Map<string, string[]>();
-  connectedGraphEdges(graph)
-    .filter((graphEdge) => graphEdge.id !== omittedEdgeId)
-    .forEach((graphEdge) => {
-      neighbors.set(graphEdge.sourceNodeId, [...(neighbors.get(graphEdge.sourceNodeId) ?? []), graphEdge.targetNodeId]);
-      neighbors.set(graphEdge.targetNodeId, [...(neighbors.get(graphEdge.targetNodeId) ?? []), graphEdge.sourceNodeId]);
-    });
-  const visited = new Set<string>();
-  const ordered: string[] = [];
-  const stack = [rootId];
-  while (stack.length > 0) {
-    const nextId = stack.pop();
-    if (!nextId || visited.has(nextId)) {
-      continue;
-    }
-    visited.add(nextId);
-    ordered.push(nextId);
-    for (const neighborId of neighbors.get(nextId) ?? []) {
-      if (!visited.has(neighborId)) {
-        stack.push(neighborId);
-      }
-    }
-  }
-  return ordered;
-}
-
 export function normalizeConditionBranchLayout(graph: GraphDocument): GraphDocument {
   const nextGraph = cloneGraph(graph);
   const nodeById = new Map(nextGraph.nodes.map((nodeItem) => [nodeItem.id, nodeItem]));

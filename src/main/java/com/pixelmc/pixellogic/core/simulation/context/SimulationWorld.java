@@ -29,10 +29,6 @@ public record SimulationWorld(
         return new SimulationWorld("minecraft:overworld");
     }
 
-    public String dimensionId() {
-        return defaultDimensionId;
-    }
-
     public Optional<SimulationRegionFact> findRegion(String name) {
         if (name == null || name.isBlank()) {
             return Optional.empty();
@@ -41,7 +37,4 @@ public record SimulationWorld(
         return regions.stream().filter(region -> region.name().equals(targetName)).findFirst();
     }
 
-    public boolean isPositionInsideRegion(SimulationPosition position, SimulationRegionFact region) {
-        return region != null && region.contains(position);
-    }
 }

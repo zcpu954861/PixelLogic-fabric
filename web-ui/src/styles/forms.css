@@ -310,16 +310,6 @@ select {
   background: #fff8e9;
 }
 
-.draft-actions {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-
-.draft-actions button {
-  width: 100%;
-}
-
 .field-hint {
   margin: 0;
   color: var(--muted);

@@ -19,10 +19,8 @@ import com.pixelmc.pixellogic.core.simulation.context.SimulationBlockFact;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationPosition;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationWorld;
 import com.pixelmc.pixellogic.core.simulation.executor.SimulationExecutionRegistry;
-import com.pixelmc.pixellogic.core.simulation.event.SimulationEvent;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionRequest;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionResult;
-import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunOptions;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunner;
 import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
@@ -285,10 +283,11 @@ public final class CatalogExpansionV3SelfCheck {
         );
         SimulationExecutionResult result = runner.run(new SimulationExecutionRequest(
                 graph.id(),
-                SimulationEvent.manual(TRIGGER_TYPE, "/pixellogic test start", "catalog-v3"),
+                TRIGGER_TYPE,
+                "/pixellogic test start",
                 actor,
                 world,
-                SimulationRunOptions.realTime(),
+                "catalog-v3",
                 0L
         ));
         ExecutionTrace trace = traces.get(result.traceId()).orElseThrow();

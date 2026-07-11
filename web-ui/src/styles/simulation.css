@@ -141,11 +141,6 @@
   color: #ffffff;
 }
 
-.sim-empty {
-  color: var(--muted);
-  font-weight: 800;
-}
-
 .sim-tag-add {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -177,14 +172,6 @@
 
 .sim-result-card {
   background: #f7fbf5;
-}
-
-.sim-error {
-  margin: 0;
-  color: #991b1b;
-  font-size: 0.84rem;
-  font-weight: 900;
-  line-height: 1.35;
 }
 
 .sim-result {

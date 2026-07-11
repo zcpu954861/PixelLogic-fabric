@@ -71,10 +71,6 @@ public final class BuiltInBlockCatalog {
         return canonical.isBlank() ? blockIdFor(type) : canonical;
     }
 
-    public static Optional<NodeType> nodeTypeFor(String blockId) {
-        return block(blockId).map(BlockDefinition::nodeType);
-    }
-
     private static String canonicalBlockId(String blockId) {
         if (blockId == null || blockId.isBlank()) {
             return "";

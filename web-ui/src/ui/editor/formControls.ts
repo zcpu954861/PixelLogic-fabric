@@ -3,7 +3,7 @@ import type { BlockCatalog, CatalogFormField, EditableField, EditorSection, Fiel
 import { richTextPlainText } from '../../model/richText';
 import type { SimulationTestContext } from '../../model/simulationTestContext';
 import { escapeAttr, escapeHtml } from '../../utils/dom';
-import { booleanLabel, booleanOptions, conditionOutputModeLabel, nodeTypeLabel, nodeTypeMetaLabel, stateScopeOptions, targetLabel, valueTypeOptions } from '../humanize/labels';
+import { booleanLabel, booleanOptions, conditionOutputModeLabel, nodeTypeMetaLabel, stateScopeOptions, targetLabel, valueTypeOptions } from '../humanize/labels';
 import { renderRichTextEditor } from './richText/richTextEditor';
 
 export function renderNodeEditor(

@@ -93,22 +93,7 @@ export function defaultSimulationTestContext(): SimulationTestContext {
 }
 
 export function cloneSimulationTestContext(context: SimulationTestContext): SimulationTestContext {
-  const normalized = withWorldDefaults(context);
-  return {
-    actor: {
-      ...normalized.actor,
-      tags: [...normalized.actor.tags],
-    },
-    world: {
-      playerPosition: { ...normalized.world.playerPosition },
-      targetBlock: { ...normalized.world.targetBlock },
-      targetEntity: {
-        ...normalized.world.targetEntity,
-        tags: [...normalized.world.targetEntity.tags],
-      },
-      regions: normalized.world.regions.map((region) => ({ ...region })),
-    },
-  };
+  return structuredClone(withWorldDefaults(context));
 }
 
 export function updateSimulationDisplayName(context: SimulationTestContext, displayName: string): SimulationTestContext {

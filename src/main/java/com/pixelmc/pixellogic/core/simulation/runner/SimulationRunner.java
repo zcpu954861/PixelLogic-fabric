@@ -60,9 +60,7 @@ public final class SimulationRunner {
                 UUID.randomUUID().toString(),
                 request.generation(),
                 actor,
-                world,
-                request.event(),
-                request.options()
+                world
         );
         GraphRuntime runtime = runtimeFactory.create(new SimulationRuntimeServices(
                 delegateServices,
@@ -73,10 +71,10 @@ public final class SimulationRunner {
                 resultObserver
         ));
         RuntimeResult result = runtime.start(new TriggerEvent(
-                request.event().triggerType(),
-                request.event().commandText(),
+                request.triggerType(),
+                request.commandText(),
                 request.actor().id(),
-                request.event().sessionId()
+                request.sessionId()
         ));
         return SimulationExecutionResult.from(result, context, initialActorTags, initialTargetEntityTags);
     }
@@ -171,19 +169,12 @@ public final class SimulationRunner {
 
         @Override
         public void scheduleTimer(Duration delay, TimerContinuation continuation) {
-            if (context.options().realTimeTimers()) {
-                delegate.scheduleTimer(delay, continuation);
-            }
+            delegate.scheduleTimer(delay, continuation);
         }
 
         @Override
         public void recordActionResult(String nodeId, String kind, String message) {
             context.addActionResult(new SimulationActionResult(nodeId, kind, message));
-        }
-
-        @Override
-        public void recordMessageResult(String nodeId, UUID playerId, String message) {
-            context.addMessageResult(new SimulationMessageResult(nodeId, playerId, message));
         }
 
         @Override

@@ -1,5 +1,4 @@
 .logic-block {
-  --tab: 18px;
   --block-outline: var(--outline);
   --accent: var(--outline);
   --fill: #ffffff;
@@ -142,16 +141,6 @@
 
 .logic-block.is-drag-root {
   z-index: 7800 !important;
-}
-
-.drop-placeholder {
-  position: absolute;
-  z-index: 7600;
-  border: 3px dashed rgba(22, 163, 74, 0.78);
-  border-radius: 14px;
-  background: rgba(220, 252, 231, 0.2);
-  box-shadow: 0 0 18px rgba(22, 163, 74, 0.22);
-  pointer-events: none;
 }
 
 .logic-block.control.container-target::after {

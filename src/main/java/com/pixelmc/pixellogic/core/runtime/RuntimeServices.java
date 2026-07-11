@@ -9,18 +9,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface RuntimeServices {
-    default Optional<RuntimeNodeExecutionResult> executeSimulationNode(NodeDefinition node, UUID playerId, String sessionId) {
-        return Optional.empty();
-    }
-
     default Optional<RuntimeNodeExecutionResult> executeSimulationNode(
             NodeDefinition node,
             RuntimeExecutionContext context
     ) {
-        return executeSimulationNode(node, context.playerId(), context.sessionId());
-    }
-
-    default Optional<RuntimePredicateResult> evaluatePredicate(NodeDefinition node, UUID playerId, String sessionId) {
         return Optional.empty();
     }
 
@@ -28,7 +20,7 @@ public interface RuntimeServices {
             NodeDefinition node,
             RuntimeExecutionContext context
     ) {
-        return evaluatePredicate(node, context.playerId(), context.sessionId());
+        return Optional.empty();
     }
 
     default Optional<RuntimeSubjectReference> runEntity(UUID playerId, String sessionId) {
@@ -58,11 +50,7 @@ public interface RuntimeServices {
     default void recordActionResult(String nodeId, String kind, String message) {
     }
 
-    default void recordMessageResult(String nodeId, UUID playerId, String message) {
-    }
-
     default void recordMessageResult(String nodeId, UUID playerId, String message, String channel) {
-        recordMessageResult(nodeId, playerId, message);
     }
 
     default void recordStateChange(String nodeId, StateKey key, String value) {

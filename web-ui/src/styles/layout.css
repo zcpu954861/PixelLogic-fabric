@@ -116,10 +116,8 @@
 
 .ghost-button,
 .run-button,
-.icon-button,
 .tiny-button,
 .graph-item,
-.library-grid button,
 .quick-start button,
 .canvas-tools button {
   border: 1px solid var(--line);
@@ -149,18 +147,6 @@
 .run-button.danger {
   border-color: #991b1b;
   background: var(--red);
-}
-
-.icon-button {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-}
-
-.icon-button svg {
-  fill: currentColor;
 }
 
 button:hover:not(:disabled) {
@@ -224,18 +210,6 @@ button:hover:not(:disabled) {
   background: #e0f4e6;
   box-shadow: inset 5px 0 0 var(--green);
   font-weight: 900;
-}
-
-.library-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.library-grid button {
-  min-height: 50px;
-  font-weight: 900;
-  font-size: 1rem;
 }
 
 .catalog-nav {

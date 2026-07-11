@@ -40,106 +40,32 @@ tasks.withType(JavaCompile).configureEach {
 	options.release = 21
 }
 
-tasks.register('manualSimulationSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.runtime.ManualSimulationSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
+def selfChecks = [
+	manualSimulationSelfCheck: 'com.pixelmc.pixellogic.core.runtime.ManualSimulationSelfCheck',
+	apiWebUiSelfCheck: 'com.pixelmc.pixellogic.server.api.ApiWebUiSelfCheck',
+	runtimeApiSafetySelfCheck: 'com.pixelmc.pixellogic.server.api.RuntimeApiSafetySelfCheck',
+	graphStorageSelfCheck: 'com.pixelmc.pixellogic.server.storage.GraphStorageSelfCheck',
+	blockCatalogSelfCheck: 'com.pixelmc.pixellogic.core.catalog.BlockCatalogSelfCheck',
+	simulationBackendSelfCheck: 'com.pixelmc.pixellogic.core.simulation.SimulationBackendSelfCheck',
+	conditionOutputModeSelfCheck: 'com.pixelmc.pixellogic.core.runtime.ConditionOutputModeSelfCheck',
+	simulationTestContextSelfCheck: 'com.pixelmc.pixellogic.server.api.SimulationTestContextSelfCheck',
+	simulationContextExpansionSelfCheck: 'com.pixelmc.pixellogic.server.api.SimulationContextExpansionSelfCheck',
+	catalogExpansionV1SelfCheck: 'com.pixelmc.pixellogic.core.catalog.CatalogExpansionV1SelfCheck',
+	textComponentEditorSelfCheck: 'com.pixelmc.pixellogic.core.catalog.TextComponentEditorSelfCheck',
+	catalogExpansionV2SelfCheck: 'com.pixelmc.pixellogic.core.catalog.CatalogExpansionV2SelfCheck',
+	catalogExpansionV3SelfCheck: 'com.pixelmc.pixellogic.core.catalog.CatalogExpansionV3SelfCheck',
+	containerControlFlowSelfCheck: 'com.pixelmc.pixellogic.core.catalog.ContainerControlFlowSelfCheck',
+	controlFlowContinuationSelfCheck: 'com.pixelmc.pixellogic.core.runtime.ControlFlowContinuationSelfCheck',
+	loopUntilConditionRackSelfCheck: 'com.pixelmc.pixellogic.core.runtime.LoopUntilConditionRackSelfCheck',
+	entityExecutionContextSelfCheck: 'com.pixelmc.pixellogic.core.runtime.EntityExecutionContextSelfCheck',
+]
 
-tasks.register('apiWebUiSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.server.api.ApiWebUiSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('runtimeApiSafetySelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.server.api.RuntimeApiSafetySelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('graphStorageSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.server.storage.GraphStorageSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('blockCatalogSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.catalog.BlockCatalogSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('simulationBackendSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.simulation.SimulationBackendSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('conditionOutputModeSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.runtime.ConditionOutputModeSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('simulationTestContextSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.server.api.SimulationTestContextSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('simulationContextExpansionSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.server.api.SimulationContextExpansionSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('catalogExpansionV1SelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.catalog.CatalogExpansionV1SelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('textComponentEditorSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.catalog.TextComponentEditorSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('catalogExpansionV2SelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.catalog.CatalogExpansionV2SelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('catalogExpansionV3SelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.catalog.CatalogExpansionV3SelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('containerControlFlowSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.catalog.ContainerControlFlowSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('controlFlowContinuationSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.runtime.ControlFlowContinuationSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('loopUntilConditionRackSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.runtime.LoopUntilConditionRackSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
-}
-
-tasks.register('entityExecutionContextSelfCheck', JavaExec) {
-	dependsOn classes
-	mainClass = 'com.pixelmc.pixellogic.core.runtime.EntityExecutionContextSelfCheck'
-	classpath = sourceSets.main.runtimeClasspath
+selfChecks.each { taskName, mainClassName ->
+	tasks.register(taskName, JavaExec) {
+		dependsOn classes
+		mainClass = mainClassName
+		classpath = sourceSets.main.runtimeClasspath
+	}
 }
 
 tasks.register('apiWebUiDevServer', JavaExec) {
@@ -148,23 +74,7 @@ tasks.register('apiWebUiDevServer', JavaExec) {
 	classpath = sourceSets.main.runtimeClasspath
 }
 
-check.dependsOn tasks.named('manualSimulationSelfCheck')
-check.dependsOn tasks.named('apiWebUiSelfCheck')
-check.dependsOn tasks.named('runtimeApiSafetySelfCheck')
-check.dependsOn tasks.named('graphStorageSelfCheck')
-check.dependsOn tasks.named('blockCatalogSelfCheck')
-check.dependsOn tasks.named('simulationBackendSelfCheck')
-check.dependsOn tasks.named('conditionOutputModeSelfCheck')
-check.dependsOn tasks.named('simulationTestContextSelfCheck')
-check.dependsOn tasks.named('simulationContextExpansionSelfCheck')
-check.dependsOn tasks.named('catalogExpansionV1SelfCheck')
-check.dependsOn tasks.named('textComponentEditorSelfCheck')
-check.dependsOn tasks.named('catalogExpansionV2SelfCheck')
-check.dependsOn tasks.named('catalogExpansionV3SelfCheck')
-check.dependsOn tasks.named('containerControlFlowSelfCheck')
-check.dependsOn tasks.named('controlFlowContinuationSelfCheck')
-check.dependsOn tasks.named('loopUntilConditionRackSelfCheck')
-check.dependsOn tasks.named('entityExecutionContextSelfCheck')
+check.dependsOn selfChecks.keySet()
 
 java {
 	withSourcesJar()

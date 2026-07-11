@@ -50,7 +50,6 @@ import type {
 } from '../model/graphTypes';
 import {
   nodeCategoryLabel,
-  nodeSummary,
   rackAwareNodeSummary,
 } from './humanize/labels';
 import { autoSaveDelayMs, connectedOverlap, doubleClickMs, dragThreshold, historyLimit, normalBlockHeight, normalBlockWidth } from './canvas/blockConstants';
@@ -93,7 +92,6 @@ import { renderSimulationTestContextModal, renderSimulationTestResultSummary, re
 import {
   bindSimulationDraftFields,
   discardSimulationEditorDraft,
-  hasSimulationDraftChanges,
   hideSimulationUnsavedConfirm,
   openSimulationEditor,
   requestCloseSimulationEditor,
@@ -1116,10 +1114,6 @@ function setDragHint(message: string, tone: string): void {
 
 
 
-function addCatalogBlock(blockId: string): void {
-  addCatalogBlockAt(blockId, null);
-}
-
 function beginCatalogPointer(event: PointerEvent, blockId: string, buttonEl: HTMLElement): void {
   if (event.button !== 0) {
     return;
@@ -1223,7 +1217,7 @@ function addCatalogBlockAt(
     ? containerAtPoint(graph, dropPoint)
     : graph.nodes.find((item) => item.id === state.selectedNodeId && isBodyContainerNode(item));
   if (conditionHit) {
-    placeCatalogNodeInConditionSlot(graph, nodeItem, conditionHit);
+      placeCatalogNodeInConditionSlot(nodeItem, conditionHit);
   } else if (selectedContainer && nodeItem.id !== selectedContainer.id) {
     const childIndex = graph.nodes.filter((item) =>
       item.parentContainerId === selectedContainer.id && (item.parentSlot || 'body') === 'body',

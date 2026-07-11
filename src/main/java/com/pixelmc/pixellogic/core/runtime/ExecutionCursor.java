@@ -26,18 +26,6 @@ public record ExecutionCursor(
         entityContextFrames = entityContextFrames == null ? List.of() : List.copyOf(entityContextFrames);
     }
 
-    public ExecutionCursor(
-            String runId,
-            String traceId,
-            UUID playerId,
-            String sessionId,
-            int steps,
-            String nodeId,
-            List<LoopFrame> loopFrames
-    ) {
-        this(runId, traceId, playerId, sessionId, steps, nodeId, loopFrames, null, null, null, null, List.of());
-    }
-
     public enum LoopKind {
         COUNT,
         FOREVER,

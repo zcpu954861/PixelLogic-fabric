@@ -17,11 +17,9 @@ import com.pixelmc.pixellogic.core.runtime.RuntimeLimits;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationActor;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationWorld;
-import com.pixelmc.pixellogic.core.simulation.event.SimulationEvent;
 import com.pixelmc.pixellogic.core.simulation.executor.SimulationExecutionRegistry;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionRequest;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionResult;
-import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunOptions;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationRunner;
 import com.pixelmc.pixellogic.core.state.InMemoryStateStore;
 import com.pixelmc.pixellogic.core.timer.TimerContinuation;
@@ -50,8 +48,8 @@ public final class SimulationBackendSelfCheck {
                 DemoGraphFactory.create(Duration.ofSeconds(1)).id(),
                 DemoGraphFactory.TRIGGER_TYPE,
                 "/pixellogic test start",
-                playerId,
-                "模拟玩家",
+                SimulationActor.player(playerId, "模拟玩家"),
+                SimulationWorld.overworld(),
                 "self-check",
                 0L
         ));
@@ -70,10 +68,11 @@ public final class SimulationBackendSelfCheck {
         SimulationActor taggedActor = new SimulationActor(playerId, "带标签玩家", true, false, Set.of("runner"));
         SimulationExecutionResult tagged = tagHarness.runner().run(new SimulationExecutionRequest(
                 tagGraph.id(),
-                SimulationEvent.manual(DemoGraphFactory.TRIGGER_TYPE, "/pixellogic test start", "tag-check"),
+                DemoGraphFactory.TRIGGER_TYPE,
+                "/pixellogic test start",
                 taggedActor,
                 SimulationWorld.overworld(),
-                SimulationRunOptions.realTime(),
+                "tag-check",
                 0L
         ));
         require(tagged.success(), "actor with tag should pass condition");
@@ -84,10 +83,11 @@ public final class SimulationBackendSelfCheck {
         SimulationActor plainActor = SimulationActor.player(playerId, "无标签玩家");
         SimulationExecutionResult added = addTagHarness.runner().run(new SimulationExecutionRequest(
                 tagGraph.id(),
-                SimulationEvent.manual(DemoGraphFactory.TRIGGER_TYPE, "/pixellogic test start", "tag-add"),
+                DemoGraphFactory.TRIGGER_TYPE,
+                "/pixellogic test start",
                 plainActor,
                 SimulationWorld.overworld(),
-                SimulationRunOptions.realTime(),
+                "tag-add",
                 0L
         ));
         require(added.success(), "actor without tag should run fail branch and add tag");

@@ -147,6 +147,9 @@ export function renderBlock(block: SlotBlock, recentNodeId: string | null): stri
       data-block="${escapeAttr(block.id)}"
       data-category="${escapeAttr(block.categoryId ?? '')}"
       data-branch="${block.branch}"
+      tabindex="0"
+      role="button"
+      aria-label="编辑积木：${escapeAttr(block.title)}"
       style="left:${block.x}px; top:${block.y}px; width:${block.width}px; height:${block.height}px; --condition-content-top:${Math.max(18, (block.inputY ?? 202) - 57)}px; z-index:${zIndex}${containerStyle}"
     >
       ${renderBlockShape(block)}
@@ -202,6 +205,9 @@ function renderPredicateCapsule(block: SlotBlock, left: number, top: number, rec
       class="logic-block condition predicate-capsule${block.selected ? ' selected' : ''}${recentNodeId === block.id ? ' newly-added' : ''}"
       data-block="${escapeAttr(block.id)}"
       data-embedded-parent="${escapeAttr(block.embeddedParentId ?? '')}"
+      tabindex="0"
+      role="button"
+      aria-label="编辑条件：${escapeAttr(block.title)}"
       style="left:${left}px; top:${top}px; width:${block.width}px; height:${block.height}px"
       title="双击编辑条件"
     >

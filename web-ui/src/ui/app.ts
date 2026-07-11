@@ -88,7 +88,7 @@ import {
   richTextSelectionOffsets,
   setRichTextSelectionOffsets,
 } from './editor/richText/richTextEditor';
-import { renderSimulationTestContextModal, renderSimulationTestResultSummary, renderTestRunControl } from './simulation/simulationTestContextPanel';
+import { bindSimulationDisclosures, bindSimulationResultDetails, prepareSimulationDisclosures, renderSimulationTestContextModal, renderSimulationTestResultSummary, renderTestRunControl } from './simulation/simulationTestContextPanel';
 import {
   bindSimulationDraftFields,
   discardSimulationEditorDraft,
@@ -100,6 +100,7 @@ import {
 import { renderTrace } from './trace/traceView';
 import { draftStatusText, uncommittedNotice, validationErrorText, validationList, validationSummaryText, validationTitle } from './validation/validationView';
 import { renderNodeInfo } from './sidebar/selectionSummary';
+import { initialReadableTransform, readableEditScale, readableZoomThreshold } from './canvas/viewportReadability';
 
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -110,6 +111,9 @@ type RichTextColorPickMode = 'hue' | 'board';
 let scale = 0.86;
 let offsetX = 28;
 let offsetY = 34;
+let viewportTouched = false;
+let autoFocusedGraphId = '';
+let traceDetailsOpen = true;
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let panOffset = { x: 0, y: 0 };
@@ -232,8 +236,8 @@ function renderApp(): void {
           <button type="button" class="ghost-button" data-history-action="undo" title="Ctrl+Z" ${canUndo() ? '' : 'disabled'}>上一步</button>
           <button type="button" class="ghost-button" data-history-action="redo" title="Ctrl+Y / Ctrl+Shift+Z" ${canRedo() ? '' : 'disabled'}>下一步</button>
           ${renderTestRunControl(state.simulationMenuOpen, apiBusyAttr())}
-          <button type="button" class="ghost-button" data-action="fit">适应视图</button>
-          <button type="button" class="ghost-button" data-action="center">回到中心</button>
+          <button type="button" class="ghost-button" data-action="fit">查看全图</button>
+          <button type="button" class="ghost-button" data-action="center">恢复可读视图</button>
         </nav>
       </header>
 
@@ -272,7 +276,7 @@ function renderApp(): void {
           </div>
         </div>
         <section class="canvas-viewport" aria-label="可拖动画布">
-          <div class="flow-world" style="width:${world.width}px; height:${world.height}px">
+          <div class="flow-world${scale < readableZoomThreshold ? ' is-overview' : ''}" style="width:${world.width}px; height:${world.height}px">
             ${joins.map(renderSlotJoin).join('')}
             ${blocks.map((block) => renderBlock(block, recentNodeId)).join('')}
           </div>
@@ -286,7 +290,7 @@ function renderApp(): void {
           <b>${selectedNode ? escapeHtml(nodeCategoryLabel(selectedNode, activeCatalog())) : '未选中'}</b>
         </div>
         ${selectedNode ? renderNodeInfo(selectedNode, graph, state.selectedNodeId, activeCatalog()) : '<section class="info-card">单击积木选中，拖动积木移动，双击积木编辑。</section>'}
-        <div data-test-result-view>${renderSimulationTestResultSummary(state.simulationResult)}</div>
+        <div data-test-result-view>${renderSimulationTestResultSummary(state.simulationResult, state.latestTrace)}</div>
         <section class="preview-card">
           <b>API 状态</b>
           <p data-api-status-message>${escapeHtml(state.statusMessage)}</p>
@@ -307,12 +311,10 @@ function renderApp(): void {
             ${validationItems}
           </ul>
         </section>
-        <section data-trace-scroll>
-          <div class="panel-title"><span>执行记录</span><b data-trace-id>${state.latestTrace ? escapeHtml(shortTraceId(state.latestTrace.id)) : '无'}</b></div>
-          <ol class="trace-list" data-trace-list>
-            ${renderTrace(state.latestTrace)}
-          </ol>
-        </section>
+        <details class="trace-details" data-trace-details${traceDetailsOpen ? ' open' : ''}>
+          <summary><span>详细执行记录</span><b data-trace-id>${state.latestTrace ? escapeHtml(shortTraceId(state.latestTrace.id)) : '无'}</b></summary>
+          <section data-trace-scroll><ol class="trace-list" data-trace-list>${renderTrace(state.latestTrace)}</ol></section>
+        </details>
       </footer>
       ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation && !state.validation.valid), modalIssue: state.error || validationSummaryText(state), steady: editorWasOpen, simulationTestContext: state.simulationTestContext, graph: rackEditorSession?.draftGraph ?? graph, rackChildEditing: Boolean(rackEditorSession && rackEditorSession.currentNodeId !== rackEditorSession.rootId) }) : ''}
       ${state.simulationEditorOpen && state.simulationDraftContext ? renderSimulationTestContextModal(state.simulationDraftContext, { closing: state.simulationEditorClosing, error: state.simulationTestContextError, steady: simulationEditorWasOpen }) : ''}
@@ -325,6 +327,8 @@ function renderApp(): void {
   restoreModalScrollSnapshot(modalScroll);
   restoreTraceScrollSnapshot(traceScroll);
   focusEditor(editorWasOpen, simulationEditorWasOpen);
+  bindSimulationDisclosures();
+  bindSimulationResultDetails();
   if (recentNodeId) {
     state.recentNodeId = null;
   }
@@ -347,6 +351,7 @@ function setTransform(): void {
   }
 
   worldEl.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  worldEl.classList.toggle('is-overview', scale < readableZoomThreshold);
 
   if (zoomText) {
     zoomText.textContent = `${Math.round(scale * 100)}%`;
@@ -365,24 +370,45 @@ function fitView(): void {
   const marginY = 28;
   const contentWidth = Math.max(1, world.contentWidth);
   const contentHeight = Math.max(1, world.contentHeight);
-  scale = Math.min(1, (rect.width - marginX * 2) / contentWidth, (rect.height - marginY * 2) / contentHeight);
+  scale = Math.max(0.42, Math.min(1, (rect.width - marginX * 2) / contentWidth, (rect.height - marginY * 2) / contentHeight));
   offsetX = marginX - world.minLeft * scale;
   offsetY = marginY - world.minTop * scale;
   setTransform();
+  viewportTouched = true;
 }
 
 function centerView(): void {
   const viewport = document.querySelector<HTMLElement>('.canvas-viewport');
-
-  if (!viewport) {
-    return;
-  }
-
+  if (!viewport) return;
   const rect = viewport.getBoundingClientRect();
-  scale = 0.78;
+  scale = readableEditScale;
   offsetX = rect.width / 2 - ((world.minLeft + world.maxRight) / 2) * scale;
   offsetY = rect.height / 2 - ((world.minTop + world.maxBottom) / 2) * scale;
   setTransform();
+  viewportTouched = true;
+}
+
+function focusInitialGraphIfNeeded(): void {
+  const graph = currentGraph();
+  if (viewportTouched || autoFocusedGraphId === graph.id || activeBlockDrag || state.editorOpen || state.simulationEditorOpen) return;
+  if (!applyReadableMainFlow()) return;
+  autoFocusedGraphId = graph.id;
+}
+
+function applyReadableMainFlow(): boolean {
+  const graph = currentGraph();
+  const viewport = document.querySelector<HTMLElement>('.canvas-viewport');
+  if (!viewport) return false;
+  const rect = viewport.getBoundingClientRect();
+  const transform = initialReadableTransform(
+    { width: rect.width, height: rect.height },
+    buildBlocks(graph, activeCatalog(), state.selectedNodeId),
+    Object.values(graph.triggerEntries),
+  );
+  if (!transform) return false;
+  ({ scale, offsetX, offsetY } = transform);
+  setTransform();
+  return true;
 }
 
 function focusSelectedBlock(): void {
@@ -398,6 +424,7 @@ function focusSelectedBlock(): void {
   offsetX = rect.width / 2 - (selected.x + selected.width / 2) * scale;
   offsetY = rect.height / 2 - (selected.y + selected.height / 2) * scale;
   setTransform();
+  viewportTouched = true;
 }
 
 function clearFocus(): void {
@@ -470,6 +497,7 @@ function bindInteractions(): void {
     event.preventDefault();
     offsetX = panOffset.x + event.clientX - panStart.x;
     offsetY = panOffset.y + event.clientY - panStart.y;
+    viewportTouched = true;
     setTransform();
   });
 
@@ -511,6 +539,7 @@ function bindInteractions(): void {
       scale = next;
       offsetX = pointerX - worldX * scale;
       offsetY = pointerY - worldY * scale;
+      viewportTouched = true;
       setTransform();
     },
     { passive: false },
@@ -524,7 +553,10 @@ function bindInteractions(): void {
     state.simulationMenuOpen = !state.simulationMenuOpen;
     renderApp();
   });
-  document.querySelector('[data-sim-action="open-editor"]')?.addEventListener('click', () => openSimulationEditor(renderApp));
+  document.querySelector('[data-sim-action="open-editor"]')?.addEventListener('click', () => {
+    prepareSimulationDisclosures(state.simulationTestContext);
+    openSimulationEditor(renderApp);
+  });
   document.querySelector('.workspace')?.addEventListener('pointerdown', (event) => {
     if (state.simulationMenuOpen && !(event.target as HTMLElement).closest('.test-run-control')) {
       state.simulationMenuOpen = false;
@@ -535,6 +567,24 @@ function bindInteractions(): void {
   document.querySelector('[data-history-action="redo"]')?.addEventListener('click', redoGraphEdit);
   document.querySelector('[data-graph-action="disconnect-input"]')?.addEventListener('click', disconnectSelectedInput);
   document.querySelector('[data-graph-action="delete-selected"]')?.addEventListener('click', deleteSelectedNode);
+  document.querySelectorAll<HTMLElement>('[data-block]').forEach((blockEl) => {
+    blockEl.addEventListener('keydown', (event) => {
+      const nodeId = blockEl.dataset.block;
+      if (!nodeId || isEditableTarget(event.target)) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        state.selectedNodeId = nodeId;
+        openEditor(nodeId);
+      } else if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        state.selectedNodeId = nodeId;
+        deleteSelectedNode();
+      }
+    });
+  });
+  document.querySelector<HTMLDetailsElement>('[data-trace-details]')?.addEventListener('toggle', (event) => {
+    traceDetailsOpen = (event.currentTarget as HTMLDetailsElement).open;
+  });
   document.querySelectorAll<HTMLButtonElement>('[data-condition-negate]').forEach((buttonEl) => {
     buttonEl.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -619,6 +669,12 @@ function bindInteractions(): void {
       }
       return;
     }
+    if (event.key === 'Escape' && state.simulationMenuOpen) {
+      event.preventDefault();
+      state.simulationMenuOpen = false;
+      renderApp();
+      return;
+    }
     if ((state.editorOpen || state.simulationEditorOpen) && editableTarget && (isUndoShortcut(event) || isRedoShortcut(event))) {
       return;
     }
@@ -640,6 +696,13 @@ function bindInteractions(): void {
     if (event.key === 'Escape' && state.simulationEditorOpen) {
       event.preventDefault();
       requestCloseSimulationEditor(renderApp);
+      return;
+    }
+    if (event.key === 'Escape' && state.selectedNodeId && !editableTarget) {
+      event.preventDefault();
+      state.selectedNodeId = '';
+      renderApp();
+      return;
     }
     if (event.key === 'Tab' && (state.editorOpen || state.simulationEditorOpen)) {
       trapEditorFocus(event);
@@ -2486,7 +2549,7 @@ async function runAction(label: string, action: () => Promise<void>, options: { 
 
 
 function selectedNodeFrom(graph: GraphDocument): GraphNode | null {
-  return graph.nodes.find((nodeItem) => nodeItem.id === state.selectedNodeId) ?? graph.nodes[0] ?? null;
+  return graph.nodes.find((nodeItem) => nodeItem.id === state.selectedNodeId) ?? null;
 }
 
 function cloneNode(nodeItem: GraphNode): GraphNode {
@@ -2571,7 +2634,8 @@ function refreshTestExecutionView(): void {
   const traceList = document.querySelector<HTMLElement>('[data-trace-list]');
 
   if (resultView) {
-    resultView.innerHTML = renderSimulationTestResultSummary(state.simulationResult);
+    resultView.innerHTML = renderSimulationTestResultSummary(state.simulationResult, state.latestTrace);
+    bindSimulationResultDetails();
   }
   if (apiStatus) {
     apiStatus.className = `api-pill ${state.apiStatus}`;
@@ -2613,8 +2677,8 @@ export function startPixelLogicApp(): void {
   }
   renderApp();
   window.addEventListener('pagehide', stopTestRunPolling, { once: true });
-  centerView();
   void loadCatalog().then(() => loadGraph()).then(() => {
+    focusInitialGraphIfNeeded();
     if (state.apiStatus === 'online') {
       void refreshLatestTrace(false).catch(() => {
         state.apiStatus = 'offline';

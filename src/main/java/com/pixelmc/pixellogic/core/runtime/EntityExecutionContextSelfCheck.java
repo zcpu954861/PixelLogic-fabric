@@ -81,8 +81,8 @@ public final class EntityExecutionContextSelfCheck {
 
     private static void catalogAndValidation() {
         BlockDefinition context = block(BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS);
-        require(context.categoryId().equals("context") && context.nodeKind().equals("control"),
-                "execute-as should use the context category and shared C-shaped control geometry");
+        require(context.categoryId().equals("player-entity.execution-context") && context.nodeKind().equals("control"),
+                "execute-as should use the player/entity context category and shared C-shaped control geometry");
         require(context.containerSlots().equals(List.of("body")), "execute-as should expose one body slot");
         require(context.inputSlots().stream().anyMatch(slot -> slot.id().equals("input")), "execute-as input missing");
         require(context.outputSlots().stream().anyMatch(slot -> slot.id().equals("done")), "execute-as done missing");

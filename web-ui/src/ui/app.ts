@@ -6,6 +6,7 @@ import {
   catalogNodeIdPrefix,
   createCatalogNode,
   fallbackCatalog,
+  sanitizeLibraryLocation,
 } from '../model/blockCatalog';
 import { fallbackGraph, graphId } from '../model/demoGraph';
 import {
@@ -20,7 +21,7 @@ import {
 import { simulationTestPayload, validateSimulationTestContext } from '../model/simulationTestContext';
 import { containerGeometry } from '../model/containerGeometry';
 import { isBodyContainerNode } from '../model/containerNodes';
-import { conditionSlots, hasPredicateRack, nextConditionSlotId } from '../model/conditionRack';
+import { conditionSlots, hasPredicateRack, nextConditionSlotId, predicateCapability } from '../model/conditionRack';
 import { state, world } from '../state/appState';
 import {
   blockMetrics,
@@ -30,6 +31,7 @@ import {
   containerBodyDropZone,
   containerBodyEntryAnchor,
   containerDescendantNodeIds,
+  conditionSlotRects,
   downstreamNodeIds,
   fallbackPosition,
   normalizeConditionBranchLayout,
@@ -61,13 +63,11 @@ import {
   findInsertCandidate,
 } from './canvas/dragInsert';
 import { ActiveDragPreviewCache } from './canvas/dragPreviewCache';
-import { renderCatalogLibrary } from './catalog/catalogLibrary';
+import { renderCatalogLibrary, renderCatalogLibraryBrowser } from './catalog/catalogLibrary';
 import { updateBlockOverflowMotion } from './canvas/cardOverflow';
 import {
   catalogDragGhostRect,
   clearCatalogDragGhost,
-  showCatalogContainerTarget,
-  showCatalogConditionSlotTarget,
   showCatalogDragGhost,
   updateCatalogDragGhost,
 } from './canvas/dragGhostView';
@@ -254,8 +254,8 @@ function renderApp(): void {
         </section>
 
         <section>
-          <div class="panel-title"><span>积木库</span><b>${state.catalogCategoryId ? '具体积木' : '全部分类'}</b></div>
-          ${renderCatalogLibrary(activeCatalog(), state.catalogCategoryId)}
+          <div class="panel-title"><span>积木库</span><b data-library-level>${escapeHtml(libraryLevelLabel())}</b></div>
+          <div data-catalog-library>${renderCatalogLibrary(activeCatalog(), libraryViewState())}</div>
         </section>
 
         <section class="quick-start">
@@ -342,6 +342,135 @@ function renderApp(): void {
 
 function activeCatalog(): BlockCatalog {
   return state.catalog ?? fallbackCatalog;
+}
+
+function libraryViewState() {
+  return {
+    location: state.libraryLocation,
+    query: state.libraryQuery,
+    filter: state.libraryFilter,
+  };
+}
+
+function libraryLevelLabel(): string {
+  if (state.libraryQuery.trim()) {
+    return '搜索结果';
+  }
+  switch (state.libraryLocation.level) {
+    case 'categories': return '一级分类';
+    case 'blocks': return '具体积木';
+    default: return '全部积木包';
+  }
+}
+
+function refreshCatalogLibrary(focusSearch = false, cursor = state.libraryQuery.length): void {
+  state.libraryLocation = sanitizeLibraryLocation(activeCatalog(), state.libraryLocation, state.libraryFilter);
+  const library = document.querySelector<HTMLElement>('[data-catalog-library]');
+  if (library) {
+    library.innerHTML = renderCatalogLibrary(activeCatalog(), libraryViewState());
+    bindCatalogLibraryInteractions(library);
+  }
+  const level = document.querySelector<HTMLElement>('[data-library-level]');
+  if (level) {
+    level.textContent = libraryLevelLabel();
+  }
+  if (focusSearch) {
+    const input = library?.querySelector<HTMLInputElement>('[data-library-search]');
+    input?.focus();
+    input?.setSelectionRange(cursor, cursor);
+  }
+}
+
+function bindCatalogLibraryInteractions(root: HTMLElement): void {
+  bindCatalogBrowserInteractions(root);
+  root.querySelector('[data-library-filter-clear]')?.addEventListener('click', clearLibraryFilter);
+  const search = root.querySelector<HTMLInputElement>('[data-library-search]');
+  const updateSearch = () => {
+    state.libraryQuery = search?.value ?? '';
+    refreshCatalogSearch(root);
+  };
+  search?.addEventListener('input', (event) => {
+    if (!(event as InputEvent).isComposing) {
+      updateSearch();
+    }
+  });
+  search?.addEventListener('compositionend', updateSearch);
+}
+
+function bindCatalogBrowserInteractions(root: HTMLElement): void {
+  root.querySelectorAll<HTMLButtonElement>('[data-library-root]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.libraryLocation = { level: 'packs' };
+      refreshCatalogLibrary();
+      root.querySelector<HTMLButtonElement>('[data-library-pack]')?.focus();
+    });
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-library-pack]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const packId = button.dataset.libraryPack;
+      if (packId) {
+        state.libraryLocation = { level: 'categories', packId };
+        refreshCatalogLibrary();
+        root.querySelector<HTMLButtonElement>('[data-library-category]')?.focus();
+      }
+    });
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-library-category]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const categoryId = button.dataset.libraryCategory;
+      const packId = button.dataset.libraryPackId;
+      if (packId && categoryId) {
+        state.libraryLocation = { level: 'blocks', packId, categoryId };
+        refreshCatalogLibrary();
+        root.querySelector<HTMLButtonElement>('[data-catalog-block]')?.focus();
+      }
+    });
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-catalog-block]').forEach((button) => {
+    button.addEventListener('pointerdown', (event) => {
+      if (button.dataset.catalogBlock) {
+        beginCatalogPointer(event, button.dataset.catalogBlock, button);
+      }
+    });
+    button.addEventListener('keydown', (event) => {
+      if (button.dataset.catalogBlock && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault();
+        addCatalogBlockAt(button.dataset.catalogBlock, null);
+      }
+    });
+  });
+}
+
+function refreshCatalogSearch(root: HTMLElement): void {
+  const browser = root.querySelector<HTMLElement>('[data-library-browser]');
+  if (browser) {
+    browser.innerHTML = renderCatalogLibraryBrowser(activeCatalog(), libraryViewState());
+    bindCatalogBrowserInteractions(root);
+  }
+  const level = document.querySelector<HTMLElement>('[data-library-level]');
+  if (level) {
+    level.textContent = libraryLevelLabel();
+  }
+}
+
+function activatePredicateLibraryFilter(targetContainerId = '', targetSlotId = ''): void {
+  if (!state.libraryFilter) {
+    state.libraryFilterRestoreLocation = state.libraryLocation;
+  }
+  state.libraryFilter = { capability: predicateCapability, label: '当前条件槽可用', targetContainerId, targetSlotId };
+  state.libraryLocation = sanitizeLibraryLocation(activeCatalog(), state.libraryLocation, state.libraryFilter);
+  refreshCatalogLibrary(true);
+}
+
+function clearLibraryFilter(): void {
+  state.libraryFilter = null;
+  state.libraryLocation = sanitizeLibraryLocation(
+    activeCatalog(),
+    state.libraryFilterRestoreLocation ?? state.libraryLocation,
+    null,
+  );
+  state.libraryFilterRestoreLocation = null;
+  refreshCatalogLibrary(true);
 }
 
 
@@ -573,7 +702,7 @@ function bindInteractions(): void {
   document.querySelectorAll<HTMLElement>('[data-block]').forEach((blockEl) => {
     blockEl.addEventListener('keydown', (event) => {
       const nodeId = blockEl.dataset.block;
-      if (!nodeId || isEditableTarget(event.target)) return;
+      if (!nodeId || event.target !== blockEl) return;
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         state.selectedNodeId = nodeId;
@@ -628,23 +757,15 @@ function bindInteractions(): void {
   document.querySelector('[data-sim-modal-action="continue-edit"]')?.addEventListener('click', hideSimulationUnsavedConfirm);
   document.querySelector('[data-sim-modal-action="discard"]')?.addEventListener('click', () => discardSimulationEditorDraft(renderApp));
   bindSimulationDraftFields(renderApp);
-  document.querySelectorAll<HTMLButtonElement>('[data-catalog-category]').forEach((buttonEl) => {
-    buttonEl.addEventListener('click', () => {
-      if (buttonEl.dataset.catalogCategory) {
-        state.catalogCategoryId = buttonEl.dataset.catalogCategory;
-        renderApp();
-      }
-    });
-  });
-  document.querySelector('[data-catalog-back]')?.addEventListener('click', () => {
-    state.catalogCategoryId = null;
-    renderApp();
-  });
-  document.querySelectorAll<HTMLButtonElement>('[data-catalog-block]').forEach((buttonEl) => {
-    buttonEl.addEventListener('pointerdown', (event) => {
-      if (buttonEl.dataset.catalogBlock) {
-        beginCatalogPointer(event, buttonEl.dataset.catalogBlock, buttonEl);
-      }
+  const catalogLibrary = document.querySelector<HTMLElement>('[data-catalog-library]');
+  if (catalogLibrary) {
+    bindCatalogLibraryInteractions(catalogLibrary);
+  }
+  document.querySelectorAll<HTMLButtonElement>('[data-library-predicate-filter]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const row = buttonEl.closest<HTMLElement>('[data-condition-slot][data-condition-container]');
+      activatePredicateLibraryFilter(row?.dataset.conditionContainer, row?.dataset.conditionSlot);
     });
   });
   document.querySelector('.editor-overlay')?.addEventListener('pointerdown', (event) => {
@@ -678,7 +799,7 @@ function bindInteractions(): void {
       renderApp();
       return;
     }
-    if ((state.editorOpen || state.simulationEditorOpen) && editableTarget && (isUndoShortcut(event) || isRedoShortcut(event))) {
+    if (editableTarget && (isUndoShortcut(event) || isRedoShortcut(event))) {
       return;
     }
     if (isUndoShortcut(event)) {
@@ -699,6 +820,11 @@ function bindInteractions(): void {
     if (event.key === 'Escape' && state.simulationEditorOpen) {
       event.preventDefault();
       requestCloseSimulationEditor(renderApp);
+      return;
+    }
+    if (event.key === 'Escape' && state.libraryFilter && !editableTarget) {
+      event.preventDefault();
+      clearLibraryFilter();
       return;
     }
     if (event.key === 'Escape' && state.selectedNodeId && !editableTarget) {
@@ -1109,7 +1235,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 
 
-function renderInsertPreview(drag: BlockDrag): void {
+function renderInsertPreview(drag: BlockDrag, graph = currentGraph()): void {
   const candidate = drag.candidate;
   const decorationKey = candidate
     ? `${drag.rootId}:${candidate.kind}:${candidate.join.id}:${candidate.valid ? 'valid' : 'invalid'}`
@@ -1134,7 +1260,6 @@ function renderInsertPreview(drag: BlockDrag): void {
     return;
   }
   if (candidate.valid) {
-    const graph = currentGraph();
     const catalog = activeCatalog();
     const preview = dragPreviewCache.getOrCompute(graph, graphVersion, catalog, state.selectedNodeId, drag, () => {
       const placementGraph = computeDragDrop(graph, drag).graph;
@@ -1200,6 +1325,8 @@ function beginCatalogPointer(event: PointerEvent, blockId: string, buttonEl: HTM
   event.preventDefault();
   const start = { x: event.clientX, y: event.clientY };
   let moved = false;
+  let catalogDragGraph: GraphDocument | null = null;
+  let catalogDrag: BlockDrag | null = null;
   const ghostBlock = catalogGhostBlock(blockId);
   cancelInteractionAnimations();
   clearPlacementPreview(false);
@@ -1225,40 +1352,76 @@ function beginCatalogPointer(event: PointerEvent, blockId: string, buttonEl: HTM
     }
     updateCatalogDragGhost(moveEvent.clientX, moveEvent.clientY);
     const point = pointerToWorld(moveEvent);
-    const ghostRect = catalogDragGhostRect();
-    const conditionPoint = ghostRect
-      ? clientToWorld(moveEvent.clientX, ghostRect.top + ghostRect.height / 2)
-      : point;
-    const blockItem = catalogBlock(activeCatalog(), blockId);
-    const conditionHit = blockItem
-      ? catalogConditionSlotAtPoint(currentGraph(), conditionPoint, blockItem, activeCatalog())
-      : null;
-    if (conditionHit) {
-      showCatalogConditionSlotTarget(conditionHit.container.id, conditionHit.slotId);
+    if (!catalogDragGraph || !catalogDrag) {
+      const blockItem = catalogBlock(activeCatalog(), blockId);
+      if (!blockItem) {
+        return;
+      }
+      catalogDragGraph = cloneGraph(currentGraph());
+      const nodeItem = createCatalogNode(blockItem, uniqueNodeId(catalogNodeIdPrefix(blockItem), catalogDragGraph), { x: 0, y: 0 });
+      catalogDragGraph.nodes.push(nodeItem);
+      const bounds = blockMetrics(catalogDragGraph, nodeItem).visualBounds;
+      nodeItem.position = {
+        x: Math.round(point.x - bounds.x - bounds.width / 2),
+        y: Math.round(point.y - bounds.y - bounds.height / 2),
+      };
+      const position = { ...nodeItem.position };
+      catalogDrag = {
+        pointerId: moveEvent.pointerId,
+        rootId: nodeItem.id,
+        groupIds: [nodeItem.id],
+        started: true,
+        startClient: { x: moveEvent.clientX, y: moveEvent.clientY },
+        startWorld: point,
+        startPositions: new Map([[nodeItem.id, position]]),
+        previewPositions: new Map([[nodeItem.id, position]]),
+        joins: buildJoins(catalogDragGraph, buildBlocks(catalogDragGraph, activeCatalog(), nodeItem.id)),
+        candidate: null,
+      };
     } else {
-      showCatalogContainerTarget(containerAtPoint(currentGraph(), point)?.id ?? null);
+      const startPosition = catalogDrag.startPositions.get(catalogDrag.rootId);
+      if (startPosition) {
+        catalogDrag.previewPositions.set(catalogDrag.rootId, {
+          x: Math.round(startPosition.x + point.x - catalogDrag.startWorld.x),
+          y: Math.round(startPosition.y + point.y - catalogDrag.startWorld.y),
+        });
+      }
     }
+    catalogDrag.candidate = findInsertCandidate(catalogDragGraph, catalogDrag, activeCatalog());
+    renderInsertPreview(catalogDrag, catalogDragGraph);
   };
   const onUp = (upEvent: PointerEvent) => {
     if (moved) {
-      updateCatalogDragGhost(upEvent.clientX, upEvent.clientY);
+      onMove(upEvent);
     }
     const ghostRect = catalogDragGhostRect();
-    const conditionPoint = ghostRect
-      ? clientToWorld(upEvent.clientX, ghostRect.top + ghostRect.height / 2)
-      : null;
     cleanup();
     clearCatalogDragGhost();
+    clearInsertPreview();
+    if (catalogDragGraph && catalogDrag) {
+      const result = computeDragDrop(catalogDragGraph, catalogDrag);
+      const blockItem = catalogBlock(activeCatalog(), blockId);
+      applyGraphEdit(
+        result.graph,
+        result.inserted ? connectedActionText(catalogDrag.candidate) : `已新增“${blockItem?.displayName ?? blockId}”，正在自动保存。`,
+        {
+          selectedNodeId: catalogDrag.rootId,
+          recentNodeId: catalogDrag.rootId,
+          animationOrigin: ghostRect ? { nodeId: catalogDrag.rootId, rect: blockRectSnapshot(ghostRect) } : undefined,
+        },
+      );
+      return;
+    }
     addCatalogBlockAt(
       blockId,
       moved ? upEvent : null,
       ghostRect ? blockRectSnapshot(ghostRect) : null,
-      conditionPoint,
     );
   };
   const onCancel = () => {
     cleanup();
     clearCatalogDragGhost();
+    clearInsertPreview();
   };
   const onKeyDown = (keyEvent: KeyboardEvent) => {
     if (keyEvent.key === 'Escape') {
@@ -1288,10 +1451,27 @@ function addCatalogBlockAt(
   const kind = blockKindFromCatalogBlock(blockItem);
   const nodeItem = createCatalogNode(blockItem, uniqueNodeId(catalogNodeIdPrefix(blockItem), graph), { x: 0, y: 0 });
   const dropPoint = event ? pointerToWorld(event) : null;
-  const conditionDropPoint = conditionProbePoint ?? dropPoint;
+  const filterContainer = !event && state.libraryFilter?.targetContainerId
+    ? graph.nodes.find((item) => item.id === state.libraryFilter?.targetContainerId)
+    : null;
+  const filterSlotRects = filterContainer && state.libraryFilter?.targetSlotId
+    ? conditionSlotRects(graph, filterContainer, state.libraryFilter.targetSlotId)
+    : null;
+  const filterConditionPoint = filterSlotRects
+    ? {
+        x: filterSlotRects.row.x + filterSlotRects.row.width / 2,
+        y: filterSlotRects.row.y + filterSlotRects.row.height / 2,
+      }
+    : null;
+  const conditionDropPoint = conditionProbePoint ?? dropPoint ?? filterConditionPoint;
   const conditionHit = conditionDropPoint
     ? catalogConditionSlotAtPoint(graph, conditionDropPoint, blockItem, activeCatalog())
     : null;
+  if (state.libraryFilter?.targetContainerId && !event && !conditionHit) {
+    state.error = '当前条件槽已不可用，请重新选择条件槽。';
+    refreshDraftIndicators();
+    return;
+  }
   const selectedContainer = dropPoint
     ? containerAtPoint(graph, dropPoint)
     : graph.nodes.find((item) => item.id === state.selectedNodeId && isBodyContainerNode(item));
@@ -2327,7 +2507,7 @@ async function performAutoSave(): Promise<void> {
     if (changedDuringSave) {
       scheduleAutoSave();
     }
-    if (activeBlockDrag || state.editorOpen) {
+    if (activeBlockDrag || state.editorOpen || document.activeElement?.matches('[data-library-search]')) {
       refreshDraftIndicators();
     } else {
       renderApp();
@@ -2349,8 +2529,9 @@ async function loadCatalog(): Promise<void> {
   await runAction('加载积木库', async () => {
     const catalogResponse = await api('/api/pixellogic/catalog');
     state.catalog = catalogResponse.catalog ?? fallbackCatalog;
-    if (state.catalogCategoryId && !state.catalog.categories.some((categoryItem) => categoryItem.id === state.catalogCategoryId)) {
-      state.catalogCategoryId = null;
+    state.libraryLocation = sanitizeLibraryLocation(state.catalog, state.libraryLocation, state.libraryFilter);
+    if (state.libraryFilterRestoreLocation) {
+      state.libraryFilterRestoreLocation = sanitizeLibraryLocation(state.catalog, state.libraryFilterRestoreLocation, null);
     }
     state.apiStatus = 'online';
     state.statusMessage = '积木库已加载';

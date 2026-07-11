@@ -219,8 +219,8 @@ try {
   assert.doesNotMatch(app + dragInsert + containerPlacement, /startsWith\('control\.loop\.'/,
     'context-aware placement must not keep loop-only container checks');
   assert.match(animations, /renderBlock\(/, 'context placement must reuse the existing rendered-block ghost');
-  assert.match(blockView, /data-category=/, 'rendered blocks must expose their catalog category for styling');
-  assert.match(styles, /\.logic-block\.control\[data-category="context"\]/,
+  assert.match(blockView, /data-pack=/, 'rendered blocks must expose their derived catalog pack for styling');
+  assert.match(styles, /\.logic-block\.control\[data-pack="player-entity"\]/,
     'execute-as must be visually distinct without a second geometry system');
 
   // Keep one ordinary control edge in this check so the graph fixture exercises the same shape as real documents.

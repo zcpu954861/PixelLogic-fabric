@@ -37,10 +37,10 @@ public final class ConditionOutputModeSelfCheck {
 
         require(stateCondition.defaultConfig().get(ConditionOutputMode.CONFIG_KEY).equals(ConditionOutputMode.PASS_ONLY.name()),
                 "new state conditions should default to PASS_ONLY");
-        require(hasTag.categoryId().equals("condition") && hasTag.subcategoryId().equals("condition.player"),
-                "player tag condition should live under condition/player condition catalog");
-        require(addTag.categoryId().equals("player") && addTag.subcategoryId().equals("player.tag"),
-                "player add tag action should remain under player/tag catalog");
+        require(hasTag.categoryId().equals("player-entity.tags"),
+                "player tag condition should live under player/entity tags");
+        require(addTag.categoryId().equals("player-entity.tags"),
+                "player add tag action should remain under player/entity tags");
         require(DemoGraphFactory.create(Duration.ofSeconds(1)).nodes().stream()
                         .filter(node -> node.id().equals("condition-started"))
                         .findFirst()

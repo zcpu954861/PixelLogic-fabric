@@ -5,7 +5,7 @@ import {
   fallbackPosition,
 } from '../../model/graphLayout';
 import { conditionRackFrame } from '../../model/containerGeometry';
-import { catalogBlock } from '../../model/blockCatalog';
+import { catalogBlock, catalogPackForBlock } from '../../model/blockCatalog';
 import { conditionRackParent, conditionSlotMember, conditionSlots, hasPredicateRack } from '../../model/conditionRack';
 import type { BlockCatalog, BlockMetrics, GraphDocument, SlotBlock, SlotJoin } from '../../model/graphTypes';
 import { nodeCategoryLabel, nodeSummary, blockKind, predicateNodeSummary } from '../humanize/labels';
@@ -21,7 +21,8 @@ export function buildBlocks(graph: GraphDocument, catalog: BlockCatalog, selecte
   );
   return graph.nodes.filter((nodeItem) => !conditionRackParent(graph, nodeItem)).map((nodeItem) => {
     const kind = blockKind(nodeItem.type);
-    const categoryId = catalogBlock(catalog, nodeItem.blockId ?? '')?.categoryId;
+    const blockItem = catalogBlock(catalog, nodeItem.blockId ?? '');
+    const packId = blockItem ? catalogPackForBlock(catalog, blockItem)?.id : undefined;
     const position = nodeItem.position ?? fallbackPosition(nodeItem.id);
     const size = blockMetrics(graph, nodeItem, metricsCache);
     const visualX = position.x + size.visualBounds.x;
@@ -33,7 +34,7 @@ export function buildBlocks(graph: GraphDocument, catalog: BlockCatalog, selecte
     return {
       id: nodeItem.id,
       kind,
-      categoryId,
+      packId,
       branch: branchForNode(graph, nodeItem),
       type: nodeCategoryLabel(nodeItem, catalog),
       title: nodeItem.displayName || nodeItem.id,

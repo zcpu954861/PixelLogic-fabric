@@ -90,7 +90,7 @@ try {
     displayName: id,
     description: id,
     categoryId,
-    subcategoryId: '',
+    subcategoryId: categoryId,
     tags: [],
     capabilities,
     nodeKind,
@@ -109,22 +109,29 @@ try {
     safetyFlags: [],
     deprecated: false,
     hidden: false,
+    visibility: 'BROWSE',
     aliases: [],
+    searchKeywords: [],
   });
   const catalog = {
+    packs: [
+      { id: 'logic-flow', displayName: '逻辑与流程', description: '', icon: '↻', order: 1 },
+      { id: 'player-entity', displayName: '玩家与实体', description: '', icon: '◎', order: 2 },
+      { id: 'presentation-feedback', displayName: '表现与反馈', description: '', icon: '✦', order: 3 },
+    ],
     categories: [
-      { id: 'control', displayName: '控制流', description: '', order: 1, visibleByDefault: true },
-      { id: 'condition', displayName: '条件判断块(胶囊)', description: '', order: 2, visibleByDefault: true },
-      { id: 'action', displayName: '动作', description: '', order: 3, visibleByDefault: true },
+      { id: 'logic-flow.loops', packId: 'logic-flow', displayName: '循环', description: '', icon: '↻', order: 1, visibleByDefault: true },
+      { id: 'player-entity.tags', packId: 'player-entity', displayName: '标签', description: '', icon: '#', order: 2, visibleByDefault: true },
+      { id: 'presentation-feedback.player-messages', packId: 'presentation-feedback', displayName: '玩家消息', description: '', icon: '✦', order: 3, visibleByDefault: true },
     ],
     subcategories: [],
     blocks: [
-      catalogBlock({ id: 'control.loop.until', nodeType: 'CONTROL_LOOP_UNTIL', nodeKind: 'control', categoryId: 'control', capabilities: ['PREDICATE_RACK'] }),
+      catalogBlock({ id: 'control.loop.until', nodeType: 'CONTROL_LOOP_UNTIL', nodeKind: 'control', categoryId: 'logic-flow.loops', capabilities: ['PREDICATE_RACK'] }),
       catalogBlock({
         id: 'condition.player.has_tag',
         nodeType: 'PLAYER_HAS_TAG_CONDITION',
         nodeKind: 'condition',
-        categoryId: 'condition',
+        categoryId: 'player-entity.tags',
         capabilities: ['PREDICATE'],
         predicateSummaryTemplate: '玩家拥有标签「{tag}」',
         predicateNegatedSummaryTemplate: '玩家没有标签「{tag}」',
@@ -137,7 +144,7 @@ try {
           formField('tag', '标签', 'string', 'runner'),
         ],
       }),
-      catalogBlock({ id: 'action.message.chat', nodeType: 'MESSAGE_ACTION', nodeKind: 'action', categoryId: 'action' }),
+      catalogBlock({ id: 'action.message.chat', nodeType: 'MESSAGE_ACTION', nodeKind: 'action', categoryId: 'presentation-feedback.player-messages' }),
     ],
   };
 
@@ -485,9 +492,9 @@ try {
   assert.match(appSource, /function updateRackEditorDraft[\s\S]*session\.draftGraph\.nodes = session\.draftGraph\.nodes\.filter[\s\S]*session\.draftGraph\.edges = session\.draftGraph\.edges\.filter/, 'filled-slot deletion must remain local to the rack draft');
   assert.match(appSource, /const nextGraph = rackEditorSession[\s\S]*cloneGraph\(rackEditorSession\.draftGraph\)[\s\S]*applyGraphEdit\(nextGraph/s, 'one modal save must apply the complete draft graph once');
   assert.match(appSource, /rackEditorSession = null;[\s\S]*renderApp\(\)/, 'closing/cancelling must discard the rack session without applying it');
-  assert.match(appSource, /clientToWorld\(moveEvent\.clientX, ghostRect\.top \+ ghostRect\.height \/ 2\)[\s\S]*catalogConditionSlotAtPoint\(currentGraph\(\), conditionPoint/, 'catalog hover must probe with the visible card center height');
-  assert.match(appSource, /const onUp[\s\S]*clientToWorld\(upEvent\.clientX, ghostRect\.top \+ ghostRect\.height \/ 2\)[\s\S]*addCatalogBlockAt\([\s\S]*conditionPoint/, 'catalog drop must commit with the same center-height probe as its preview');
-  assert.match(appSource, /const conditionDropPoint = conditionProbePoint \?\? dropPoint;[\s\S]*catalogConditionSlotAtPoint\(graph, conditionDropPoint/, 'catalog drop must consume the center-height probe instead of ignoring it');
+  assert.match(appSource, /nodeItem\.position = \{[\s\S]*point\.x - bounds\.x - bounds\.width \/ 2[\s\S]*point\.y - bounds\.y - bounds\.height \/ 2[\s\S]*findInsertCandidate\(catalogDragGraph, catalogDrag, activeCatalog\(\)\)/, 'catalog hover must probe with the centered visible card geometry');
+  assert.match(appSource, /const onUp[\s\S]*onMove\(upEvent\)[\s\S]*computeDragDrop\(catalogDragGraph, catalogDrag\)/, 'catalog drop must commit the same candidate computed from the visible card geometry');
+  assert.match(appSource, /const conditionDropPoint = conditionProbePoint \?\? dropPoint \?\? filterConditionPoint;[\s\S]*catalogConditionSlotAtPoint\(graph, conditionDropPoint/, 'catalog drop must consume the pointer center-height probe before the keyboard rack target');
 
   // Embedded transforms/ghosts are parent-relative and avoid double-moving a capsule with its parent.
   assert.match(appSource, /embeddedParentId[\s\S]*!drag\.groupIds\.includes\(embeddedParentId\)[\s\S]*style\.transform/, 'live drag transform must skip an embedded capsule when its parent is in the group');

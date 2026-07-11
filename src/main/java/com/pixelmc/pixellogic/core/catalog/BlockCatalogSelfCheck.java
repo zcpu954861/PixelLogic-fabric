@@ -60,14 +60,14 @@ public final class BlockCatalogSelfCheck {
         catalog.blocks().forEach(block -> actual.add(block.id()));
 
         require(actual.equals(expected), "catalog should contain demo, player, and message concrete block ids");
+        require(catalog.packs().stream()
+                        .anyMatch(pack -> pack.id().equals("player-entity")
+                                && pack.displayName().equals("玩家与实体")),
+                "player/entity pack should be user-visible");
         require(catalog.categories().stream()
-                        .anyMatch(category -> category.id().equals("condition")
-                                && category.displayName().equals("条件判断块(胶囊)")),
-                "condition category should explain its capsule form");
-        require(catalog.categories().stream()
-                        .anyMatch(category -> category.id().equals("context")
-                                && category.displayName().equals("执行上下文")),
-                "context category should be user-visible");
+                        .anyMatch(category -> category.id().equals("player-entity.execution-context")
+                                && category.displayName().equals("实体上下文")),
+                "execution context category should be user-visible");
         catalog.blocks().forEach(block -> {
             require(catalog.categories().stream().anyMatch(category -> category.id().equals(block.categoryId())),
                     "block category should exist: " + block.id());
@@ -111,14 +111,14 @@ public final class BlockCatalogSelfCheck {
         BlockDefinition isAdmin = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN).orElseThrow();
         BlockDefinition addTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG).orElseThrow();
         BlockDefinition removeTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG).orElseThrow();
-        require(hasTag.categoryId().equals("condition") && hasTag.subcategoryId().equals("condition.player"),
-                "player tag condition should be under condition/player condition");
-        require(isAdmin.categoryId().equals("condition") && isAdmin.subcategoryId().equals("condition.player"),
-                "player admin condition should be under condition/player condition");
-        require(addTag.categoryId().equals("player") && addTag.subcategoryId().equals("player.tag"),
-                "player tag action should stay under player/tag");
-        require(removeTag.categoryId().equals("player") && removeTag.subcategoryId().equals("player.tag"),
-                "player remove tag action should stay under player/tag");
+        require(hasTag.categoryId().equals("player-entity.tags"),
+                "player tag condition should be under player/entity tags");
+        require(isAdmin.categoryId().equals("player-entity.identity-permissions"),
+                "player admin condition should be under identity/permissions");
+        require(addTag.categoryId().equals("player-entity.tags"),
+                "player tag action should stay under player/entity tags");
+        require(removeTag.categoryId().equals("player-entity.tags"),
+                "player remove tag action should stay under player/entity tags");
         require(hasTag.formSchema().stream().anyMatch(field -> field.key().equals("tag") && field.type().equals("string")),
                 "player tag condition should expose tag field");
         require(hasTag.formSchema().stream().anyMatch(field -> field.key().equals(ConditionOutputMode.CONFIG_KEY) && field.type().equals("segmented")),
@@ -131,28 +131,28 @@ public final class BlockCatalogSelfCheck {
                         && addTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE
                         && removeTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE,
                 "player tag blocks should be fully simulatable");
-        require(messageBlock(BuiltInBlockCatalog.ACTION_MESSAGE_TITLE).subcategoryId().equals("message.screen"),
-                "title message block should live under message/screen prompt");
+        require(messageBlock(BuiltInBlockCatalog.ACTION_MESSAGE_TITLE).categoryId().equals("presentation-feedback.screen-prompts"),
+                "title message block should live under presentation/feedback screen prompts");
         require(messageBlock(BuiltInBlockCatalog.ACTION_MESSAGE_SUBTITLE).formSchema().stream()
                         .anyMatch(field -> field.key().equals("message") && field.type().equals("rich_text_component")),
                 "subtitle message block should use rich_text_component");
         require(messageBlock(BuiltInBlockCatalog.ACTION_MESSAGE_ACTIONBAR).formSchema().stream()
                         .anyMatch(field -> field.key().equals("message") && field.type().equals("rich_text_component")),
                 "actionbar message block should use rich_text_component");
-        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS).subcategoryId().equals("condition.player"),
-                "player dimension condition should live under player conditions");
-        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION).subcategoryId().equals("condition.region"),
-                "player region condition should live under region conditions");
-        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE).subcategoryId().equals("condition.block"),
-                "target block type condition should live under block conditions");
-        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IN_REGION).subcategoryId().equals("condition.region"),
-                "target block region condition should live under region conditions");
-        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_Y_COMPARE).subcategoryId().equals("condition.player"),
-                "player y compare condition should live under player conditions");
-        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_Y_COMPARE).subcategoryId().equals("condition.block"),
-                "target block y compare condition should live under block conditions");
-        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_NEAR_TARGET_BLOCK).subcategoryId().equals("condition.spatial"),
-                "near target condition should live under spatial conditions");
+        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS).categoryId().equals("location-region.dimensions-heights"),
+                "player dimension condition should live under dimensions/heights");
+        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION).categoryId().equals("location-region.regions"),
+                "player region condition should live under regions");
+        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE).categoryId().equals("block-world.target-block"),
+                "target block type condition should live under target block");
+        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IN_REGION).categoryId().equals("location-region.regions"),
+                "target block region condition should live under regions");
+        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_Y_COMPARE).categoryId().equals("location-region.dimensions-heights"),
+                "player y compare condition should live under dimensions/heights");
+        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_Y_COMPARE).categoryId().equals("location-region.dimensions-heights"),
+                "target block y compare condition should live under dimensions/heights");
+        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_NEAR_TARGET_BLOCK).categoryId().equals("location-region.spatial-relations"),
+                "near target condition should live under spatial relations");
         BlockDefinition loopUntil = block(BuiltInBlockCatalog.CONTROL_LOOP_UNTIL);
         require(loopUntil.capabilities().equals(List.of(BlockCapability.PREDICATE_RACK))
                         && loopUntil.containerSlots().equals(List.of("body")),

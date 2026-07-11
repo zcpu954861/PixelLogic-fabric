@@ -56,14 +56,14 @@ public final class CatalogExpansionV2SelfCheck {
     }
 
     private static void checkCatalog() {
-        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS).categoryId().equals("condition"),
-                "player dimension condition should be under condition category");
-        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION).subcategoryId().equals("condition.region"),
-                "player region condition should be under region condition subcategory");
-        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE).subcategoryId().equals("condition.block"),
-                "target block type condition should be under block condition subcategory");
-        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IN_REGION).subcategoryId().equals("condition.region"),
-                "target block region condition should be under region condition subcategory");
+        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS).categoryId().equals("location-region.dimensions-heights"),
+                "player dimension condition should be under dimensions/heights");
+        require(block(BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION).categoryId().equals("location-region.regions"),
+                "player region condition should be under regions");
+        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE).categoryId().equals("block-world.target-block"),
+                "target block type condition should be under target block");
+        require(block(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IN_REGION).categoryId().equals("location-region.regions"),
+                "target block region condition should be under regions");
         require(modeLabels(BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS)
                         .equals(List.of("在该维度时继续", "不在该维度时继续", "分开执行")),
                 "dimension condition should expose block-specific mode labels");

@@ -1,12 +1,10 @@
 package com.pixelmc.pixellogic.core.catalog;
 
-public record BlockCategoryDefinition(
+public record BlockPackDefinition(
         String id,
-        String packId,
         String displayName,
         String description,
         String icon,
-        int order,
-        boolean visibleByDefault
+        int order
 ) {
 }

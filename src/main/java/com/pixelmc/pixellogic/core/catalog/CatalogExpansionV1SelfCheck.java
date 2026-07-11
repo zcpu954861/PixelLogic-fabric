@@ -61,8 +61,8 @@ public final class CatalogExpansionV1SelfCheck {
                 "has_tag should not add an extra positive/negative field");
 
         BlockDefinition isAdmin = block(BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN);
-        require(isAdmin.categoryId().equals("condition") && isAdmin.subcategoryId().equals("condition.player"),
-                "is_admin should live under condition/player condition");
+        require(isAdmin.categoryId().equals("player-entity.identity-permissions"),
+                "is_admin should live under player/entity identity category");
         require(modeLabels(isAdmin).equals(List.of("是管理员时继续", "不是管理员时继续", "分开执行")),
                 "is_admin should expose admin-specific condition mode labels");
         require(isAdmin.formSchema().stream().map(BlockFormFieldDefinition::key).toList().equals(List.of("outputMode")),
@@ -74,10 +74,10 @@ public final class CatalogExpansionV1SelfCheck {
                 "catalog should not add a negative player tag block");
         require(catalog.blocks().stream().noneMatch(block -> block.displayName().equals(negativeAdminName)),
                 "catalog should not add a negative admin block");
-        require(block(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG).subcategoryId().equals("player.tag"),
-                "add_tag should remain under player/tag");
-        require(block(BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG).subcategoryId().equals("player.tag"),
-                "remove_tag should live under player/tag");
+        require(block(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG).categoryId().equals("player-entity.tags"),
+                "add_tag should remain under player/entity tags");
+        require(block(BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG).categoryId().equals("player-entity.tags"),
+                "remove_tag should live under player/entity tags");
 
         List.of(
                 BuiltInBlockCatalog.ACTION_MESSAGE_TITLE,
@@ -85,7 +85,8 @@ public final class CatalogExpansionV1SelfCheck {
                 BuiltInBlockCatalog.ACTION_MESSAGE_ACTIONBAR
         ).forEach(blockId -> {
             BlockDefinition message = block(blockId);
-            require(message.subcategoryId().equals("message.screen"), blockId + " should live under message/screen prompt");
+            require(message.categoryId().equals("presentation-feedback.screen-prompts"),
+                    blockId + " should live under presentation/feedback screen prompts");
             require(message.formSchema().stream().anyMatch(field -> field.key().equals("message") && field.type().equals("rich_text_component")),
                     blockId + " should use rich_text_component");
         });

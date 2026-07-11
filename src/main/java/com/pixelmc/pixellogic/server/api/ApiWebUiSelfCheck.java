@@ -42,8 +42,24 @@ public final class ApiWebUiSelfCheck {
 
             CheckedResponse catalog = send(client, "GET", base + "/api/pixellogic/catalog");
             requireJson(catalog, "catalog should be JSON");
-            require(catalog.body().contains("\"categories\"") && catalog.body().contains("\"blocks\""),
-                    "catalog endpoint should return categories and blocks");
+            JsonObject catalogSnapshot = JsonParser.parseString(catalog.body()).getAsJsonObject().getAsJsonObject("catalog");
+            require(catalogSnapshot.has("packs") && catalogSnapshot.has("categories")
+                            && catalogSnapshot.has("subcategories") && catalogSnapshot.has("blocks"),
+                    "catalog endpoint should extend the existing snapshot with packs");
+            require(catalogSnapshot.getAsJsonArray("subcategories").size()
+                            == catalogSnapshot.getAsJsonArray("categories").size()
+                            && catalogSnapshot.getAsJsonArray("categories").get(0).getAsJsonObject().has("visibleByDefault"),
+                    "catalog should retain its derived subcategory and category compatibility metadata");
+            JsonObject manualBlock = catalogSnapshot.getAsJsonArray("blocks").asList().stream()
+                    .map(element -> element.getAsJsonObject())
+                    .filter(block -> "trigger.manual_test".equals(block.get("id").getAsString()))
+                    .findFirst()
+                    .orElseThrow();
+            require(manualBlock.has("subcategoryId") && manualBlock.has("tags") && manualBlock.has("hidden")
+                            && manualBlock.has("aliases") && manualBlock.has("searchKeywords")
+                            && manualBlock.has("visibility")
+                            && manualBlock.getAsJsonArray("aliases").get(0).getAsString().equals("manual.test.start"),
+                    "catalog blocks should retain legacy metadata while adding taxonomy metadata");
             require(catalog.body().contains("trigger.manual_test") && catalog.body().contains("condition.state.equals"),
                     "catalog should include demo block ids");
             require(catalog.body().contains("\"formSchema\"") && catalog.body().contains("rich_text_component")
@@ -64,6 +80,9 @@ public final class ApiWebUiSelfCheck {
                     "graph endpoint should expose additive typed condition slot data");
 
             JsonObject graph = JsonParser.parseString(graphResponse.body()).getAsJsonObject().getAsJsonObject("graph");
+            require(!graph.toString().contains("\"packId\"") && !graph.toString().contains("\"categoryId\"")
+                            && !graph.toString().contains("\"visibility\"") && !graph.toString().contains("\"searchKeywords\""),
+                    "graph payload must not persist library taxonomy metadata");
             setNodeConfig(graph, "welcome-message", "message", "API self-check welcome");
             CheckedResponse draft = send(
                     client,

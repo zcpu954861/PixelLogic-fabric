@@ -177,6 +177,8 @@ This checkpoint still does not add a real Minecraft adapter, draft simulation, n
 
 ## Block Catalog Model
 
+> Current taxonomy note: Block Library Taxonomy v1 replaces the historical Category/Subcategory navigation model below with one formal `Pack → Category → Block` Snapshot. Historical wire fields remain as a derived compatibility projection, not a second navigation authority. The current matrix and visibility/search rules live in `BLOCK_LIBRARY_TAXONOMY_V1.md`; Graph and Runtime boundaries remain unchanged.
+
 Block Catalog 是“用户能放什么积木，以及这些积木如何被找到、编辑、验证、模拟和执行”的 registry。
 
 ### Category Registry

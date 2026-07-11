@@ -40,7 +40,15 @@ public final class InMemoryStateStore {
             throw new IllegalStateException("State value is not INTEGER: " + key);
         }
         int base = current == null ? 0 : current.asInteger(0);
-        StateValue next = StateValue.integer(base + amount);
+        int result;
+        try {
+            result = Math.addExact(base, amount);
+        } catch (ArithmeticException exception) {
+            throw new IllegalStateException(
+                    "状态「" + key.key() + "」累加失败：结果超出整数允许范围，原值未修改。"
+            );
+        }
+        StateValue next = StateValue.integer(result);
         values.put(key, next);
         return next;
     }

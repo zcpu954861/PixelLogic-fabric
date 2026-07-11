@@ -95,7 +95,7 @@ public final class PixelLogicSpikeService implements AutoCloseable {
 
             @Override
             public void scheduleTimer(Duration delay, TimerContinuation continuation) {
-                if (continuation.generation() != runtimeGeneration.get()) {
+                if (closed.get() || continuation.generation() != runtimeGeneration.get()) {
                     return;
                 }
                 GraphRuntime scheduledRuntime = runtime;
@@ -135,7 +135,8 @@ public final class PixelLogicSpikeService implements AutoCloseable {
         return startManualTest(actor, SimulationWorld.overworld());
     }
 
-    public RuntimeResult startManualTest(SimulationActor actor, SimulationWorld world) {
+    public synchronized RuntimeResult startManualTest(SimulationActor actor, SimulationWorld world) {
+        ensureOpen();
         SimulationRunner currentRunner = simulationRunner;
         GraphDocument graph = committedGraph;
         if (validator.hasErrors(validationIssues) || currentRunner == null || graph == null) {
@@ -166,7 +167,8 @@ public final class PixelLogicSpikeService implements AutoCloseable {
         );
     }
 
-    public void resetPlayer(UUID playerId) {
+    public synchronized void resetPlayer(UUID playerId) {
+        ensureOpen();
         simulationRunSequence.incrementAndGet();
         cancelSimulationResult("测试运行已重置。");
         runtimeGeneration.incrementAndGet();
@@ -199,7 +201,8 @@ public final class PixelLogicSpikeService implements AutoCloseable {
         return graphStorage.loadDraft(graphId);
     }
 
-    public GraphDocument saveDraft(String graphId, GraphDocument draft) throws IOException {
+    public synchronized GraphDocument saveDraft(String graphId, GraphDocument draft) throws IOException {
+        ensureOpen();
         return graphStorage.saveDraft(graphId, draft);
     }
 
@@ -208,6 +211,7 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     }
 
     public synchronized GraphStorageService.CommitReport commitDraft(String graphId) throws IOException {
+        ensureOpen();
         GraphStorageService.CommitReport report = graphStorage.commitDraft(graphId);
         if (report.committed()) {
             installCommittedGraph(report.graph());
@@ -255,8 +259,12 @@ public final class PixelLogicSpikeService implements AutoCloseable {
         return result != null && result.traceId().equals(runId) ? Optional.of(result) : Optional.empty();
     }
 
+    public boolean isClosed() {
+        return closed.get();
+    }
+
     @Override
-    public void close() {
+    public synchronized void close() {
         if (closed.compareAndSet(false, true)) {
             simulationRunSequence.incrementAndGet();
             cancelSimulationResult("服务已停止。");
@@ -306,6 +314,12 @@ public final class PixelLogicSpikeService implements AutoCloseable {
         GraphRuntime current = runtime;
         if (current != null) {
             current.cancelPendingContinuations();
+        }
+    }
+
+    private void ensureOpen() {
+        if (closed.get()) {
+            throw new IllegalStateException("PixelLogic 服务已关闭，操作未执行。");
         }
     }
 

@@ -4,7 +4,7 @@
 
 当前版本分支是 `mc-1.21.11`。版本开发不从 `main` 或 `master` 开始。
 
-主线 HEAD `e78b190` 已包含：
+主线 HEAD `52adac1` 已包含：
 
 - Direct Edge / Graph 主模型、草稿保存/校验/提交、自动保存与 undo/redo；
 - Catalog、Form Schema、Simulation Backend、Condition Output Modes；
@@ -13,23 +13,21 @@
 - 可跨 `timer.wait` 恢复的 Control Flow Continuation；
 - Loop Until + Condition Rack；
 - Contextual Entity Execution；
+- Polling、Runtime/API、Catalog/Validation、拖拽性能与文档治理收口；
 - 独立 Vanilla TypeScript WebUI 和有界 trace/runtime 安全机制。
 
 这些能力仍以 simulation-first 为边界；真实 Minecraft adapter 尚未接入。
 
-## 当前治理堆叠
+## 当前产品分支
 
-治理分支从 `mc-1.21.11` 的 Contextual Entity Execution baseline 向前堆叠，尚未合并主线：
+`feature/block-library-taxonomy-v1` 基于当前主线，将左侧积木库升级为：
 
-1. Polling Interaction Safety Hotfix；
-2. Runtime / API Safety Hardening；
-3. Cleanup A — 低风险删除与构建收缩；
-4. UI Polish v1；
-5. Drag Performance v1；
-6. Catalog / Validation Cleanup v1；
-7. Cleanup E — 文档与 Self-check 收缩（当前阶段）。
+- 积木包 → 一级分类 → 具体积木；
+- 跨包搜索与正式路径；
+- visibility 与 capability 槽位过滤的交集；
+- 不改变 Graph、Runtime、Simulation 或拖拽 payload。
 
-本轮治理完成后先做总收口，再决定是否合入 `mc-1.21.11`；当前不发布、不 tag。
+只注册当前已有积木的领域；未来新增物品/容器等能力时再增加对应 pack，不预建空目录。收藏、最近使用和第三方包留给后续独立阶段。
 
 ## 近期候选方向
 

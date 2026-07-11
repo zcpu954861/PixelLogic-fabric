@@ -2,6 +2,7 @@ import type { SlotBlock } from '../../model/graphTypes';
 import { renderBlock } from './blockView';
 
 let ghostEl: HTMLElement | null = null;
+let ghostScale = 1;
 
 export function showCatalogDragGhost(block: SlotBlock, clientX: number, clientY: number, canvasScale: number): void {
   clearCatalogDragGhost();
@@ -15,14 +16,15 @@ export function showCatalogDragGhost(block: SlotBlock, clientX: number, clientY:
   element.classList.remove('selected', 'newly-added', 'is-related');
   element.classList.add('catalog-drag-ghost');
   element.setAttribute('aria-hidden', 'true');
-  element.style.setProperty('--catalog-ghost-scale', String(Math.min(0.86, Math.max(0.62, canvasScale))));
+  ghostScale = Math.min(0.86, Math.max(0.62, canvasScale));
+  element.style.setProperty('--catalog-ghost-scale', String(ghostScale));
   document.body.append(element);
   ghostEl = element;
   updateCatalogDragGhost(clientX, clientY);
 }
 
 export function updateCatalogDragGhost(clientX: number, clientY: number): void {
-  ghostEl?.style.setProperty('transform', `translate3d(${Math.round(clientX + 18)}px, ${Math.round(clientY + 16)}px, 0) scale(var(--catalog-ghost-scale))`);
+  ghostEl?.style.setProperty('transform', `translate3d(${Math.round(clientX - ghostEl.offsetWidth * ghostScale / 2)}px, ${Math.round(clientY - ghostEl.offsetHeight * ghostScale / 2)}px, 0) scale(var(--catalog-ghost-scale))`);
 }
 
 export function catalogDragGhostRect(): DOMRect | null {

@@ -40,8 +40,8 @@ public final class ContainerControlFlowSelfCheck {
         SelfCheckSupport.run("containerControlFlowSelfCheck", () -> {
             BlockDefinition count = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONTROL_LOOP_COUNT).orElseThrow();
             BlockDefinition forever = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONTROL_LOOP_FOREVER).orElseThrow();
-            require(count.categoryId().equals("control"), "loop count should be in control category");
-            require(forever.categoryId().equals("control"), "forever loop should be in control category");
+            require(count.categoryId().equals("logic-flow.loops"), "loop count should be in logic/flow loops");
+            require(forever.categoryId().equals("logic-flow.loops"), "forever loop should be in logic/flow loops");
             require(count.containerSlots().equals(List.of("body")), "loop count should expose a body slot");
             require(forever.containerSlots().equals(List.of("body")), "forever loop should expose a body slot");
             require(count.outputSlots().stream().anyMatch(slot -> slot.id().equals("done")), "loop count should have an outer done output");

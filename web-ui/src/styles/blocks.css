@@ -79,7 +79,7 @@
   padding: 15px 54px 5px 38px;
 }
 
-.logic-block.control[data-category="context"] {
+.logic-block.control[data-pack="player-entity"] {
   --accent: #6d28d9;
   --block-outline: #6d28d9;
   --fill: #fbf8ff;
@@ -333,10 +333,20 @@
   display: grid;
   place-items: center;
   color: rgba(45, 111, 159, 0.68);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
   font-size: 0.84rem;
   font-weight: 900;
   text-align: center;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.condition-rack-empty:hover,
+.condition-rack-empty:focus-visible {
+  background: rgba(45, 111, 159, 0.1);
+  color: #234f70;
 }
 
 .logic-block.predicate-capsule {

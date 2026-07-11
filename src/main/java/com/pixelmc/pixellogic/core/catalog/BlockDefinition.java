@@ -14,6 +14,8 @@ public record BlockDefinition(
         String categoryId,
         String subcategoryId,
         List<String> tags,
+        List<String> aliases,
+        List<String> searchKeywords,
         List<BlockCapability> capabilities,
         String nodeKind,
         NodeType nodeType,
@@ -31,10 +33,14 @@ public record BlockDefinition(
         List<BlockSafetyFlag> safetyFlags,
         boolean deprecated,
         boolean hidden,
-        List<String> aliases
+        BlockLibraryVisibility visibility
 ) {
     public BlockDefinition {
+        categoryId = categoryId == null ? "" : categoryId;
+        subcategoryId = subcategoryId == null ? categoryId : subcategoryId;
         tags = tags == null ? List.of() : List.copyOf(tags);
+        aliases = aliases == null ? List.of() : List.copyOf(aliases);
+        searchKeywords = searchKeywords == null ? List.of() : List.copyOf(searchKeywords);
         capabilities = capabilities == null ? List.of() : List.copyOf(capabilities);
         defaultConfig = defaultConfig == null ? Map.of() : Map.copyOf(defaultConfig);
         formSchema = formSchema == null ? List.of() : List.copyOf(formSchema);
@@ -46,7 +52,5 @@ public record BlockDefinition(
         inputSlots = inputSlots == null ? List.of() : List.copyOf(inputSlots);
         outputSlots = outputSlots == null ? List.of() : List.copyOf(outputSlots);
         safetyFlags = safetyFlags == null ? List.of() : List.copyOf(safetyFlags);
-        aliases = aliases == null ? List.of() : List.copyOf(aliases);
-        subcategoryId = subcategoryId == null ? "" : subcategoryId;
     }
 }

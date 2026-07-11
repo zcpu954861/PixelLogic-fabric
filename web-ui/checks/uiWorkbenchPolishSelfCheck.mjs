@@ -31,7 +31,7 @@ try {
   assert.match(blockCss, /\.flow-world\.is-overview \.logic-block > p[\s\S]*visibility: hidden/,
     'overview must visually hide secondary text without changing geometry');
 
-  const catalog = { categories: [], subcategories: [], blocks: [{ id: 'condition.test', displayName: '玩家是否拥有标签', aliases: [] }] };
+  const catalog = { packs: [], categories: [], subcategories: [], blocks: [{ id: 'condition.test', displayName: '玩家是否拥有标签', aliases: [] }] };
   const node = { blockId: 'condition.test', displayName: '玩家是否拥有标签', type: 'CONDITION', config: {}, slots: [] };
   assert.equal(modal.blockEditorTitle(node, catalog), '未命名(玩家是否拥有标签)');
   assert.equal(modal.blockEditorTitle({ ...node, displayName: '守卫检查' }, catalog), '守卫检查(玩家是否拥有标签)');
@@ -55,8 +55,8 @@ try {
     'cards must expose a keyboard focus and edit affordance');
   assert.match(app, /event\.key === 'Enter' \|\| event\.key === ' '/);
   assert.match(app, /event\.key === 'Delete' \|\| event\.key === 'Backspace'/);
-  assert.match(app, /if \(!nodeId \|\| isEditableTarget\(event\.target\)\) return/,
-    'editable controls must keep native delete behavior');
+  assert.match(app, /if \(!nodeId \|\| event\.target !== blockEl\) return/,
+    'nested controls must keep native keyboard behavior');
   assert.match(blockCss, /\.logic-block:focus-visible/);
   assert.match(baseCss, /:focus-visible/);
   assert.match(responsiveCss, /prefers-reduced-motion: reduce/);

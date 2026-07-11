@@ -13,21 +13,23 @@ The WebUI is an independent Vite + TypeScript project.
 
 ## Block Catalog
 
-The left library is now driven by the Block Catalog skeleton. The current top-level entries (`触发事件 / 条件判断块(胶囊) / 玩家操作 / 消息显示 / 控制流 / 执行上下文 / 状态数据 / 时间调度 / 调试诊断`) are catalog data, not hard-coded frontend node families.
+The left library is driven by the single Catalog Snapshot and uses `pack → category → block` navigation. Packs and categories are discovery metadata, never executable graph nodes.
 
 Current behavior:
 
-- categories come from `BlockCatalog.categories`;
-- clicking a category opens concrete blocks for that category;
+- packs and categories come from `BlockCatalog.packs/categories`; empty visible groups are omitted;
+- legacy `subcategories/subcategoryId/tags/hidden/visibleByDefault` remain a backend-derived wire projection only and are not another UI taxonomy;
+- breadcrumbs and back actions preserve an in-memory `LibraryLocation`;
+- global search uses one index per Snapshot and displays each result's formal pack/category path;
+- search typing replaces only the result browser, preserving the input node for IME, caret, and native text undo/redo;
+- Condition Rack filtering intersects visibility with the existing `PREDICATE` capability and restores the previous browse location on exit;
+- an empty predicate rack records its container/slot for keyboard creation; pointer drag keeps using its real drop point;
 - clicking a concrete block creates a graph node with `blockId`, `nodeType`, default config, and slots from catalog data;
-- API catalog failures show a minimal offline catalog placeholder while the normal Chinese API disconnected error explains that the full catalog is unavailable;
+- API catalog failures use an empty fallback Snapshot while the normal Chinese API disconnected error explains that the full catalog is unavailable;
 - technical block ids are not primary user-facing copy.
 - catalog entries support live drag ghosts and placement previews before pointer release.
 
-Still future:
-
-- search, tags, recent blocks, and common recommendations;
-- richer per-block summary templates shared with backend trace formatting;
+Still future: favorites, recent blocks, recommendations, fuzzy/pinyin search, third-party packs, and richer shared summary templates.
 
 Users should drag concrete blocks such as `发送聊天消息`, `状态等于`, or `等待一段时间`, not a generic `动作` or `条件` block that hides many unrelated modes in one form.
 
@@ -125,7 +127,7 @@ Important user semantics:
 - Container Control Flow v1 adds C-shaped control blocks. Loop nodes remain flat graph nodes, while body children store `parentContainerId` and `parentSlot=body`; internal body chains still use normal edges.
 - Entity Execution Context v1 reuses that same C-shaped body model. `context.entity.execute_as` edits one catalog-backed `entitySource` field with user-facing choices `当前条件对象`, `运行实体`, and `目标实体`; the graph stores only the enum value and body membership, never a runtime subject or mutable entity state.
 - Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
-- Card type labels and the right-panel selected-block badge show the catalog top-level category, such as `条件判断块(胶囊)`, `玩家操作`, or `消息显示`, instead of repeating the concrete block name.
+- Card type labels and the right-panel selected-block badge show the formal Catalog category. Pack metadata is derived for styling and navigation instead of being copied into Graph nodes.
 - Block card titles stay on one line. If the rendered title actually overflows, it scrolls horizontally back and forth instead of wrapping or using a fixed ellipsis.
 - Block card summaries reserve about three lines. If the rendered summary actually overflows, it scrolls vertically back and forth; short summaries and summaries that fit in three lines do not animate.
 - The block editor title uses `未命名(官方积木名)` when the current display name still equals the catalog name, and `自定义名称(官方积木名)` after the user renames it.
@@ -191,7 +193,7 @@ Rack rows, capsules, toggles, selection, hit testing, nesting, and canvas bounds
 
 ## Entity Execution Context
 
-`context.entity.execute_as` uses the existing container geometry, layout, drag insertion, ghost, and interaction-animation systems. A shared `isBodyContainerNode` classification covers loop and entity-context nodes so empty-body insertion, multi-node body chains, nested loop/context layouts, descendant dragging, and container growth use one `body` anchor contract. The `执行上下文` catalog category and purple styling distinguish the block visually without introducing a second C-shape geometry.
+`context.entity.execute_as` uses the existing container geometry, layout, drag insertion, ghost, and interaction-animation systems. A shared `isBodyContainerNode` classification covers loop and entity-context nodes so empty-body insertion, multi-node body chains, nested loop/context layouts, descendant dragging, and container growth use one `body` anchor contract. The derived `player-entity` pack styling distinguishes the block visually without introducing a second C-shape geometry.
 
 The entity-context editor is catalog driven. `entitySource` defaults to `当前条件对象` and stores one of `CONDITION_SUBJECT`, `RUN_ENTITY`, or `TARGET_ENTITY`; normal UI never exposes a subject identity or raw runtime object. Contextual condition trace/result text remains readable Chinese and shows the checked object and fact for both satisfied and unsatisfied paths.
 
@@ -209,7 +211,7 @@ Current responsibility boundaries:
 
 - `api/`: localhost PixelLogic API client and connection/content-type errors.
 - `model/`: graph/API types, seeded demo graph, pure graph layout, connection, and cloning helpers.
-- `model/blockCatalog.ts`: catalog sorting/lookup helpers, catalog-block-to-graph-node conversion, and a minimal API-offline fallback placeholder.
+- `model/blockCatalog.ts`: one cached index per Snapshot, visibility/capability projection, global search, location reconciliation, lookup helpers, graph-node conversion, and an empty offline Snapshot.
 - `model/richText.ts`: rich text component helpers for structured storage, named/hex color normalization, selected-range formatting, and plain text display.
 - `ui/editor/richText/`: shared rich text editor toolbar, contenteditable rendering, and selection-offset helpers.
 - `model/simulationTestContext.ts`: per-run WebUI test context model, validation, tag normalization, simple world facts, and request payload.
@@ -217,7 +219,7 @@ Current responsibility boundaries:
 - `state/`: mutable app state and canvas world dimensions.
 - `ui/app.ts`: orchestration, app shell assembly, event binding, autosave, undo/redo, and API actions.
 - `ui/canvas/`: puzzle block view, slot-flow view-model building, card overflow measurement, active output helpers, block constants, and drag/insert graph rules.
-- `ui/catalog/`: catalog library rendering for category and block lists.
+- `ui/catalog/`: pure rendering for pack, category, block, breadcrumb, search, and compatibility-filter views.
 - `ui/editor/`: editor modal shell, custom dropdown binding, and humanized form controls.
 - `ui/sidebar/`: selected-block summary and connection actions.
 - `ui/simulation/`: test-run split dropdown, test-player modal rendering/handlers, and simulation result summary.

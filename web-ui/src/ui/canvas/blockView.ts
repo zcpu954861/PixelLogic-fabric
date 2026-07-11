@@ -145,7 +145,7 @@ export function renderBlock(block: SlotBlock, recentNodeId: string | null): stri
     <article
       class="logic-block ${block.kind} ${block.branch}${conditionClass}${block.selected ? ' selected' : ''}${recentNodeId === block.id ? ' newly-added' : ''}"
       data-block="${escapeAttr(block.id)}"
-      data-category="${escapeAttr(block.categoryId ?? '')}"
+      data-pack="${escapeAttr(block.packId ?? '')}"
       data-branch="${block.branch}"
       tabindex="0"
       role="button"
@@ -182,7 +182,12 @@ function renderConditionRack(block: SlotBlock): string {
         >
           ${row.capsule
             ? renderPredicateCapsule(row.capsule, 0, 0, null)
-            : '<span class="condition-rack-empty">拖入条件</span>'}
+            : `<button
+                type="button"
+                class="condition-rack-empty"
+                data-library-predicate-filter
+                aria-label="打开当前条件槽可用积木"
+              >拖入条件</button>`}
         </div>
         <button
           type="button"

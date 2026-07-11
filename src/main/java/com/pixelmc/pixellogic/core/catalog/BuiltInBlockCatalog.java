@@ -42,7 +42,7 @@ public final class BuiltInBlockCatalog {
     public static final String TIMER_WAIT = "timer.wait";
     public static final String DEBUG_LOG = "debug.log";
 
-    private static final BlockCatalog CATALOG = new BlockCatalog(categories(), subcategories(), blocks());
+    private static final BlockCatalog CATALOG = new BlockCatalog(packs(), categories(), blocks());
     private static final Map<String, BlockDefinition> BLOCKS_BY_ID = CATALOG.blocks().stream()
             .collect(Collectors.toUnmodifiableMap(BlockDefinition::id, Function.identity()));
     private static final Map<String, String> ALIASES = CATALOG.blocks().stream()
@@ -107,37 +107,35 @@ public final class BuiltInBlockCatalog {
         return ALIASES.getOrDefault(blockId, blockId);
     }
 
-    private static List<BlockCategoryDefinition> categories() {
+    private static List<BlockPackDefinition> packs() {
         return List.of(
-                category("trigger", "触发事件", "从玩家操作或测试入口开始一条逻辑流。", 10),
-                category("condition", "条件判断块(胶囊)", "按状态或上下文决定走哪条分支。", 20),
-                category("player", "玩家操作", "修改当前玩家的模拟属性。", 30),
-                category("message", "消息显示", "向玩家或调试视图展示文本反馈。", 40),
-                category("control", "控制流", "包裹并重复执行一段内部逻辑。", 50),
-                category("context", "执行上下文", "选择后续内部积木所操作的实体。", 55),
-                category("state", "状态数据", "读取或修改流程运行时状态。", 60),
-                category("timer", "时间调度", "等待一段时间后继续流程。", 70),
-                category("debug", "调试诊断", "记录测试和排查信息。", 80)
+                pack("events-triggers", "事件与触发", "从测试或游戏事件开始一条逻辑流。", "⚡", 10),
+                pack("logic-flow", "逻辑与流程", "组织循环、等待和流程推进。", "↻", 20),
+                pack("player-entity", "玩家与实体", "判断或修改玩家、实体及执行上下文。", "♟", 30),
+                pack("location-region", "位置与区域", "判断维度、高度、区域和空间关系。", "⌖", 40),
+                pack("block-world", "方块与世界", "读取目标方块与世界事实。", "■", 50),
+                pack("presentation-feedback", "表现与反馈", "向玩家或调试视图提供文本反馈。", "✦", 60),
+                pack("state-data", "状态与数据", "读取、设置和累加流程状态。", "▤", 70)
         );
     }
 
-    private static List<BlockSubcategoryDefinition> subcategories() {
+    private static List<BlockCategoryDefinition> categories() {
         return List.of(
-                subcategory("trigger.manual", "trigger", "手动测试", "用于 WebUI 和本地验证的测试入口。", 10),
-                subcategory("condition.state", "condition", "状态条件", "基于玩家、全局或会话状态做判断。", 10),
-                subcategory("condition.player", "condition", "玩家条件", "基于当前模拟玩家做判断。", 20),
-                subcategory("condition.region", "condition", "区域条件", "基于测试上下文中的区域事实做判断。", 30),
-                subcategory("condition.block", "condition", "方块条件", "基于测试上下文中的目标方块事实做判断。", 40),
-                subcategory("condition.spatial", "condition", "空间关系", "基于玩家和目标方块之间的位置关系做判断。", 50),
-                subcategory("condition.context_entity", "condition", "上下文实体条件", "判断当前实体上下文。", 60),
-                subcategory("player.tag", "player", "标签", "写入当前模拟玩家的标签。", 10),
-                subcategory("message.player", "message", "玩家消息", "面向玩家的文本反馈。", 10),
-                subcategory("message.screen", "message", "屏幕提示", "显示标题、副标题或快捷栏消息。", 20),
-                subcategory("control.loop", "control", "循环", "重复执行内部积木。", 10),
-                subcategory("context.entity", "context", "实体上下文", "切换并操作当前实体上下文。", 10),
-                subcategory("state.write", "state", "写入状态", "设置或累加状态值。", 10),
-                subcategory("timer.basic", "timer", "基础等待", "等待后继续执行。", 10),
-                subcategory("debug.basic", "debug", "调试输出", "记录模拟执行信息。", 10)
+                category("events-triggers.test-entry", "events-triggers", "测试入口", "从 WebUI 或本地测试开始流程。", "▶", 10),
+                category("logic-flow.loops", "logic-flow", "循环", "重复执行内部积木。", "↻", 10),
+                category("logic-flow.timing", "logic-flow", "等待与时序", "等待指定时间后继续。", "◷", 20),
+                category("player-entity.tags", "player-entity", "标签", "判断或修改玩家与上下文实体标签。", "#", 10),
+                category("player-entity.identity-permissions", "player-entity", "身份与权限", "判断玩家身份和权限。", "★", 20),
+                category("player-entity.execution-context", "player-entity", "实体上下文", "切换内部积木操作的实体上下文。", "◎", 30),
+                category("location-region.dimensions-heights", "location-region", "维度与高度", "判断维度或垂直高度。", "↕", 10),
+                category("location-region.regions", "location-region", "区域", "判断玩家或目标方块是否位于区域内。", "▣", 20),
+                category("location-region.spatial-relations", "location-region", "空间关系", "判断玩家与目标对象的空间关系。", "⇄", 30),
+                category("block-world.target-block", "block-world", "目标方块", "判断测试上下文中的目标方块。", "■", 10),
+                category("presentation-feedback.player-messages", "presentation-feedback", "玩家消息", "向玩家发送聊天消息。", "✉", 10),
+                category("presentation-feedback.screen-prompts", "presentation-feedback", "屏幕提示", "显示标题、副标题或快捷栏消息。", "▱", 20),
+                category("presentation-feedback.diagnostics", "presentation-feedback", "调试诊断", "记录模拟执行和排查信息。", "⌕", 30),
+                category("state-data.conditions", "state-data", "状态条件", "读取并比较流程状态。", "?", 10),
+                category("state-data.mutations", "state-data", "状态写入", "设置或累加流程状态。", "≔", 20)
         );
     }
 
@@ -147,8 +145,7 @@ public final class BuiltInBlockCatalog {
                         TRIGGER_MANUAL_TEST,
                         "WebUI 测试运行",
                         "点击测试运行时进入这条流程。",
-                        "trigger",
-                        "trigger.manual",
+                        "events-triggers.test-entry",
                         "trigger",
                         NodeType.MANUAL_TRIGGER,
                         Map.of(),
@@ -166,8 +163,7 @@ public final class BuiltInBlockCatalog {
                         CONDITION_STATE_EQUALS,
                         "判断状态是否等于",
                         "比较一个状态值，按通过或失败继续。",
-                        "condition",
-                        "condition.state",
+                        "state-data.conditions",
                         "condition",
                         NodeType.STATE_COMPARE_CONDITION,
                         Map.of(
@@ -199,8 +195,7 @@ public final class BuiltInBlockCatalog {
                         ACTION_MESSAGE_CHAT,
                         "发送聊天消息",
                         "向当前玩家或模拟玩家发送一条消息。",
-                        "message",
-                        "message.player",
+                        "presentation-feedback.player-messages",
                         "action",
                         NodeType.MESSAGE_ACTION,
                         Map.of(
@@ -245,8 +240,7 @@ public final class BuiltInBlockCatalog {
                         CONDITION_PLAYER_HAS_TAG,
                         "玩家是否拥有标签",
                         "按当前模拟玩家是否拥有指定标签继续流程。",
-                        "condition",
-                        "condition.player",
+                        "player-entity.tags",
                         "condition",
                         NodeType.PLAYER_HAS_TAG_CONDITION,
                         Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "tag", "runner"),
@@ -268,8 +262,7 @@ public final class BuiltInBlockCatalog {
                         CONDITION_PLAYER_IS_ADMIN,
                         "玩家是否为管理员",
                         "按当前模拟玩家是否为管理员继续流程。",
-                        "condition",
-                        "condition.player",
+                        "player-entity.identity-permissions",
                         "condition",
                         NodeType.PLAYER_IS_ADMIN_CONDITION,
                         Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name()),
@@ -291,8 +284,7 @@ public final class BuiltInBlockCatalog {
                         CONDITION_PLAYER_DIMENSION_IS,
                         "玩家所在维度是否为",
                         "按当前模拟玩家所在维度继续流程。",
-                        "condition",
-                        "condition.player",
+                        "location-region.dimensions-heights",
                         "condition",
                         NodeType.PLAYER_DIMENSION_CONDITION,
                         Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "dimensionId", "minecraft:overworld"),
@@ -317,8 +309,7 @@ public final class BuiltInBlockCatalog {
                         CONDITION_PLAYER_IN_REGION,
                         "玩家是否在区域内",
                         "按当前模拟玩家是否位于测试区域内继续流程。",
-                        "condition",
-                        "condition.region",
+                        "location-region.regions",
                         "condition",
                         NodeType.PLAYER_IN_REGION_CONDITION,
                         Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "regionName", "出生区"),
@@ -343,8 +334,7 @@ public final class BuiltInBlockCatalog {
                         CONDITION_PLAYER_Y_COMPARE,
                         "玩家高度是否满足",
                         "按当前模拟玩家的 Y 高度继续流程。",
-                        "condition",
-                        "condition.player",
+                        "location-region.dimensions-heights",
                         "condition",
                         NodeType.PLAYER_Y_COMPARE_CONDITION,
                         Map.of(
@@ -368,8 +358,7 @@ public final class BuiltInBlockCatalog {
                         CONDITION_TARGET_BLOCK_IS_TYPE,
                         "目标方块是否为",
                         "按测试上下文中的目标方块类型继续流程。",
-                        "condition",
-                        "condition.block",
+                        "block-world.target-block",
                         "condition",
                         NodeType.TARGET_BLOCK_TYPE_CONDITION,
                         Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "blockId", "minecraft:stone"),
@@ -394,8 +383,7 @@ public final class BuiltInBlockCatalog {
                         CONDITION_TARGET_BLOCK_Y_COMPARE,
                         "目标方块高度是否满足",
                         "按测试上下文中的目标方块 Y 高度继续流程。",
-                        "condition",
-                        "condition.block",
+                        "location-region.dimensions-heights",
                         "condition",
                         NodeType.TARGET_BLOCK_Y_COMPARE_CONDITION,
                         Map.of(
@@ -419,8 +407,7 @@ public final class BuiltInBlockCatalog {
                         CONDITION_PLAYER_NEAR_TARGET_BLOCK,
                         "玩家是否靠近目标方块",
                         "按当前模拟玩家与目标方块的距离继续流程。",
-                        "condition",
-                        "condition.spatial",
+                        "location-region.spatial-relations",
                         "condition",
                         NodeType.PLAYER_NEAR_TARGET_BLOCK_CONDITION,
                         Map.of(
@@ -446,8 +433,7 @@ public final class BuiltInBlockCatalog {
                         CONDITION_TARGET_BLOCK_IN_REGION,
                         "目标方块是否在区域内",
                         "按测试上下文中的目标方块是否位于测试区域内继续流程。",
-                        "condition",
-                        "condition.region",
+                        "location-region.regions",
                         "condition",
                         NodeType.TARGET_BLOCK_IN_REGION_CONDITION,
                         Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "regionName", "出生区"),
@@ -468,8 +454,7 @@ public final class BuiltInBlockCatalog {
                         ACTION_PLAYER_ADD_TAG,
                         "添加玩家标签",
                         "给当前模拟玩家添加一个标签。",
-                        "player",
-                        "player.tag",
+                        "player-entity.tags",
                         "action",
                         NodeType.PLAYER_ADD_TAG_ACTION,
                         Map.of("tag", "runner"),
@@ -487,8 +472,7 @@ public final class BuiltInBlockCatalog {
                         ACTION_PLAYER_REMOVE_TAG,
                         "移除玩家标签",
                         "从当前模拟玩家移除一个标签。",
-                        "player",
-                        "player.tag",
+                        "player-entity.tags",
                         "action",
                         NodeType.PLAYER_REMOVE_TAG_ACTION,
                         Map.of("tag", "runner"),
@@ -506,8 +490,7 @@ public final class BuiltInBlockCatalog {
                         CONTROL_LOOP_COUNT,
                         "循环次数",
                         "重复执行内部积木指定次数，然后继续后续流程。",
-                        "control",
-                        "control.loop",
+                        "logic-flow.loops",
                         "control",
                         NodeType.CONTROL_LOOP_COUNT,
                         Map.of("count", "3"),
@@ -526,8 +509,7 @@ public final class BuiltInBlockCatalog {
                         CONTROL_LOOP_FOREVER,
                         "无限循环",
                         "按安全模拟上限重复执行内部积木；正常情况下不继续外部链。",
-                        "control",
-                        "control.loop",
+                        "logic-flow.loops",
                         "control",
                         NodeType.CONTROL_LOOP_FOREVER,
                         Map.of("intervalSeconds", "1"),
@@ -546,8 +528,7 @@ public final class BuiltInBlockCatalog {
                         CONTROL_LOOP_UNTIL,
                         "循环直到",
                         "每轮开始前检查结束条件；全部成立时退出，否则执行内部积木。",
-                        "control",
-                        "control.loop",
+                        "logic-flow.loops",
                         "control",
                         NodeType.CONTROL_LOOP_UNTIL,
                         Map.of(),
@@ -574,8 +555,7 @@ public final class BuiltInBlockCatalog {
                         CONTEXT_ENTITY_EXECUTE_AS,
                         "以实体为上下文执行",
                         "在内部积木执行期间切换当前实体上下文，完成后恢复外层实体。",
-                        "context",
-                        "context.entity",
+                        "player-entity.execution-context",
                         "control",
                         NodeType.CONTEXT_ENTITY_EXECUTE_AS,
                         Map.of("entitySource", "CONDITION_SUBJECT"),
@@ -598,8 +578,7 @@ public final class BuiltInBlockCatalog {
                         CONDITION_CONTEXT_ENTITY_HAS_TAG,
                         "上下文实体是否拥有标签",
                         "按当前实体上下文是否拥有指定标签继续流程。",
-                        "condition",
-                        "condition.context_entity",
+                        "player-entity.tags",
                         "condition",
                         NodeType.CONTEXT_ENTITY_HAS_TAG_CONDITION,
                         Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "tag", "ready"),
@@ -624,8 +603,7 @@ public final class BuiltInBlockCatalog {
                         ACTION_CONTEXT_ENTITY_ADD_TAG,
                         "为上下文实体添加标签",
                         "给当前实体上下文添加一个标签。",
-                        "context",
-                        "context.entity",
+                        "player-entity.tags",
                         "action",
                         NodeType.CONTEXT_ENTITY_ADD_TAG_ACTION,
                         Map.of("tag", "ready"),
@@ -643,8 +621,7 @@ public final class BuiltInBlockCatalog {
                         ACTION_CONTEXT_ENTITY_REMOVE_TAG,
                         "移除上下文实体标签",
                         "从当前实体上下文移除一个标签。",
-                        "context",
-                        "context.entity",
+                        "player-entity.tags",
                         "action",
                         NodeType.CONTEXT_ENTITY_REMOVE_TAG_ACTION,
                         Map.of("tag", "ready"),
@@ -662,8 +639,7 @@ public final class BuiltInBlockCatalog {
                         STATE_SET,
                         "设置状态",
                         "把一个状态写成指定值。",
-                        "state",
-                        "state.write",
+                        "state-data.mutations",
                         "state",
                         NodeType.STATE_SET_ACTION,
                         Map.of("scope", "PLAYER", "key", "started", "valueType", "BOOLEAN", "value", "true"),
@@ -686,8 +662,7 @@ public final class BuiltInBlockCatalog {
                         STATE_ADD,
                         "累加状态",
                         "把数字状态增加指定数值。",
-                        "state",
-                        "state.write",
+                        "state-data.mutations",
                         "state",
                         NodeType.STATE_ADD_ACTION,
                         Map.of("scope", "PLAYER", "key", "start_count", "valueType", "INTEGER", "amount", "1"),
@@ -710,8 +685,7 @@ public final class BuiltInBlockCatalog {
                         TIMER_WAIT,
                         "等待一段时间",
                         "等待指定秒数后继续执行。",
-                        "timer",
-                        "timer.basic",
+                        "logic-flow.timing",
                         "timer",
                         NodeType.TIMER_START_ACTION,
                         Map.of("durationSeconds", "30"),
@@ -729,8 +703,7 @@ public final class BuiltInBlockCatalog {
                         DEBUG_LOG,
                         "调试记录",
                         "在模拟执行记录里写入一条调试信息。",
-                        "debug",
-                        "debug.basic",
+                        "presentation-feedback.diagnostics",
                         "debug",
                         NodeType.DEBUG_LOG_ACTION,
                         Map.of("message", "调试记录"),
@@ -747,12 +720,19 @@ public final class BuiltInBlockCatalog {
         );
     }
 
-    private static BlockCategoryDefinition category(String id, String displayName, String description, int order) {
-        return new BlockCategoryDefinition(id, displayName, description, order, true);
+    private static BlockPackDefinition pack(String id, String displayName, String description, String icon, int order) {
+        return new BlockPackDefinition(id, displayName, description, icon, order);
     }
 
-    private static BlockSubcategoryDefinition subcategory(String id, String categoryId, String displayName, String description, int order) {
-        return new BlockSubcategoryDefinition(id, categoryId, displayName, description, order);
+    private static BlockCategoryDefinition category(
+            String id,
+            String packId,
+            String displayName,
+            String description,
+            String icon,
+            int order
+    ) {
+        return new BlockCategoryDefinition(id, packId, displayName, description, icon, order, true);
     }
 
     private static BlockDefinition block(
@@ -760,7 +740,6 @@ public final class BuiltInBlockCatalog {
             String displayName,
             String description,
             String categoryId,
-            String subcategoryId,
             String nodeKind,
             NodeType nodeType,
             Map<String, String> defaultConfig,
@@ -779,7 +758,6 @@ public final class BuiltInBlockCatalog {
                 displayName,
                 description,
                 categoryId,
-                subcategoryId,
                 nodeKind,
                 nodeType,
                 defaultConfig,
@@ -801,7 +779,6 @@ public final class BuiltInBlockCatalog {
             String displayName,
             String description,
             String categoryId,
-            String subcategoryId,
             String nodeKind,
             NodeType nodeType,
             Map<String, String> defaultConfig,
@@ -821,7 +798,6 @@ public final class BuiltInBlockCatalog {
                 displayName,
                 description,
                 categoryId,
-                subcategoryId,
                 nodeKind,
                 nodeType,
                 defaultConfig,
@@ -846,7 +822,6 @@ public final class BuiltInBlockCatalog {
             String displayName,
             String description,
             String categoryId,
-            String subcategoryId,
             String nodeKind,
             NodeType nodeType,
             Map<String, String> defaultConfig,
@@ -870,8 +845,10 @@ public final class BuiltInBlockCatalog {
                 displayName,
                 description,
                 categoryId,
-                subcategoryId,
+                categoryId,
                 List.of(),
+                aliases,
+                searchKeywords(id),
                 capabilities,
                 nodeKind,
                 nodeType,
@@ -889,7 +866,7 @@ public final class BuiltInBlockCatalog {
                 safetyFlags,
                 false,
                 false,
-                aliases
+                BlockLibraryVisibility.BROWSE
         );
     }
 
@@ -898,8 +875,7 @@ public final class BuiltInBlockCatalog {
                 id,
                 displayName,
                 description,
-                "message",
-                "message.screen",
+                "presentation-feedback.screen-prompts",
                 "action",
                 NodeType.MESSAGE_ACTION,
                 Map.of(
@@ -920,6 +896,35 @@ public final class BuiltInBlockCatalog {
                 List.of(BlockSafetyFlag.PLAYER_MUTATING, BlockSafetyFlag.REQUIRES_PLAYER),
                 List.of()
         );
+    }
+
+    private static List<String> searchKeywords(String id) {
+        return switch (id) {
+            case TRIGGER_MANUAL_TEST -> List.of("手动", "测试", "触发", "manual");
+            case CONDITION_STATE_EQUALS -> List.of("变量", "状态", "score", "计分", "state equals");
+            case STATE_SET -> List.of("变量", "状态", "score", "计分", "set state");
+            case STATE_ADD -> List.of("变量", "状态", "score", "计分", "add state");
+            case ACTION_MESSAGE_CHAT -> List.of("消息", "聊天", "富文本", "chat");
+            case ACTION_MESSAGE_TITLE -> List.of("消息", "屏幕提示", "title");
+            case ACTION_MESSAGE_SUBTITLE -> List.of("消息", "屏幕提示", "subtitle");
+            case ACTION_MESSAGE_ACTIONBAR -> List.of("消息", "屏幕提示", "actionbar");
+            case CONDITION_PLAYER_HAS_TAG, ACTION_PLAYER_ADD_TAG, ACTION_PLAYER_REMOVE_TAG -> List.of("玩家标签", "标签");
+            case CONDITION_PLAYER_IS_ADMIN -> List.of("管理员", "权限");
+            case CONDITION_PLAYER_DIMENSION_IS -> List.of("世界", "维度");
+            case CONDITION_PLAYER_IN_REGION, CONDITION_TARGET_BLOCK_IN_REGION -> List.of("区域", "范围");
+            case CONDITION_PLAYER_Y_COMPARE, CONDITION_TARGET_BLOCK_Y_COMPARE -> List.of("高度", "坐标", "Y");
+            case CONDITION_TARGET_BLOCK_IS_TYPE -> List.of("方块", "目标方块");
+            case CONDITION_PLAYER_NEAR_TARGET_BLOCK -> List.of("距离", "附近", "靠近");
+            case CONTROL_LOOP_COUNT -> List.of("循环", "loop", "repeat");
+            case CONTROL_LOOP_FOREVER -> List.of("循环", "loop", "while");
+            case CONTROL_LOOP_UNTIL -> List.of("循环", "loop", "until");
+            case CONTEXT_ENTITY_EXECUTE_AS -> List.of("实体上下文", "执行实体", "as");
+            case CONDITION_CONTEXT_ENTITY_HAS_TAG, ACTION_CONTEXT_ENTITY_ADD_TAG, ACTION_CONTEXT_ENTITY_REMOVE_TAG ->
+                    List.of("实体上下文", "标签");
+            case TIMER_WAIT -> List.of("等待", "延迟", "timer", "delay");
+            case DEBUG_LOG -> List.of("调试", "诊断", "日志", "log");
+            default -> List.of();
+        };
     }
 
     private static SlotDefinition in(String id) {

@@ -1,5 +1,7 @@
 # Initial Block Catalog Draft
 
+> This is a historical candidate draft. The current built-in ownership matrix and library navigation contract are defined by `BLOCK_LIBRARY_TAXONOMY_V1.md`.
+
 这个文档是初始积木目录草案，不是实现清单，不代表下一阶段一次性开发。它只列当前 v1/vNext 最有价值的核心候选，用于避免继续把“动作 / 条件 / 触发器”当成可执行万能大块。
 
 能力等级：

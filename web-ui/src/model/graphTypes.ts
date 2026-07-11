@@ -56,10 +56,20 @@ export type GraphNode = {
   slots: GraphSlot[];
 };
 
-export type CatalogCategory = {
+export type CatalogPack = {
   id: string;
   displayName: string;
   description: string;
+  icon: string;
+  order: number;
+};
+
+export type CatalogCategory = {
+  id: string;
+  packId: string;
+  displayName: string;
+  description: string;
+  icon: string;
   order: number;
   visibleByDefault: boolean;
 };
@@ -113,13 +123,28 @@ export type CatalogBlock = {
   safetyFlags: string[];
   deprecated: boolean;
   hidden: boolean;
+  visibility: 'BROWSE' | 'CONTEXT_ONLY' | 'HIDDEN';
   aliases: string[];
+  searchKeywords: string[];
 };
 
 export type BlockCatalog = {
+  packs: CatalogPack[];
   categories: CatalogCategory[];
   subcategories: CatalogSubcategory[];
   blocks: CatalogBlock[];
+};
+
+export type LibraryLocation =
+  | { level: 'packs' }
+  | { level: 'categories'; packId: string }
+  | { level: 'blocks'; packId: string; categoryId: string };
+
+export type LibraryFilter = {
+  capability: string;
+  label: string;
+  targetContainerId?: string;
+  targetSlotId?: string;
 };
 
 export type EditableField = {
@@ -220,7 +245,10 @@ export type UiState = {
   error: string;
   latestTrace: ApiTrace | null;
   catalog: BlockCatalog | null;
-  catalogCategoryId: string | null;
+  libraryLocation: LibraryLocation;
+  libraryQuery: string;
+  libraryFilter: LibraryFilter | null;
+  libraryFilterRestoreLocation: LibraryLocation | null;
   graph: GraphDocument | null;
   committedGraph: GraphDocument | null;
   validation: ValidationReport | null;
@@ -245,7 +273,7 @@ export type GraphHistoryEntry = {
 export type SlotBlock = {
   id: string;
   kind: BlockKind;
-  categoryId?: string;
+  packId?: string;
   branch: Branch;
   type: string;
   title: string;

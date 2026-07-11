@@ -46,6 +46,7 @@ def selfChecks = [
 	runtimeApiSafetySelfCheck: 'com.pixelmc.pixellogic.server.api.RuntimeApiSafetySelfCheck',
 	graphStorageSelfCheck: 'com.pixelmc.pixellogic.server.storage.GraphStorageSelfCheck',
 	blockCatalogSelfCheck: 'com.pixelmc.pixellogic.core.catalog.BlockCatalogSelfCheck',
+	blockLibraryTaxonomySelfCheck: 'com.pixelmc.pixellogic.core.catalog.BlockLibraryTaxonomySelfCheck',
 	simulationBackendSelfCheck: 'com.pixelmc.pixellogic.core.simulation.SimulationBackendSelfCheck',
 	conditionOutputModeSelfCheck: 'com.pixelmc.pixellogic.core.runtime.ConditionOutputModeSelfCheck',
 	simulationTestContextSelfCheck: 'com.pixelmc.pixellogic.server.api.SimulationTestContextSelfCheck',

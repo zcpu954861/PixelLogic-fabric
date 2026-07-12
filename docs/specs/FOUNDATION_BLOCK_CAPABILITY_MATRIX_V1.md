@@ -28,6 +28,21 @@ Status means:
 
 All 28 definitions have a description, Form Schema and summary metadata. They all declare `REQUIRES_MINECRAFT_RUNTIME`; that flag is a required-environment marker, not proof that a Minecraft executor exists. There is no independent help/example metadata. Trace is currently `timestamp + nodeId + message`, and runtime errors are primarily readable strings rather than stable structured action error codes.
 
+### Approved Slice 1 forecast — not yet implemented
+
+The current 28-block snapshot above remains authoritative during the design phase. It still contains the six old player/context tag blocks. Slice 1 is a breaking reform with no alias or migration:
+
+| Metric | Current mainline | Expected after Slice 1 |
+|---|---:|---:|
+| Built-in / BROWSE blocks | 28 / 28 | 25 / 25 |
+| `player-entity` blocks | 8 | 5 |
+| `FULLY_SIMULATABLE / APPROXIMATE_SIMULATION` | 23 / 5 | 20 / 5 |
+| `PREDICATE / PREDICATE_RACK` | 6 / 1 | 5 / 1 |
+| old player/context tag IDs | 6 | 0 |
+| generic entity tag IDs | 0 | 3 |
+
+The arithmetic is `28 - 6 + 3 = 25`. Packs and non-empty categories remain 7 and 15. Completion status must be rescored from the implemented Runtime/Simulation result; this design does not predeclare a future COMPLETE/PARTIAL count.
+
 ## Eight-domain overview
 
 | Domain | Registered pack | Blocks | COMPLETE | PARTIAL | High-value MISSING | DEFERRED |
@@ -53,7 +68,7 @@ All 28 definitions have a description, Form Schema and summary metadata. They al
 | 逻辑与流程 | fixed-count loop | `control.loop.count` | PARTIAL | repeated function invocation | container composition, continuation and step budgets | existing body container | runtime hardening |
 | 逻辑与流程 | forever/until loop | `control.loop.forever`, `control.loop.until` | PARTIAL | scheduled function + predicate | condition rack, bounded simulation and path context | predicate contract, durable scheduler | later |
 | 逻辑与流程 | wait then continue | `timer.wait` | PARTIAL | `schedule` | one-shot continuation with nested context restoration | durable timer identity | later runtime |
-| 玩家与实体 | player/current-entity tags | six tag blocks | PARTIAL | `tag` | a shared typed target, changed result and fail-closed adapter | Entity Target Reference | v1-A migration candidate |
+| 玩家与实体 | player/current-entity tags | six tag blocks in current mainline | PARTIAL | `tag` | replace them with three generic EntityTargetRef blocks and typed outcomes | Entity Target Reference | Slice 1 breaking reform |
 | 玩家与实体 | execute with one current entity | `context.entity.execute_as` | PARTIAL | `execute as` | explicit single source and stack-safe continuation without selector syntax | existing execution context | current foundation |
 | 玩家与实体 | administrator check | `condition.player.is_admin` | PARTIAL | OP/permission check | typed predicate and explicit permission provider | Player-only target constraint | later |
 | 玩家与实体 | health, damage, effects and game mode | none | MISSING | `damage`, `effect`, `kill`, `gamemode` | typed targets, structured results, Simulation and errors | EntityTargetRef, EffectSpec, EntityTypeRef | v1-A |
@@ -87,6 +102,8 @@ Common boundaries for every row:
 
 This appendix keeps the task fields separate. “No MC executor” is a current Runtime contract fact, not a statement that the block lacks Simulation execution.
 
+Rows that say `run actor` or `run player` describe the current `ab0bf4d` implementation only. Slice 1 removes that identity as a target source; request player/session metadata may remain for API ownership, security and audit without becoming an implicit entity fallback.
+
 | blockId | pack/category ID | kind | Current parameters | Target/context | Actual Form Schema (`key:type`) | Simulation enum | Current Runtime contract | Errors / Trace | Current help / summary | Gap | Priority |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | `trigger.manual_test` | `events-triggers` / `events-triggers.test-entry` | trigger | no persisted config; schema-only trigger label | explicit manual start | `triggerType:readonly` (schema default only) | FULLY_SIMULATABLE | `RuntimeNodeExecutor` emits the `started` output | missing entry fails; `GraphRuntime` adds manual-trigger Trace | description + manual-test summary | no gameplay event | keep |
@@ -101,7 +118,7 @@ This appendix keeps the task fields separate. “No MC executor” is a current 
 | `action.context_entity.add_tag` | `player-entity` / `player-entity.tags` | action | tag | current entity | `tag:string` | FULLY_SIMULATABLE | context-entity Simulation executor; no MC executor | unresolvable context fails; change Trace | “为上下文实体添加标签 …” | no real resolver | high |
 | `action.context_entity.remove_tag` | `player-entity` / `player-entity.tags` | action | tag | current entity | `tag:string` | FULLY_SIMULATABLE | context-entity Simulation executor; no MC executor | unresolvable/absent result Trace | “移除上下文实体标签 …” | no real resolver | high |
 | `condition.player.is_admin` | `player-entity` / `player-entity.identity-permissions` | condition + PREDICATE | output mode | run actor | `outputMode:segmented` | APPROXIMATE_SIMULATION | Simulation operator flag; no permission adapter | boolean/subject Trace, string runtime errors | admin positive/negated summary | permission semantics | medium |
-| `context.entity.execute_as` | `player-entity` / `player-entity.execution-context` | control | `CONDITION_SUBJECT/RUN_ENTITY/TARGET_ENTITY` | one resolvable source | `entitySource:select` | FULLY_SIMULATABLE | `GraphRuntime` context frame | missing/type/unresolvable fail; switch/restore Trace | summary plus UI/errors still say “条件对象” | production target provider; object→subject terminology | high |
+| `context.entity.execute_as` | `player-entity` / `player-entity.execution-context` | control | current baseline: `CONDITION_SUBJECT/RUN_ENTITY/TARGET_ENTITY` | one resolvable source | current `entitySource:select` | FULLY_SIMULATABLE | `GraphRuntime` context frame | missing/type/unresolvable fail; switch/restore Trace | current UI/errors still say “条件对象” | Slice 1 removes RUN_ENTITY and adopts composite EntityTargetRef | high |
 | `condition.player.dimension_is` | `location-region` / `location-region.dimensions-heights` | condition + PREDICATE | output mode, dimension id | run actor position | `outputMode:segmented`; `dimensionId:string` | FULLY_SIMULATABLE | Simulation world fact; no MC position adapter | false/Trace; no contextual subject | dimension summary | adapter + subject contract | medium |
 | `condition.player.y_compare` | `location-region` / `location-region.dimensions-heights` | condition | mode, target/min/max Y | run actor position | `outputMode:segmented`; `compareMode:select`; `targetY/minY/maxY:integer` | FULLY_SIMULATABLE | Simulation position fact; no MC adapter | bounds validator + observed-value Trace | dynamic Y comparison summary | not PREDICATE | medium |
 | `condition.target_block.y_compare` | `location-region` / `location-region.dimensions-heights` | condition | mode, target/min/max Y | optional target block | `outputMode:segmented`; `compareMode:select`; `targetY/minY/maxY:integer` | FULLY_SIMULATABLE | Simulation block fact; no MC adapter | missing target becomes false + Trace | target-block Y summary | missing-target structure | medium |
@@ -133,6 +150,8 @@ condition.context_entity.has_tag
 
 Only `condition.player.has_tag`, `condition.player.is_admin` and `condition.context_entity.has_tag` currently write `RuntimeConditionResult.subject`. `RuntimeConditionResult` has no `object` or independent target field. A later ordinary condition without a contextual result clears the old result. Therefore “predicate-compatible” and “produces a condition subject” are separate capabilities and must not be inferred from one another.
 
+After Slice 1, the two old tag predicates above are replaced by the single `condition.entity.has_tag`, leaving five rack-compatible predicates in the expected 25-block Catalog. This is a forecast until implementation is verified.
+
 ## Vanilla high-frequency gap
 
 | Vanilla reference | Current coverage | Assessment | PixelLogic direction |
@@ -149,7 +168,7 @@ Only `condition.player.has_tag`, `condition.player.is_admin` and `condition.cont
 | `kill` | none | MISSING | preserve death semantics and distinguish removal |
 | `spawnpoint` | none | MISSING | depends on PositionRef and player target |
 | `time` / `weather` | none | MISSING, lower priority | world-scoped typed actions, not command text |
-| `tag` | six player/current-entity blocks | PARTIAL | migrate toward one EntityTargetRef and a real adapter without breaking old graphs |
+| `tag` | six player/current-entity blocks in current mainline | PARTIAL | Slice 1 deletes them and adds three generic EntityTargetRef blocks; no old-graph compatibility |
 
 One command does not imply one block. PixelLogic should expose one user behavior with typed parameters, validation, readable summary, Simulation intent, runtime contract, structured result and Trace—not raw command grammar.
 
@@ -163,7 +182,7 @@ One command does not imply one block. PixelLogic should expose one user behavior
 - containerized count/forever/until control flow;
 - Simulation preview using the real graph traversal path;
 - Chinese summaries, validation messages and bounded Trace;
-- legacy `blockId` canonicalization and old-graph defaults;
+- explicit Catalog defaults and strict unknown-block handling;
 - a future event context can enter the same run model without exposing Channel.
 
 These features are the product advantage. New blocks should compose with them rather than imitate raw `execute` syntax.
@@ -172,8 +191,8 @@ These features are the product advantage. New blocks should compose with them ra
 
 | Component | Controlled status | Current evidence | Decision |
 |---|---|---|---|
-| Entity Target Reference | 近期必须 | run/current/condition references exist, but no action-level unified target | design in `ENTITY_TARGET_REFERENCE_V1.md` |
-| Player Target Reference | 暂缓 | current message/tag blocks hard-code run actor | use `EntityTargetRef` with `PLAYER_ONLY`; do not create a parallel system |
+| Entity Target Reference | 近期必须 | current/condition/target identities exist, but no action-level unified target | implement the approved four-source composite model in Slice 1 |
+| Player Target Reference | 暂缓 | current message/tag blocks still bind request/test actors | use `EntityTargetRef` with `PLAYER_ONLY`; request actor metadata is not a target fallback |
 | Position Reference | 后续 | only Simulation position facts exist | required before teleport/spawnpoint |
 | Direction / Rotation | 后续 | absent | design with PositionRef when movement is in scope |
 | Item Stack Specification | 后续 | absent | required for a later item foundation pack |
@@ -187,7 +206,7 @@ These features are the product advantage. New blocks should compose with them ra
 | Resource ID Editor | 已有但不足 | backend namespaced validation; WebUI text input | reuse now; picker/autocomplete later |
 | Number Source | 后续 | literal number/integer fields only | v1-A deliberately uses bounded literals |
 | Text Component | 已有可复用 | versioned rich text field/editor exists | reuse; real delivery adapter remains partial |
-| Context Source | 已有但不足 | run/current/condition cursor semantics exist | reuse and narrow wording to real `subject` semantics |
+| Context Source | 已有但不足 | current/condition/target cursor semantics exist; legacy run entity is scheduled for removal | reuse and narrow wording to real `subject` semantics |
 
 ## Foundation decisions
 
@@ -195,7 +214,7 @@ These features are the product advantage. New blocks should compose with them ra
 2. A player target is a type constraint on `EntityTargetRef`, not another reference universe.
 3. The existing optional Simulation target is a test fixture that populates the formal `TARGET_ENTITY` run input; it is not a separate `TEST_TARGET_ENTITY` source, and current production providers do not populate that input yet.
 4. The current runtime has a condition subject but no condition object. New specifications must not pretend otherwise.
-5. Existing tag blocks are migration examples, not reasons to add duplicate “set tag” blocks in v1-A.
+5. Slice 1 deletes the six existing tag blocks and adds exactly three generic tag blocks; old IDs become unknown with no alias, wrapper or migrator.
 6. Position, inventory, selectors, scans, detector polling and advanced execute-like control remain outside v1-A.
 
 ## Evidence

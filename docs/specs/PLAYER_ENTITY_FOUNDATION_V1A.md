@@ -15,6 +15,20 @@ v1-A recommends:
 
 The pack is intentionally limited to high-frequency single-entity behavior that does not require PositionRef, inventory, world scanning or a large event subsystem.
 
+## Approved Slice 1 reform
+
+The current `ab0bf4d` mainline still contains six player/context-specific tag blocks. Slice 1 deliberately replaces them, without compatibility aliases or migration, with:
+
+```text
+condition.entity.has_tag
+action.entity.add_tag
+action.entity.remove_tag
+```
+
+All three use the shared composite `target: EntityTargetRef`, requirement `ANY_ENTITY`, and an explicit new-node default of `CURRENT_ENTITY`. The condition remains compatible with `PASS_ONLY`, `FAIL_ONLY`, `BRANCH` and Predicate Rack, records the resolved entity as condition subject for normal true/false results, and leaves condition object empty. The six old block IDs become unknown, and their corresponding old tag NodeTypes are deleted.
+
+Slice 1 also removes `RUN_ENTITY`, adds the shared resolver/errors/action outcome, provides on-demand online-player UUID selection, and moves `context.entity.execute_as` onto the same target control. The eight later actions and six later conditions specified below are not implemented by Slice 1.
+
 ## Taxonomy plan
 
 These are planned paths only. The Catalog must not register them until real blocks are implemented.
@@ -33,7 +47,7 @@ These are planned paths only. The Catalog must not register them until real bloc
 
 ### Target
 
-All fourteen blocks use `ENTITY_TARGET_REFERENCE_V1.md`. Generic blocks default to `CURRENT_ENTITY`. Each block declares `ANY_ENTITY`, `LIVING_ENTITY` or `PLAYER_ONLY`. Target resolution failure terminates execution; a condition must not turn a missing target into its false branch.
+All Slice 1 tag blocks and the fourteen later blocks use `ENTITY_TARGET_REFERENCE_V1.md`. New Catalog definitions write a composite `target` object with explicit `CURRENT_ENTITY`; stored configs never receive an implicit decode fallback. Each block declares `ANY_ENTITY`, `LIVING_ENTITY` or `PLAYER_ONLY`. Target resolution failure terminates execution; a condition must not turn a missing target into its false branch.
 
 ### Results and errors
 
@@ -42,18 +56,31 @@ Actions extend the existing node-result path with one bounded `RuntimeActionOutc
 ```text
 nodeId
 blockId
-targetReference
+status              SUCCESS / FAILURE
+code
+targetId            resolved stable identity, optional on failure
+targetDisplay       bounded readable display, optional on failure
 changed
+affectedCount
 message
 beforeSummary       optional
 afterSummary        optional
 ```
 
-`message` is required readable text capped at 512 characters. `RuntimeNodeExecutionResult` gains nullable `actionOutcome` beside its existing output/trace/condition fields and the structured error defined by EntityTargetRef. `RuntimeServices` gains an overload that records this outcome; the old string overload stays as a compatibility adapter. Existing `SimulationActionResult` is extended additively with `blockId`, `targetId`, `changed`, `beforeSummary` and `afterSummary` while retaining its current `nodeId/kind/message` fields and old constructor. The API continues returning the same action-results array with additive fields.
+`targetId` and `targetDisplay` describe the resolved entity; an unresolved target does not fabricate either value. `message` is required readable text capped at 512 characters.
 
-For v1-A, the executor only returns `actionOutcome`; it does not also call `RuntimeServices.recordActionResult`. `GraphRuntime` is the single recorder: after a successful node result, it forwards a non-null outcome exactly once before selecting the next edge. The new `RuntimeServices.recordActionResult(RuntimeActionOutcome)` default delegates one way to the existing string overload using `blockId` as `kind` and the bounded `message`; the old overload never calls back into the new one. Simulation overrides the new overload to retain all additive fields. Existing blocks may keep their current direct string recording until explicitly migrated, so no result is duplicated.
+`RuntimeNodeExecutionResult` gains nullable `actionOutcome` beside its existing output, Trace, condition result and structured error. `RuntimeServices` gains `recordActionResult(RuntimeActionOutcome)`. Runtime and Simulation implementations of that typed recorder retain every field above. The existing string recorder remains only for unaffected existing callers; neither overload delegates to the other, and it is not an old-block compatibility path.
 
-This is not a generic object/result framework. It is the minimum extension of current records immediately reused by eight v1-A actions. There is no free-form payload map: block-specific facts are summarized into the bounded before/after strings, each capped at 256 characters.
+The executor returns `actionOutcome` and does not record it directly. `GraphRuntime` records a non-null outcome exactly once. `SUCCESS` may continue through the ordinary done edge. `FAILURE` carries the same stable code/message as the structured terminal error and does not select an output. `SimulationActionResult` and the existing action-results API gain additive `blockId`, `targetId`, `targetDisplay`, `status`, `code`, `changed`, `affectedCount`, `beforeSummary` and `afterSummary` fields while retaining their existing fields.
+
+The two Slice 1 tag actions are the first consumers:
+
+- adding an existing tag returns `SUCCESS`, `changed=false`, `affectedCount=1`;
+- removing an absent tag returns `SUCCESS`, `changed=false`, `affectedCount=1`;
+- a real add or remove returns `SUCCESS`, `changed=true`, `affectedCount=1`;
+- target resolution failure returns `FAILURE`, `changed=false`, `affectedCount=0` and the structured terminal target error.
+
+This is not a generic object/result framework. It is the minimum extension first reused by the two Slice 1 tag actions and later by the eight v1-A actions. There is no free-form payload map. Block-specific facts use bounded before/after strings capped at 256 characters.
 
 All common target errors come from EntityTargetRef. Domain errors use stable codes. Trace includes the readable target, requested operation, changed/no-change outcome, selected condition output, and error code when present; it must not dump Minecraft objects.
 
@@ -71,7 +98,7 @@ All six conditions:
 
 v1-A justifies two small reusable components:
 
-1. `entity_target`: flat EntityTargetRef fields and compact picker;
+1. `entity_target`: one composite EntityTargetRef value and compact picker;
 2. `status_effect`: one namespaced effect-id editor/validator reused by add, remove and has-effect blocks. Duration, level, visibility and minimum thresholds remain ordinary block-specific fields.
 
 `condition.entity.type_is` uses the existing namespaced Resource ID field/validator with an “实体类型” label. It is the only v1-A consumer, so v1-A does not create an `entity_type` component; extraction waits for a second real consumer.
@@ -122,7 +149,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Errors/result:** `ENTITY_TARGET_NOT_ALIVE`, `ENTITY_DAMAGE_REJECTED`, `ENTITY_DAMAGE_KIND_UNAVAILABLE`; result distinguishes requested amount, accepted/no-change and before/after health when observable.
 - **Trace/help:** explains that the real server may reduce or reject damage; example: damage the latest condition subject after a type check.
 - **Self-check:** deterministic approximation, invulnerable rejection, death, wrong type, dead target, each source and continuation cancellation; a Runtime adapter spy proves the real executor issues a damage request and never substitutes a set-health request.
-- **Compatibility:** new v1 block; missing target uses `CURRENT_ENTITY`, missing damage kind uses `GENERIC`; missing/invalid amount is not silently defaulted on old data.
+- **Creation/defaults:** new Catalog nodes explicitly store `target.source=CURRENT_ENTITY` and `damageKind=GENERIC`; missing target or amount is invalid.
 
 ### `action.entity.heal` — 恢复实体生命
 
@@ -139,7 +166,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Errors/result:** `ENTITY_TARGET_NOT_ALIVE`; success may have `changed=false` when already full, with before/after/actual restored amount.
 - **Trace/help:** explicitly distinguishes restoring from setting health.
 - **Self-check:** partial/full clamp, already full, dead, wrong type and target failure.
-- **Compatibility:** new block; target defaults current, amount is required.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY`; amount is required and missing target is invalid.
 
 ### `action.entity.set_health` — 设置实体生命值
 
@@ -156,7 +183,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Errors/result:** `ENTITY_TARGET_NOT_ALIVE`, `ENTITY_HEALTH_ABOVE_MAXIMUM`; result includes requested, applied and before/after health.
 - **Trace/help:** warns that maximum health can vary by attributes and effects.
 - **Self-check:** below/equal/above max, both policies, dead/wrong target and no zero-kill alias.
-- **Compatibility:** new block; target and policy have defaults, health is required.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY` and `CLAMP_TO_MAX`; health is required and missing target is invalid.
 
 ### `action.entity.kill` — 杀死实体
 
@@ -173,7 +200,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Errors/result:** `ENTITY_TARGET_NOT_ALIVE`, `ENTITY_KILL_REJECTED`; changed true only when a live target is killed.
 - **Trace/help:** states that players may be killed and recommends explicit confirmation for player-only graphs.
 - **Self-check:** living mob, player, already dead, rejection and cancellation before execution.
-- **Compatibility:** new block; target defaults current.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY`; missing target is invalid.
 
 ### `action.entity.remove` — 移除非玩家实体
 
@@ -190,7 +217,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Errors/result:** `ENTITY_REMOVE_PLAYER_FORBIDDEN`, `ENTITY_TARGET_UNRESOLVABLE`; changed true only on actual removal.
 - **Trace/help:** prominently contrasts remove with kill.
 - **Self-check:** mob removal, player rejection, later reference failure, double removal and no death-result emission.
-- **Compatibility:** new block; target defaults current. Player prohibition is an open product decision and an implementation gate.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY`; missing target is invalid. Player prohibition is an open product decision and implementation gate.
 
 ### `action.entity.add_status_effect` — 给予状态效果
 
@@ -208,7 +235,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Errors/result:** `STATUS_EFFECT_UNKNOWN`, `STATUS_EFFECT_REJECTED`, target errors; result includes changed and effective duration/level.
 - **Trace/help:** explains the user level/amplifier mapping and the two update policies.
 - **Self-check:** new effect, stronger/weaker/longer/infinite existing effect under both policies, visibility flags, unknown id and dead target.
-- **Compatibility:** new block; target, booleans and policy have defaults; effect/duration/level are required.
+- **Creation/defaults:** new nodes explicitly store target, booleans and policy; effect/duration/level are required and missing target is invalid.
 
 ### `action.entity.remove_status_effect` — 移除状态效果
 
@@ -225,7 +252,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Errors/result:** `STATUS_EFFECT_UNKNOWN`; result distinguishes removed from not present.
 - **Trace/help:** example pairs it with the has-effect condition.
 - **Self-check:** present, absent, unknown, wrong/dead target and idempotent no-change.
-- **Compatibility:** new block; target defaults current, effect id required.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY`; effect id is required and missing target is invalid.
 
 ### `action.player.set_game_mode` — 设置玩家游戏模式
 
@@ -242,7 +269,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Errors/result:** player offline/type mismatch plus `PLAYER_GAME_MODE_REJECTED`; same-mode request is successful no-change.
 - **Trace/help:** names all four modes and warns that target must be online.
 - **Self-check:** all modes, same-mode no-change, non-player, offline player and permission rejection.
-- **Compatibility:** new block; target defaults current, mode required.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY`; mode is required and missing target is invalid.
 
 ## Final condition set
 
@@ -267,7 +294,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Runtime:** use the adapter's target-version alive/removed state.
 - **Errors/Trace:** target resolution errors; normal true/false records the target as condition subject and selected output.
 - **Self-check:** alive, resolved dead, removed/unresolvable, all output modes and rack evaluation.
-- **Compatibility:** new block; target defaults current, missing output mode follows the existing condition compatibility default.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY` and the Catalog output mode; missing target is invalid.
 
 ### `condition.entity.type_is` — 实体类型是否为
 
@@ -281,7 +308,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Runtime:** compare the registry identity returned by the audited adapter; unknown configured type is an error rather than ordinary false.
 - **Errors/Trace:** `ENTITY_TYPE_UNKNOWN`; result retains subject for true/false.
 - **Self-check:** match, mismatch, unknown id, player type, all outputs and rack.
-- **Compatibility:** new block; target defaults current, type required.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY`; type is required and missing target is invalid.
 
 ### `condition.entity.health_compare` — 实体生命值是否满足
 
@@ -296,7 +323,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Simulation/Runtime:** read fixture/live health once and use the same comparison helper.
 - **Errors/Trace:** target/type errors; true/false retains subject and records observed value.
 - **Self-check:** boundaries, equal tolerance, range, dead fixture, output modes and rack.
-- **Compatibility:** new block; target defaults current; mode default `AT_OR_ABOVE`, numeric field required.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY` and `AT_OR_ABOVE`; the numeric field is required and missing target is invalid.
 
 ### `condition.entity.has_status_effect` — 实体是否拥有状态效果
 
@@ -311,7 +338,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Simulation/Runtime:** resolve one active effect and compare user level plus remaining ticks/seconds consistently. An infinite existing effect satisfies every bounded v1 `minimumRemainingSeconds`; an adapter sentinel must never be compared as a negative duration. A successfully resolved dead living entity is a normal read and may return true or false from its stored active effects; removed/unresolvable is an error.
 - **Errors/Trace:** `STATUS_EFFECT_UNKNOWN`; absence or below minimum is normal false, and the subject is retained.
 - **Self-check:** absent/present, finite and infinite duration boundaries, level boundaries, unknown id, all output modes and rack.
-- **Compatibility:** new block; target/minimums default, effect required.
+- **Creation/defaults:** new nodes explicitly store target/minimums; effect is required and missing target is invalid.
 
 ### `condition.player.game_mode_is` — 玩家游戏模式是否为
 
@@ -325,7 +352,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Runtime:** read the online server player's target-version game mode.
 - **Errors/Trace:** offline/type errors; mismatch is normal false and retains subject.
 - **Self-check:** each mode, mismatch, non-player/offline, all outputs and rack.
-- **Compatibility:** new block; target defaults current, mode required.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY`; mode is required and missing target is invalid.
 
 ### `condition.entity.is_player` — 实体是否为玩家
 
@@ -338,7 +365,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Simulation/Runtime:** compare resolved kind/metadata; no second lookup or scan.
 - **Errors/Trace:** resolution failure is an error; resolved non-player is normal false and retains subject.
 - **Self-check:** player, non-player, unresolved, all outputs and rack.
-- **Compatibility:** new block; target defaults current.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY`; missing target is invalid.
 
 ## Minimum help examples
 
@@ -373,7 +400,7 @@ The first implementation supplies at least one runnable/help-center example per 
 | remove entity | include behind explicit no-player safety decision | necessary cleanup behavior and deliberately distinct from kill |
 | set game mode | include | high-frequency player setup with a small closed enum |
 | set entity velocity | defer to v1-B | needs a typed vector/direction foundation and physics semantics |
-| set entity tag | do not duplicate | six tag blocks already exist; migrate them later to EntityTargetRef |
+| entity tags | reform in Slice 1 | delete the six player/context variants and add three generic EntityTargetRef blocks |
 | teleport | defer | depends on PositionRef, rotation, dimension and collision policy |
 | summon | defer | depends on PositionRef, EntityTypeRef creation policy, ownership and world lifecycle |
 
@@ -396,21 +423,22 @@ No raw registry object, amplifier zero-base, ticks, internal enum or Minecraft c
 Scope:
 
 ```text
-flat EntityTargetRef model and validation
+composite EntityTargetRef model, serializer and validation
+four-source shared resolver; remove RUN_ENTITY
+optional current-entity initialization and continuation preservation
 Catalog entity_target field contract
 compact accessible WebUI selector
-shared Simulation resolver and one online-player fixture
-Minecraft adapter resolution contract
-minimal structured target errors and additive action-result records
-target self-check
+on-demand online-player UUID provider/API and minimal Simulation fixture
+minimal structured target errors and typed action outcome
+replace six old tag blocks with three generic tag blocks
+move context.entity.execute_as to the shared target control/resolver
+migrate Catalog snapshots/fallbacks, examples, Prefabs, help and summaries; old tag IDs have zero runtime residue
+Java and WebUI target self-checks
 ```
 
 Recommended branch: `feature/entity-target-reference-v1` from current `mc-1.21.11` after design approval.
 
-Suggested commits:
-
-1. `feat: add entity target reference foundation`;
-2. `feat: add structured entity action outcomes`.
+After all automatic checks and the explicit user hand-test gate, the implementation is committed once as `feat: add entity target references and unify entity tags`.
 
 This slice should be the next implementation task. It has immediate reuse across all later slices and prevents each action from inventing target/error semantics.
 
@@ -452,11 +480,13 @@ Each slice is independently reviewable and mergeable. Slices 2 and 3 depend on S
 
 Slice 1:
 
-- current/run/condition/run-target/online-player source selection;
+- current entity / condition subject / target entity / online-player source selection;
+- no `RUN_ENTITY` option or permanent run-start entity fallback;
 - unavailable sources show a warning and fail without fallback;
 - execute-as changes `CURRENT_ENTITY` target behavior;
 - UUID selection survives rerender and player rename hint changes;
 - delay/cancel does not mutate a stale target.
+- only the three generic entity-tag blocks remain; old IDs are unknown.
 
 Slice 2:
 
@@ -484,20 +514,19 @@ Slice 4:
 - spawning entities, attributes/modifiers, equipment and inventory;
 - arbitrary NBT/components or complex custom damage-source chains;
 - event triggers, detectors, polling and every-tick monitoring;
-- complete execute-as/at replication;
+- execute-at and position-context replication;
 - entity velocity until a Vector/Direction foundation is designed.
 
 ## Open decisions
 
-1. **Specified player identity:** recommended UUID + name hint; confirm offline-mode/server-binding expectations.
-2. **Remove entity and players:** recommended hard prohibition for players; otherwise remove is too easy to misuse and differs from kill in unsafe ways.
-3. **Damage kinds:** confirm the small closed v1 list after a Minecraft 1.21.11 adapter audit; do not expose arbitrary registry ids in v1.
-4. **Effect update policy:** recommended `VANILLA_UPDATE` and explicit `REPLACE`; confirm user wording and exact adapter behavior.
-5. **Condition subject/object convention:** v1 records the resolved target as `subject` and adds no object; confirm this terminology before expanding to genuine two-entity conditions.
+1. **Remove entity and players:** recommended hard prohibition for players; otherwise remove is too easy to misuse and differs from kill in unsafe ways.
+2. **Damage kinds:** confirm the small closed v1 list after a Minecraft 1.21.11 adapter audit; do not expose arbitrary registry ids in v1.
+3. **Effect update policy:** recommended `VANILLA_UPDATE` and explicit `REPLACE`; confirm user wording and exact adapter behavior.
 
 ## Acceptance boundary for this design
 
 - no product code, Catalog entries, Graph schema, Runtime executor or WebUI is changed by the design branch;
-- the next implementation starts with Slice 1 only;
+- the next implementation performs Slice 1 only: TargetRef, tag reform, execute-as integration and online-player discovery;
+- Slice 1 keeps no `RUN_ENTITY`, old tag ID, alias, migrator, wrapper or implicit target decoder;
 - all blocks remain single-responsibility, target one entity, and use typed parameters;
 - no command form, selector language, second Catalog, second context or speculative interface family is introduced.

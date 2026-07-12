@@ -4,7 +4,7 @@
 
 当前版本分支是 `mc-1.21.11`。版本开发不从 `main` 或 `master` 开始。
 
-主线 HEAD `ab0bf4d` 已包含：
+当前 `mc-1.21.11` 主线（以真实 Git HEAD 为准）已包含：
 
 - Direct Edge / Graph 主模型、草稿保存/校验/提交、自动保存与 undo/redo；
 - Catalog、Form Schema、Simulation Backend、Condition Output Modes；
@@ -26,7 +26,16 @@ Block Library Taxonomy v1 已独立合并主线。当前基础积木能力盘点
 - 正式 Catalog 当前为 7 个 pack、15 个 category、28 张 built-in block；
 - Simulation 能力不等于真实 Minecraft adapter 已完成；
 - Entity Target Reference 是生命、状态效果和玩家设置动作的共同前置；
-- Player & Entity Foundation v1-A 是下一实现候选，先评审设计，再从 Slice 1 开始实现。
+- Player & Entity Foundation v1-A 设计已经确定，下一步从 Slice 1 开始实现。
+
+Entity Target Reference Slice 1 的产品决策已经确定，当前尚未在产品代码实现：
+
+- 目标来源固定为当前执行实体、当前条件主体、当前目标实体、指定在线玩家；删除 `RUN_ENTITY`；
+- Graph 使用一个复合 `target` 对象，不使用松散 sibling 字段或隐式缺省解码；
+- 当前主线仍有六张玩家/上下文标签积木；Slice 1 将直接删除并替换为三张通用实体标签积木；
+- 旧 blockId、alias、迁移器和兼容 wrapper 均不保留；
+- `context.entity.execute_as` 使用同一目标控件与 resolver；
+- 指定在线玩家只保存 UUID，名字仅作提示，离线时结构化失败且不按名字回退。
 
 设计依据见[基础积木能力矩阵](specs/FOUNDATION_BLOCK_CAPABILITY_MATRIX_V1.md)、[Entity Target Reference v1](specs/ENTITY_TARGET_REFERENCE_V1.md) 与 [Player & Entity Foundation v1-A](specs/PLAYER_ENTITY_FOUNDATION_V1A.md)。
 
@@ -34,10 +43,11 @@ Block Library Taxonomy v1 已独立合并主线。当前基础积木能力盘点
 
 以下是候选方向，不是已承诺功能：
 
-- Entity Target Reference v1 的单实体解析、类型约束、结构化错误与 Simulation/Runtime 对照；
+- Entity Target Reference v1 的复合目标、四来源 resolver、结构化错误、在线玩家与标签改革；
 - 玩家与实体基础包的生命动作、状态效果、玩家设置和条件胶囊；
 - 在现有 condition rack 中增加经过明确产品确认的 predicate capsule；
 - 为真实 Minecraft adapter 建立权限、执行上下文和行为对照前置；
+- Slice 1 验收后，下一实现候选是 Health and Termination；
 - Position Reference、传送和执行位置上下文留给 v1-B 或更晚阶段。
 
 新增方向继续复用 Catalog、GraphValidator、SimulationExecutionRegistry、Direct Edge runtime 和现有 WebUI editor，不另建平行模型。

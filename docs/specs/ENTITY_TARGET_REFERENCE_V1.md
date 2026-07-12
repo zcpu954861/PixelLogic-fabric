@@ -1,327 +1,380 @@
 # Entity Target Reference v1
 
-## Decision
+## Status and decision
 
-Entity Target Reference v1 answers one question for an action or condition:
+This specification is the approved contract for Slice 1. It answers one question for an action or condition:
 
-> Which single entity or player does this block operate on?
+> Which single entity or online player does this block operate on?
 
-It is an action/condition parameter. It does not change `currentEntity`; `context.entity.execute_as` remains the only v1 mechanism that changes execution identity for a body. The reference reuses `RuntimeExecutionContext`, `RuntimeSubjectReference`, `RuntimeConditionResult.subject` and the existing Continuation cursor instead of introducing a second execution context.
+`EntityTargetRef` selects a target. It never changes execution identity, position, condition subject or the run target. `context.entity.execute_as` remains the explicit container that changes `currentEntity` for its body and restores the outer value on exit.
+
+The approved reform is intentionally breaking:
+
+- remove `RUN_ENTITY` and the permanent “run-start entity” concept;
+- keep only one optional current execution entity;
+- replace six player/context tag blocks with three generic entity tag blocks;
+- remove old block IDs, NodeTypes, aliases and implicit defaults;
+- do not add a migrator, deprecated Catalog entry or compatibility wrapper.
+
+The current design branch documents this contract only. Product code still reflects the 28-block `ab0bf4d` baseline until Slice 1 is implemented.
 
 ## Non-goals
 
 v1 does not provide:
 
-- an `@e` selector or selector parser;
-- multiple entities, collections or fan-out;
-- world scans, chunk loading, radius or nearest queries;
-- sorting, `limit`, random selection or NBT/component matching;
-- nested target expressions;
+- selectors, multiple entities, collections or fan-out;
+- all-online-player actions, world/entity scans, chunk loading, sorting, random choice or `limit` semantics in Graph;
+- NBT/component predicates or nested target expressions;
+- offline-player mutation or name-based rebinding;
 - execute-at, position, dimension, facing or rotation changes;
-- offline-player mutation;
-- a new condition-result model or a new execution-context container;
+- entity-valued variables, a second execution context or a second condition-result model;
 - Minecraft object persistence or cross-restart Continuation.
 
-## Current context truth
+## Runtime context reform
 
-The current runtime has these identities:
+After Slice 1, the runtime identities are:
 
-| Existing value | Real meaning | v1 decision |
-|---|---|---|
-| `RuntimeExecutionContext.currentEntity` | current execution entity; initially the run entity and temporarily replaced by execute-as | expose as `CURRENT_ENTITY`; default for generic entity blocks |
-| `runEntity` | entity bound when the run starts | expose as `RUN_ENTITY` |
-| `currentCondition.subject` | subject checked by the latest ordinary contextual condition on this path | expose as `CONDITION_SUBJECT` |
-| `targetEntity` | optional target bound to this run | reuse the existing `TARGET_ENTITY` token, but only when the run/trigger contract supplies one |
-| Simulation actor | Simulation implementation of `runEntity` | not a separate source |
-| Simulation target entity | test fixture used to populate `targetEntity` | not a source named “test target” |
+| Value | Meaning |
+|---|---|
+| `currentEntity` | optional current execution entity; initialized once and temporarily replaced by execute-as |
+| `currentCondition.subject` | entity checked by the latest ordinary contextual condition on this path |
+| `targetEntity` | optional target supplied by the current trigger/path contract |
+| request actor/player ID and session ID | security, API ownership and audit metadata only; never an entity-target fallback |
 
-There is no `RuntimeConditionResult.object`. The existing UI phrase “当前条件对象” is broader than the model and should become “最近条件主体”. v1 must not alias `targetEntity` into a fictitious condition object.
+There is no stored `runEntity`, `initialEntity` or equivalent permanent source. A run may start with no entity. A trigger may provide one optional initial current identity, but the runtime stores it only as `currentEntity`.
 
-The current production `RuntimeServices.targetEntity` returns empty by default. Existing `EntitySource.TARGET_ENTITY` is a formal run input, not a claim that every current trigger can produce it. A graph may only rely on it when its entry contract or test fixture provides one; otherwise resolution fails closed.
+`RuntimeConditionResult` continues to contain a subject and no object. `targetEntity` remains independent from the condition subject.
 
-## Minimal model
+`ExecutionCursor` and Continuation retain only stable, environment-neutral identities for:
 
-The common model is intentionally flat:
+- current entity;
+- target entity;
+- condition subject through the existing condition result;
+- outer execute-as frames.
+
+They never retain a Minecraft `Entity`, `ServerPlayer` or cross-thread world object.
+
+## Data and wire model
+
+The shared model is:
 
 ```text
 EntityTargetSource
   CURRENT_ENTITY
-  RUN_ENTITY
   CONDITION_SUBJECT
   TARGET_ENTITY
   ONLINE_PLAYER
 
-EntityTargetType
+EntityTargetRequirement
   ANY_ENTITY
   LIVING_ENTITY
   PLAYER_ONLY
 
-EntityTargetRefV1
+EntityTargetRef
   source
-  playerId          # ONLINE_PLAYER only; UUID string
-  playerNameHint    # optional display only; max 64 characters; never identity
+  playerUuid       # ONLINE_PLAYER only
+  playerNameHint   # optional display hint only
 ```
 
-Implementation must extend/reuse the existing `EntitySource` token contract (or replace it with one shared superset) so `RUN_ENTITY`, `CONDITION_SUBJECT` and `TARGET_ENTITY` have one spelling and one parser. It must not keep parallel execute-as and target-source enums that map synonymous values.
+Graph JSON stores one composite value under the block config key `target`:
 
-Graph config remains `Map<String, String>`. A target field with prefix `target` writes:
-
-```text
-targetSource
-targetPlayerId
-targetPlayerNameHint
+```json
+{
+  "target": {
+    "source": "CURRENT_ENTITY"
+  },
+  "tag": "ready"
+}
 ```
 
-The Catalog exposes one `entity_target` Form Schema field that groups those existing flat keys in the editor. It is not a JSON expression, AST or new Graph record. The existing wire fields carry its complete contract:
+For a selected online player:
+
+```json
+{
+  "target": {
+    "source": "ONLINE_PLAYER",
+    "playerUuid": "00000000-0000-0000-0000-000000000000",
+    "playerNameHint": "Steve"
+  }
+}
+```
+
+The current string-only config/Form Schema path must gain one formal composite serializer for `entity_target`. The editor, Graph parser, validator, summaries and executors consume that one object. Long-lived `targetSource/targetUuid/targetName` sibling fields are not permitted.
+
+Catalog fields declare:
 
 ```text
-key: targetSource
+key: target
 type: entity_target
-options: allowed source values and Chinese labels
-ui: targetPrefix:target targetType:LIVING_ENTITY section:common fullWidth
+default: { source: CURRENT_ENTITY }
+ui metadata: requirement and allowed sources
 ```
 
-`targetType` is one of the three required types; `options` is the authoritative allowed-source set; `targetPrefix` locates the two companion config keys. These tokens travel through the existing Form Schema `ui/options` wire. GraphValidator, WebUI and executor setup read the same field definition rather than hard-coding target type/source by blockId. Slice 1 adds parsing/validation for these exact tokens; unknown/missing target metadata fails the Catalog self-check.
+There is no implicit target during decode. New block definitions explicitly write `CURRENT_ENTITY`; missing or malformed stored `target` is invalid. Canonical JSON omits `playerUuid` and `playerNameHint` for every source except `ONLINE_PLAYER`; explicitly supplied companion keys, including `null`, are invalid for other sources.
 
-Every block declares one required `EntityTargetType` in its definition/execution contract:
+## Source contract
 
-- `ANY_ENTITY`: a resolved `PLAYER` or `ENTITY` reference;
-- `LIVING_ENTITY`: adapter/Simulation metadata must explicitly say the entity is living;
-- `PLAYER_ONLY`: the resolved kind must be `PLAYER`.
+| Source | Resolution | UI wording |
+|---|---|---|
+| `CURRENT_ENTITY` | current runtime entity | 当前执行实体 |
+| `CONDITION_SUBJECT` | latest ordinary condition subject | 当前条件主体 |
+| `TARGET_ENTITY` | current path/trigger target | 当前目标实体 |
+| `ONLINE_PLAYER` | exact configured UUID in the online-player provider | 指定在线玩家 |
 
-Type is not inferred from a display name or string pattern. It is also not a safety flag: target type is an execution contract.
+`TARGET_ENTITY` is always selectable as an advanced source. The UI warns: `当前执行路径可能不提供目标实体。`
 
-## Source availability and defaults
+Missing sources never fall back to current entity, request actor, player name or any other source.
 
-| Source | Resolution | Availability | UI wording |
-|---|---|---|---|
-| `CURRENT_ENTITY` | `context.currentEntity` | normal runs; in execute-as it is the selected entity | 当前执行实体 |
-| `RUN_ENTITY` | `context.runEntity` | when the run has a bound entity | 本次运行实体 |
-| `CONDITION_SUBJECT` | `context.currentCondition.subject` | only after an ordinary condition that emits a subject | 最近条件主体 |
-| `TARGET_ENTITY` | `context.targetEntity` | only when the run entry/adapter provides a target | 本次运行目标实体 |
-| `ONLINE_PLAYER` | UUID lookup in the online player directory | only with a valid selected UUID and an online player | 指定在线玩家 |
+## Requirement contract
 
-Generic entity actions and conditions default to `CURRENT_ENTITY`, so they naturally compose with execute-as. Player-only blocks may also default to `CURRENT_ENTITY`; type validation then catches a non-player context instead of silently bypassing it. A product implementation may choose `RUN_ENTITY` for a specifically player-oriented legacy block only as an explicit compatibility default.
+- `ANY_ENTITY`: any resolved `PLAYER` or `ENTITY` reference.
+- `LIVING_ENTITY`: a living entity plus the block-specific alive/dead precondition.
+- `PLAYER_ONLY`: a currently online player.
 
-Missing sources never fall back to actor, run entity or current entity.
+The requirement is declared by Block Definition/executor metadata. Individual executors must not invent private requirement strings or type rules.
 
-## Resolution contract
+## Configuration validation
 
-One shared resolver is used by Simulation and Minecraft adapters:
+Save-time validation is authoritative:
+
+- `target` object and `source` are required;
+- source must be one of the four v1 values;
+- `ONLINE_PLAYER` requires one canonical UUID;
+- `playerNameHint` is optional, at most 64 characters, contains no control characters and is escaped as plain text;
+- non-player sources must not carry `playerUuid` or `playerNameHint`;
+- UUID/name fields are normalized only within the same selected identity;
+- no static validator claims that a dynamic condition subject or target entity will exist at runtime.
+
+Required validation codes:
 
 ```text
-resolve(ref, requiredType, executionContext)
-  1. read exactly the configured source;
-  2. for ONLINE_PLAYER, parse and look up the UUID;
-  3. require a PLAYER/ENTITY RuntimeSubjectReference;
-  4. resolve current environment metadata by stable identity;
-  5. validate ANY_ENTITY/LIVING_ENTITY/PLAYER_ONLY;
-  6. return the stable reference plus minimal metadata;
-  7. do not modify currentEntity.
+entity_target_invalid_config
+entity_target_source_invalid
+entity_target_player_uuid_missing
+entity_target_player_uuid_invalid
+entity_target_player_name_hint_invalid
 ```
 
-The minimal environment-neutral result is:
+## Shared resolver and errors
+
+Runtime and Simulation use one resolver contract:
 
 ```text
-reference
-entityTypeId
-living
-alive
-online
+resolve(nodeId, fieldPath, EntityTargetRef, EntityTargetRequirement, executionContext)
+  1. validate the decoded target object;
+  2. read exactly the configured source;
+  3. resolve current environment metadata by stable identity;
+  4. enforce ANY_ENTITY/LIVING_ENTITY/PLAYER_ONLY;
+  5. return reference, display name, entity type, living/alive/online facts;
+  6. never mutate currentEntity or condition context.
 ```
 
-Core and Continuation never retain a Minecraft `Entity`. The loader adapter may use a live object only inside one execution call.
+Required execution codes:
 
-Resolution uses existing context identity plus the target-version server's bounded per-world UUID lookup (`O(world count)`), without enumerating entities or loading chunks. A non-player entity must already be present in the run/current/condition/target context; v1 does not expose arbitrary UUID lookup as a user source.
+```text
+entity_target_invalid_config
+entity_target_missing
+entity_target_unresolvable
+entity_target_offline
+entity_target_type_mismatch
+entity_target_not_alive
+entity_target_provider_unavailable
+```
 
-## Identity and lifecycle
-
-- `RuntimeSubjectReference.id` remains the stable environment-neutral identity.
-- `ONLINE_PLAYER` stores the UUID as authority and the last-known name only for summaries.
-- A name is never a fallback lookup key. Rename, duplicate name and offline-mode policy must not silently retarget a graph.
-- Each node execution resolves its target once and passes that resolution through the block executor.
-- `CURRENT_ENTITY`, `RUN_ENTITY`, `CONDITION_SUBJECT` and `TARGET_ENTITY` already travel in `ExecutionCursor`; EntityTargetRef adds no frame or continuation type. Existing source token spellings are reused where they already exist.
-- On resume, existing cursor identities are revalidated before mutation. An online-player config reached after a wait is looked up again by UUID.
-- An offline player fails. An unloaded/removed/unresolvable entity fails. No implementation may force-load a chunk in v1.
-- “Entity is alive” can return false for a successfully resolved dead fixture. Blocks that require a living, alive target return a target precondition error instead.
-- Continuations remain in-memory and single-use; server restart recovery is outside v1.
-
-## Conditions and condition subject
-
-Every new entity condition that successfully resolves a target records that same target in the existing `RuntimeConditionResult.subject` for both true and false results. This lets downstream `CONDITION_SUBJECT` and `context.entity.execute_as` compose without a second result channel.
-
-Target resolution failure is not boolean false. It terminates the node/run fail-closed and must not enter a condition's fail edge, because that edge may contain side effects.
-
-Condition Rack uses the same raw predicate evaluator and target resolver, but retains its current rule: rack evaluation does not replace the ordinary path's `currentCondition`.
-
-v1 has no condition object. A future genuinely two-entity condition must first define subject/object semantics and lifecycle; it must not reuse `TARGET_ENTITY` as an implicit object.
-
-## Structured errors
-
-Slice 1 must introduce one minimal runtime/simulation error shape that can reach Trace and API results:
+Errors contain:
 
 ```text
 code
 nodeId
+fieldPath          # for example node-1.target
 source
-requiredType
+requirement
 referenceId
-message
+Chinese message
 ```
 
-Required resolution codes:
+The common error shape is bounded at the API boundary and reaches Trace, `RuntimeResult` and `SimulationExecutionResult`. A target error terminates an action, ordinary condition, Predicate Capsule or execute-as entry. It is never converted into condition false and never selects an output edge.
 
-| Code | Meaning |
-|---|---|
-| `ENTITY_TARGET_MISSING` | configured context source has no reference |
-| `ENTITY_TARGET_UNRESOLVABLE` | identity cannot be resolved without a scan/load |
-| `ENTITY_TARGET_PLAYER_OFFLINE` | configured online player is now offline |
-| `ENTITY_TARGET_TYPE_MISMATCH` | resolved target violates the block type |
-| `ENTITY_TARGET_NOT_ALIVE` | block requires an alive target and resolution found a dead target |
+The ordinary predicate adapter and Predicate Rack both propagate the same structured error. Rack evaluation continues not to overwrite the ordinary path condition context.
 
-Save-time configuration codes:
+## Conditions
 
-```text
-entity_target_source_invalid
-entity_target_player_id_missing
-entity_target_player_id_invalid
-entity_target_player_name_hint_invalid
-```
+Every generic entity condition that resolves successfully records that entity in `RuntimeConditionResult.subject` for both true and false results. `condition object` remains empty in v1.
 
-`targetPlayerNameHint` is optional, limited to 64 characters and rejects control characters. WebUI summaries and Trace render it as escaped plain text. It is never used for lookup or authorization.
+The generic tag condition supports `PASS_ONLY`, `FAIL_ONLY`, `BRANCH` and `PREDICATE`. Missing target, offline player, wrong type and provider failure terminate instead of entering the fail edge.
 
-The shared resolver owns the common code/message. A block adds its own domain error only after target resolution. Runtime, Simulation and API must not translate the same failure into unrelated strings.
+## `context.entity.execute_as`
 
-### Integration with current result records
+The container uses the same `target: EntityTargetRef`, shared editor, validator and resolver.
 
-Slice 1 extends the existing result path; it does not add a parallel error bus:
+- Catalog default is explicit `CONDITION_SUBJECT`.
+- Allowed sources are all four v1 sources.
+- `CURRENT_ENTITY` means “与当前上下文相同”.
+- successful resolution sets the body current entity;
+- nested bodies and delays retain the selected stable identity;
+- body completion restores the outer current entity;
+- resolution failure does not enter the body.
 
-1. Add one core `RuntimeExecutionError(code, nodeId, source, requiredType, referenceId, message)` record.
-2. Add nullable `error` to the existing `RuntimeNodeExecutionResult`. Existing two/three-argument constructors continue to set it to null.
-3. Add nullable `error` to the existing `RuntimeResult`. Existing constructors and successful/waiting results remain wire-compatible with null.
-4. When a node result has an error, `GraphRuntime` appends its readable message/code to the existing Trace, stops traversal, and returns the same error on `RuntimeResult`; it does not throw away the code or follow an output slot.
-5. Add nullable `error` to the existing `RuntimePredicateResult`; its existing two/three-argument constructors continue to set it to null. Predicate Rack checks this field before reading `value`, appends the same code/message to Trace, and terminates through the same `RuntimeResult.error` path instead of converting the failure to boolean false or a string-only exception. The ordinary predicate-to-node adapter must likewise copy this error into `RuntimeNodeExecutionResult.error` with no output slot; `GraphRuntime` then follows step 4 and never selects pass/fail from `value`.
-6. Add nullable `error` to `SimulationExecutionResult`, while retaining the existing `errors: List<String>` as a derived compatibility projection containing at most the one readable message.
-7. The API uses `error.code/message` when present and keeps legacy `RUNTIME_FAILED` only for unexpected failures that have no structured error. The change is additive to JSON; old clients may continue reading `message`/`errors`.
+No position context is added.
 
-There is at most one terminal execution error per run result. `code`, `source` and `requiredType` are enums; `nodeId` uses the existing graph limit; `referenceId` is capped at 128 characters and `message` at 512 characters at the trust boundary. No arbitrary details map or stack trace crosses the API.
+## Online-player provider and API
 
-## Simulation
+`ONLINE_PLAYER` stores a UUID as the only identity. The name is a display hint and never a lookup fallback. In offline-mode servers, a rename that changes UUID is a new identity.
 
-Simulation uses the same source, type and error rules:
+Each execution preserves the provider result one-to-one:
 
-- the actor remains the run entity and initial current entity;
-- execute-as continues to change only current entity;
-- the existing optional target entity is the fixture for formal `TARGET_ENTITY`—there is no `TEST_TARGET_ENTITY` source;
-- an explicit online-player fixture with stable UUID is needed to simulate `ONLINE_PLAYER` without falling back to the actor;
-- fixture metadata must include entity type, living/alive and online state needed by v1-A;
-- missing fixture or incompatible metadata returns the same structured error code as Runtime;
-- mutable health/effects/game mode are copied per run and never written back to the test-context draft;
-- the same `SimulationContext` remains attached to an in-run Continuation.
+- an unavailable or closed provider returns `entity_target_provider_unavailable`;
+- an available provider that cannot resolve the UUID returns `entity_target_unresolvable`;
+- a known UUID whose player is not currently online returns `entity_target_offline`;
+- an exact online UUID match continues with that resolved player.
 
-A single optional online-player fixture is sufficient for v1. It is an environment lookup fixture, not a multi-target query or entity collection.
+Runtime and Simulation must not collapse these states. A saved name hint is display data only and never changes an unresolvable result into offline or success.
 
-## Minecraft adapter boundary
+The loader adapter provides:
 
-Slice 1 adds a narrow adapter contract for:
+- exact online-player resolution by UUID;
+- bounded listing/search of current online players;
+- minimal type/living/alive/online metadata;
+- no world-entity enumeration, chunk loading or live-object storage in core/cursors.
 
-- resolving a contextual entity reference by its already-known identity;
-- looking up one configured online player UUID;
-- reporting type/living/alive/online metadata;
-- executing later entity operations without exposing Minecraft classes to core.
-
-The adapter must use target Minecraft 1.21.11 APIs and remain loader-specific. It must not enumerate all world entities, force-load chunks, cache live objects across ticks, or leak Minecraft classes into Catalog/Graph/Simulation.
-
-## Catalog and WebUI
-
-The common control is compact:
+The WebUI loads the directory only when the player picker opens or the user presses refresh. It performs no periodic polling and exposes no manual UUID input.
 
 ```text
-目标：[当前执行实体 ▼]
-```
-
-When `ONLINE_PLAYER` is selected, a searchable online-player combobox appears and saves UUID plus a display hint. Other source-specific fields stay hidden.
-
-Slice 1 adds one narrow read-only endpoint backed by the loader's online-player manager:
-
-```text
-GET /api/pixellogic/runtime/online-players?query=<text>&limit=<1..50>&selectedId=<optional-uuid>
+GET /api/pixellogic/runtime/online-players?query=<text>&limit=<1..50>&selectedUuid=<optional-uuid>
 
 {
-  "players": [
-    { "id": "<uuid>", "displayName": "Steve" }
-  ],
-  "selected": { "id": "<uuid>", "displayName": "Alex", "available": true }
+  "players": [{ "uuid": "<uuid>", "name": "Steve" }],
+  "selected": { "uuid": "<uuid>", "name": "Alex", "availability": "ONLINE" }
 }
 ```
 
-- on the current baseline it inherits the editor API's `127.0.0.1`-only development boundary; that server has no authentication, and loopback binding must not be described as authorization;
-- it must never bind publicly; when the planned client-hosted bridge is implemented, this route requires the bridge's server-authorized session and a narrow player-directory read capability before production exposure;
-- `query` is trimmed, at most 64 characters, and matches current display names case-insensitively;
-- results are deterministic by case-insensitive display name then UUID, limited to 20 by default and 50 maximum;
-- optional `selectedId` is parsed as one UUID and resolved by exact online-player lookup independently of `query`, sorting and `limit`; the response uses `selected: null` when it is omitted and `{ id, available: false }` when that UUID is offline;
-- no address, permission, OP state, game mode or profile metadata is returned; `displayName` is escaped plain text capped at 64 characters;
-- the WebUI queries only while the combobox is open, debounces input by 150 ms, aborts/sequence-guards stale responses and performs no background polling;
-- opening the combobox refreshes results; closing cancels the request;
-- a selected player going offline remains visible from the saved name hint, is marked unavailable from the exact `selectedId` result—not inferred from absence in the paged search list—and fails with `ENTITY_TARGET_PLAYER_OFFLINE` at execution;
-- selecting a result stores its UUID/name hint in the flat target config. The endpoint never writes Graph state itself.
+`selected` has four exact response shapes:
 
-The runtime adapter contract therefore includes both exact `onlinePlayer(UUID)` resolution for execution and bounded `onlinePlayers(query, limit)` discovery for this endpoint. Simulation uses the explicit UUID fixture rather than this live endpoint.
-
-Rules:
-
-- options are ordered by ordinary usefulness: current, run, condition subject, run target, online player;
-- a block only shows sources allowed by its target type and execution contract;
-- the control displays an `任意实体 / 生物 / 仅玩家` type hint;
-- a statically impossible source is disabled with a reason;
-- a dynamically uncertain condition/run target shows a warning and remains runtime-authoritative;
-- an unresolvable/offline UUID remains visible from its saved name hint and is marked unavailable; if the same UUID is online after a rename, it remains available and displays the current returned name without changing identity;
-- keyboard navigation, focus and screen-reader labels use the existing Form Schema control patterns;
-- no selector, radius, sort, limit, random or NBT form is present.
-
-Summary examples:
-
-```text
-伤害当前执行实体 4 点
-恢复最近条件主体 6 点生命
-给予玩家 Steve 速度效果
+```json
+{ "selected": null }
 ```
 
-## Existing-block compatibility
+when `selectedUuid` is omitted;
 
-Existing `player.*` and `context_entity.*` tag blocks keep their current config/default semantics in v1-A. They are useful migration fixtures but are not silently rewritten:
+```json
+{ "selected": { "uuid": "<uuid>", "name": "Alex", "availability": "ONLINE" } }
+```
 
-- old player blocks continue to target the run actor;
-- old context-entity blocks continue to target current entity;
-- a later explicit migration may add EntityTargetRef defaults while preserving old graph meaning;
-- no duplicate generic “set entity tag” block is added to v1-A.
+for an exact online match;
 
-## Acceptance checks for Slice 1
+```json
+{ "selected": { "uuid": "<uuid>", "name": null, "availability": "OFFLINE" } }
+```
 
-- all five sources resolve or fail with the specified code;
-- no source fallback exists;
-- all three target types are checked in Simulation and Runtime adapter tests;
-- direct condition execution and Predicate Rack preserve the same structured target error code;
-- online player identity is UUID-authoritative;
-- true and false entity conditions retain the resolved subject;
-- rack predicates do not overwrite path condition context;
-- nested execute-as and wait resume preserve existing cursor semantics;
-- cancellation/stale continuation cannot mutate a target;
-- Graph stores only flat config strings, never a runtime entity/Minecraft object;
-- WebUI shows one compact accessible selector and no selector-language controls;
-- self-check covers missing, unresolvable, offline, wrong type, dead and success paths.
+for a known but currently offline UUID; `name` may instead contain a trustworthy cached name when the provider has one; and
 
-## Open decisions
+```json
+{ "selected": { "uuid": "<uuid>", "name": null, "availability": "UNRESOLVABLE" } }
+```
 
-| Decision | Recommendation | Why it still needs product confirmation |
-|---|---|---|
-| specified player identity | UUID + last-known name hint | binds a graph to a server identity; name-only is less stable, especially in offline mode |
-| `TARGET_ENTITY` visibility | keep the existing formal source token, label it “本次运行目标实体”, disable/warn when entry cannot provide it | the current production adapters do not populate it yet |
+when an available provider reports that the UUID is unknown or unresolvable. The WebUI uses the saved `playerNameHint` when the response has no current name and never infers availability from absence in the paged `players` list.
 
-## Evidence
+These four shapes apply only to a successful request while the provider is available. An unavailable, closed or timed-out provider returns the existing bounded API error response and no `selected` payload; it is never represented as `availability: UNRESOLVABLE`.
+
+- `query` is at most 64 characters; default result limit is 20 and maximum is 50;
+- `selectedUuid` is resolved exactly and independently of the result list;
+- `OFFLINE` and `UNRESOLVABLE` selections preserve the configured UUID and saved name hint and are marked `当前不在线`; this shared UI wording does not merge their Runtime error codes;
+- a renamed player with the same UUID remains selected and displays the current name;
+- list refresh never clears the saved selection;
+- the endpoint returns no address, permission, OP, game-mode or profile metadata;
+- the existing loopback-only API, request bounds, server-thread timeout and close fence remain authoritative;
+- loopback is not authentication, and this task does not invent the future Authorized Session.
+
+## Simulation
+
+Simulation follows the same four-source resolver and error codes.
+
+- the test actor may initialize `currentEntity`, but is not exposed as `RUN_ENTITY`;
+- a scenario may deliberately initialize no current entity;
+- the existing optional target fixture supplies `TARGET_ENTITY`;
+- the current actor UUID may act as the one online-player fixture when it matches; otherwise a single optional online-player fixture is sufficient;
+- no online-player collection or world scan is introduced;
+- mutable test facts are copied per run and retained by the in-run Continuation only.
+
+## Breaking tag-block reform
+
+Slice 1 deletes:
+
+```text
+condition.player.has_tag
+action.player.add_tag
+action.player.remove_tag
+condition.context_entity.has_tag
+action.context_entity.add_tag
+action.context_entity.remove_tag
+```
+
+It adds:
+
+```text
+condition.entity.has_tag
+action.entity.add_tag
+action.entity.remove_tag
+```
+
+All three use `target: EntityTargetRef`, requirement `ANY_ENTITY`, explicit new-node default `CURRENT_ENTITY` and the existing authoritative tag lexical validation. The six removed IDs become unknown blocks; their old NodeTypes are deleted, and no alias, migration or legacy NodeType fallback remains.
+
+All three are classified under `player-entity/tags` (`玩家与实体 > 标签`) and use exactly three generic NodeTypes:
+
+```text
+ENTITY_HAS_TAG_CONDITION
+ENTITY_ADD_TAG_ACTION
+ENTITY_REMOVE_TAG_ACTION
+```
+
+Names may follow the existing enum style, but the one-condition/two-action split is normative. The implementation retains one generic condition/predicate path and one entity-target action path for each operation; it does not retain separate player and context-entity executors or evaluators.
+
+Tag action outcomes are:
+
+- adding an existing tag: `SUCCESS`, `changed=false`, `affectedCount=1`;
+- removing an absent tag: `SUCCESS`, `changed=false`, `affectedCount=1`;
+- making a real change: `SUCCESS`, `changed=true`, `affectedCount=1`;
+- target resolution failure: `FAILURE`, `changed=false`, `affectedCount=0`, with the shared structured target error.
+
+The condition uses the same evaluator for ordinary execution and Predicate Rack, records the resolved entity as condition subject for normal true and false results, and leaves condition object empty.
+
+## Repository-internal migration
+
+The lack of external old-Graph compatibility does not permit stale repository fixtures. Slice 1 removes or updates every old tag-specific:
+
+- Block Definition and NodeType;
+- executor and predicate evaluator;
+- summary/help helper and Form Schema branch;
+- example Graph, Prefab and test graph;
+- Catalog fallback, snapshot and taxonomy fixture;
+- Java/WebUI self-check branch and documentation reference.
+
+Outside formal historical “removed ID” documentation, repository searches for the six old block IDs and removed `RUN_ENTITY` source must return zero. Supplying an old block ID is validated as unknown; no alias, wrapper, deprecated entry or migration decoder is used.
+
+## Slice 1 acceptance
+
+- exactly four sources and three requirements exist; `RUN_ENTITY` is absent from runtime code and WebUI;
+- global runs can have no current entity and fail closed when a block targets it;
+- initial current entity, nested execute-as, loop/delay Continuation and outer restoration preserve only stable identities;
+- Graph JSON contains one `target` object and no loose sibling target fields;
+- UUID/name validation, provider unavailable, offline, missing, wrong-type and not-alive paths use stable errors;
+- ordinary conditions and Predicate Rack do not convert resolution errors to false;
+- online-player discovery is on demand, manually refreshable and non-polling;
+- the three generic tag blocks fully replace the six old blocks;
+- old IDs are unknown and old NodeTypes are deleted, with no alias or fallback;
+- the generic tag NodeTypes use no duplicated player/context executor or predicate path;
+- tag actions preserve the specified `SUCCESS`/`FAILURE`, `changed` and `affectedCount` semantics;
+- repository examples, Prefabs, help, snapshots, fallbacks and self-checks contain no live old-tag reference;
+- selected-player responses preserve configured offline/unresolvable selections without using paged-list absence as availability evidence;
+- Runtime and Simulation distinguish provider unavailable, unresolvable UUID and known-but-offline UUID with the specified one-to-one error codes;
+- WebUI uses one compact accessible target editor for tag blocks and execute-as;
+- no selector, collection, position context, offline player or success/failure graph port is added.
+
+## Evidence to verify during implementation
 
 - `RuntimeExecutionContext`, `RuntimeConditionResult`, `RuntimeSubjectReference`;
-- `ExecutionCursor`, `ExecutionScopes` and `GraphRuntime` continuation validation;
-- `RuntimeServices` adapter boundary;
+- `ExecutionCursor`, `EntityContextFrame`, `ExecutionScopes` and `GraphRuntime`;
+- `RuntimeServices` and loader-specific online-player access;
 - `SimulationActor`, `SimulationEntity`, `SimulationContext` and `SimulationRunner`;
-- [`ENTITY_EXECUTION_CONTEXT_V1.md`](../audits/ENTITY_EXECUTION_CONTEXT_V1.md) for existing execute-as semantics.
+- `BuiltInBlockCatalog`, `GraphValidator` and the current Form Schema editor;
+- [`ENTITY_EXECUTION_CONTEXT_V1.md`](../audits/ENTITY_EXECUTION_CONTEXT_V1.md).

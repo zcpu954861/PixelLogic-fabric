@@ -5,7 +5,7 @@ import { createServer } from 'vite';
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 try {
   const catalogModel = await server.ssrLoadModule('/src/model/blockCatalog.ts');
-  const { renderCatalogLibrary } = await server.ssrLoadModule('/src/ui/catalog/catalogLibrary.ts');
+  const { renderCatalogIcon, renderCatalogLibrary } = await server.ssrLoadModule('/src/ui/catalog/catalogLibrary.ts');
   const pack = (id, order) => ({ id, displayName: id === 'players' ? '玩家与实体' : '逻辑与流程', description: `${id} pack`, icon: '◇', order });
   const category = (id, packId, order) => ({ id, packId, displayName: id.includes('tags') ? '标签' : '循环', description: `${id} category`, icon: '·', order, visibleByDefault: true });
   const block = (id, categoryId, visibility = 'BROWSE', capabilities = [], aliases = [], searchKeywords = []) => ({
@@ -74,6 +74,8 @@ try {
   assert.match(packHtml, /data-library-pack="players"/);
   assert.doesNotMatch(packHtml, /data-library-pack="empty"/);
   assert.match(packHtml, /aria-label="搜索全部积木"/);
+  assert.match(renderCatalogIcon('events-triggers', '⚡'), /<svg[\s\S]*catalog-icon-fill/, 'built-in pack icons should use the shared SVG system');
+  assert.equal(renderCatalogIcon('third-party-pack', '<unsafe>'), '&lt;unsafe&gt;', 'unknown third-party icons must keep the escaped catalog fallback');
   const categoryHtml = renderCatalogLibrary(catalog, { location: { level: 'categories', packId: 'players' }, query: '', filter: null });
   assert.match(categoryHtml, /data-library-root/);
   assert.match(categoryHtml, /data-library-category="players\.tags"/);
@@ -115,6 +117,7 @@ try {
   assert.match(app, /if \(editableTarget && \(isUndoShortcut\(event\) \|\| isRedoShortcut\(event\)\)\)/,
     'library search must keep native text undo/redo shortcuts');
   assert.match(layoutCss, /\.catalog-description\s*\{/, 'catalog descriptions must have a dedicated selector');
+  assert.match(layoutCss, /\.catalog-icon svg\s*\{[\s\S]*stroke-linecap:\s*round/, 'catalog SVG icons must share one crisp stroke system');
   assert.doesNotMatch(layoutCss, /\.catalog-category span\s*,/, 'description rules must not override pack/category icons');
   const pollingRefresh = app.slice(app.indexOf('function refreshTestExecutionView'), app.indexOf('function apiBusyAttr'));
   assert.doesNotMatch(pollingRefresh, /libraryLocation|libraryQuery|renderCatalogLibrary|renderApp\(/, 'polling local refresh must not reset library state');

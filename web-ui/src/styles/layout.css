@@ -305,9 +305,39 @@ button:hover:not(:disabled) {
   place-items: center;
   border: 1px solid rgba(31, 111, 81, 0.28);
   border-radius: 7px;
-  background: #eaf6ee;
+  background: linear-gradient(145deg, #f7fcf8, #e4f3e9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(31, 111, 81, 0.08);
   color: #1f6f51;
   font-weight: 900;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.catalog-icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.catalog-icon .catalog-icon-fill {
+  fill: currentColor;
+  stroke: none;
+}
+
+.catalog-category:hover:not(:disabled) .catalog-icon {
+  border-color: rgba(31, 111, 81, 0.46);
+  color: #155f45;
+  transform: translateY(-1px);
 }
 
 .catalog-category b,

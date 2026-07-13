@@ -2,7 +2,7 @@
 
 正式名称：**Player & Entity Foundation v1-A / 玩家与实体基础包：目标、生命与状态**。
 
-This is a design and implementation contract, not implementation in the current branch.
+This is the design contract for the full v1-A pack and the implementation record for Slice 1. The later health, effect, game-mode and condition blocks remain planned only.
 
 ## Product slice
 
@@ -15,9 +15,9 @@ v1-A recommends:
 
 The pack is intentionally limited to high-frequency single-entity behavior that does not require PositionRef, inventory, world scanning or a large event subsystem.
 
-## Approved Slice 1 reform
+## Implemented Slice 1 reform
 
-The current `ab0bf4d` mainline still contains six player/context-specific tag blocks. Slice 1 deliberately replaces them, without compatibility aliases or migration, with:
+Stage B has replaced the six player/context-specific tag blocks, without compatibility aliases or migration, with:
 
 ```text
 condition.entity.has_tag
@@ -25,9 +25,9 @@ action.entity.add_tag
 action.entity.remove_tag
 ```
 
-All three use the shared composite `target: EntityTargetRef`, requirement `ANY_ENTITY`, and an explicit new-node default of `CURRENT_ENTITY`. The condition remains compatible with `PASS_ONLY`, `FAIL_ONLY`, `BRANCH` and Predicate Rack, records the resolved entity as condition subject for normal true/false results, and leaves condition object empty. The six old block IDs become unknown, and their corresponding old tag NodeTypes are deleted.
+All three use the shared composite `target: EntityTargetRef`, requirement `ANY_ENTITY`, and an explicit new-node default of `CURRENT_ENTITY`. The condition remains compatible with `PASS_ONLY`, `FAIL_ONLY`, `BRANCH` and Predicate Rack, records the resolved entity as condition subject for normal true/false results, and leaves condition object empty. The retired block IDs are unknown, and their former tag NodeTypes are absent.
 
-Slice 1 also removes `RUN_ENTITY`, adds the shared resolver/errors/action outcome, provides on-demand online-player UUID selection, and moves `context.entity.execute_as` onto the same target control. The eight later actions and six later conditions specified below are not implemented by Slice 1.
+Slice 1 also removes the former permanent run-start source, adds the shared resolver/errors/action outcome, provides on-demand online-player UUID selection, and moves `context.entity.execute_as` onto the same target control. The eight later actions and six later conditions specified below are not implemented by Slice 1.
 
 ## Taxonomy plan
 
@@ -418,7 +418,7 @@ No raw registry object, amplifier zero-base, ticks, internal enum or Minecraft c
 
 ## Implementation slices
 
-### Slice 1 — Entity Target Foundation
+### Slice 1 — Entity Target Foundation (implemented)
 
 Scope:
 
@@ -440,13 +440,13 @@ Recommended branch: `feature/entity-target-reference-v1` from current `mc-1.21.1
 
 After all automatic checks and the explicit user hand-test gate, the implementation is committed once as `feat: add entity target references and unify entity tags`.
 
-This slice should be the next implementation task. It has immediate reuse across all later slices and prevents each action from inventing target/error semantics.
+This slice establishes the shared target/error/result boundary reused by every later slice. Its final release gate is the explicit Stage B user hand-test matrix.
 
-### Slice 2 — Health and entity termination
+### Slice 2 — Health and Termination (next)
 
 Scope: damage, heal, set health, kill and remove. The Simulation fixture extends Slice 1 metadata with bounded `health`, `maximumHealth` and `invulnerable` facts, and makes the existing per-run `alive` fact mutable for damage/kill transitions; it does not introduce a second alive field.
 
-Recommended branch: `feature/player-entity-health-v1a`, based on merged Slice 1.
+Recommended branch: `feature/player-entity-health-v1a`, based on merged Slice 1 after its hand-test and merge gates.
 
 Suggested commits:
 
@@ -523,10 +523,9 @@ Slice 4:
 2. **Damage kinds:** confirm the small closed v1 list after a Minecraft 1.21.11 adapter audit; do not expose arbitrary registry ids in v1.
 3. **Effect update policy:** recommended `VANILLA_UPDATE` and explicit `REPLACE`; confirm user wording and exact adapter behavior.
 
-## Acceptance boundary for this design
+## Acceptance boundary
 
-- no product code, Catalog entries, Graph schema, Runtime executor or WebUI is changed by the design branch;
-- the next implementation performs Slice 1 only: TargetRef, tag reform, execute-as integration and online-player discovery;
-- Slice 1 keeps no `RUN_ENTITY`, old tag ID, alias, migrator, wrapper or implicit target decoder;
+- Slice 1 changes only TargetRef, the tag reform, execute-as integration and online-player discovery; it does not pre-register later blocks;
+- Slice 1 keeps no permanent run-start source, retired tag ID, alias, migrator, wrapper or implicit target decoder;
 - all blocks remain single-responsibility, target one entity, and use typed parameters;
 - no command form, selector language, second Catalog, second context or speculative interface family is introduced.

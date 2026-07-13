@@ -1,4 +1,4 @@
-import type { BlockCatalog, GraphDocument, GraphNode } from '../../model/graphTypes';
+import type { BlockCatalog, GraphDocument, GraphNode, OnlinePlayerDirectory } from '../../model/graphTypes';
 import { conditionRackParent } from '../../model/conditionRack';
 import type { SimulationTestContext } from '../../model/simulationTestContext';
 import { escapeHtml } from '../../utils/dom';
@@ -9,7 +9,7 @@ import { renderConditionRackEditor } from './conditionRackEditor';
 export function renderEditorModal(
   nodeItem: GraphNode,
   catalog: BlockCatalog,
-  options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string; steady: boolean; simulationTestContext: SimulationTestContext; graph: GraphDocument; rackChildEditing?: boolean },
+  options: { editorClosing: boolean; error: string; hasValidation: boolean; modalIssue: string; steady: boolean; simulationTestContext: SimulationTestContext; graph: GraphDocument; rackChildEditing?: boolean; onlinePlayerDirectory?: OnlinePlayerDirectory },
 ): string {
   const title = blockEditorTitle(nodeItem, catalog);
   const modalIssue = options.modalIssue;
@@ -30,7 +30,7 @@ export function renderEditorModal(
             <b>当前摘要</b>
             <p data-modal-summary>${escapeHtml(rackAwareNodeSummary(nodeItem, options.graph, catalog))}</p>
           </section>
-          ${renderNodeEditor(nodeItem, catalog, options.simulationTestContext, rackCapsule)}
+          ${renderNodeEditor(nodeItem, catalog, options.simulationTestContext, rackCapsule, options.onlinePlayerDirectory)}
           ${renderConditionRackEditor(nodeItem, options.graph, catalog)}
           <p class="editor-save-note">拖拽和连接会自动保存；此处字段修改需点击“保存修改”。</p>
           ${options.error || options.hasValidation ? `

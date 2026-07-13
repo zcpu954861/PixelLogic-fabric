@@ -140,6 +140,39 @@ select {
   box-shadow: inset 4px 0 0 #16a34a;
 }
 
+.custom-select-empty {
+  padding: 8px 9px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.entity-target-player-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.entity-target-source-control {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.entity-target-source-control button {
+  padding-inline: 4px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.entity-target-refresh {
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.entity-target-warning {
+  color: #9a5a08 !important;
+}
+
 .editor-section {
   display: grid;
   gap: 12px;

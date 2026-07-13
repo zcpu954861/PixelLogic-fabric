@@ -51,7 +51,7 @@ public final class CatalogValidationCleanupSelfCheck {
 
     private static List<SchemaCase> schemaCases() {
         return List.of(
-                schema("outputMode option", BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG, "outputMode", "INVALID", "config_option_invalid"),
+                schema("outputMode option", BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, "outputMode", "INVALID", "config_option_invalid"),
                 schema("expected boolean", BuiltInBlockCatalog.CONDITION_STATE_EQUALS, "expected", "yes", "config_boolean_invalid"),
                 schema("missing boolean", BuiltInBlockCatalog.CONDITION_STATE_EQUALS, "missing", "no", "config_boolean_invalid"),
                 schema("state scope", BuiltInBlockCatalog.STATE_SET, "scope", "WORLD", "config_scope_invalid"),
@@ -80,9 +80,9 @@ public final class CatalogValidationCleanupSelfCheck {
                 special("hidden condition valueType", () -> graph(BuiltInBlockCatalog.CONDITION_STATE_EQUALS, Map.of("valueType", "STRING")), "condition_state_type_invalid"),
                 special("hidden state.add valueType", () -> graph(BuiltInBlockCatalog.STATE_ADD, Map.of("valueType", "BOOLEAN")), "state_add_type"),
                 special("STATE_SET typed value", () -> graph(BuiltInBlockCatalog.STATE_SET, Map.of("valueType", "INTEGER", "value", "one")), "state_set_value_invalid"),
-                special("tag whitespace", () -> graph(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG, Map.of("tag", "bad tag")), "player_tag_invalid"),
-                special("tag control character", () -> graph(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG, Map.of("tag", "bad\ntag")), "player_tag_invalid"),
-                special("tag length", () -> graph(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG, Map.of("tag", "x".repeat(65))), "player_tag_invalid"),
+                special("tag whitespace", () -> graph(BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, Map.of("tag", "bad tag")), "player_tag_invalid"),
+                special("tag control character", () -> graph(BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, Map.of("tag", "bad\ntag")), "player_tag_invalid"),
+                special("tag length", () -> graph(BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, Map.of("tag", "x".repeat(65))), "player_tag_invalid"),
                 special("dimension namespaced id", () -> graph(BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS, Map.of("dimensionId", "overworld")), "condition_dimension_id_invalid"),
                 special("block namespaced id", () -> graph(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE, Map.of("blockId", "stone")), "condition_block_id_invalid"),
                 special("region control character", () -> graph(BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION, Map.of("regionName", "bad\nregion")), "condition_region_name_invalid"),
@@ -141,10 +141,10 @@ public final class CatalogValidationCleanupSelfCheck {
         SimulationPredicateEvaluator predicate = new SimulationPredicateEvaluator() {
             @Override
             public NodeType nodeType() {
-                return NodeType.PLAYER_HAS_TAG_CONDITION;
+                return NodeType.ENTITY_HAS_TAG_CONDITION;
             }
         };
-        expectDuplicateRegistry(List.of(predicate, predicate), NodeType.PLAYER_HAS_TAG_CONDITION);
+        expectDuplicateRegistry(List.of(predicate, predicate), NodeType.ENTITY_HAS_TAG_CONDITION);
     }
 
     private static SimulationBlockExecutor executor(NodeType type) {

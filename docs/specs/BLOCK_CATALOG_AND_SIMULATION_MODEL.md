@@ -61,8 +61,8 @@
 - `SimulationActor` supports id, display name, online/operator flags, and tags.
 - `SimulationWorld` only records a dimension id.
 - `SimulationExecutionResult` reports trace id, action results, message results, state changes, actor tags, timer scheduling, and errors.
-- `condition.player.has_tag` and `action.player.add_tag` are now registered catalog blocks.
-- These player tag blocks include form schema, summaries, capability flags, safety flags, validation, simulation behavior, trace output, and self-check coverage.
+- This historical checkpoint registered the first player-specific tag pair. Entity Target Reference v1 later replaced it with three generic entity-tag blocks.
+- The current generic tag blocks include form schema, summaries, capability flags, safety flags, validation, simulation/runtime behavior, trace output, and self-check coverage.
 
 This checkpoint still does not add a real Minecraft adapter, draft simulation, named scenarios, inventory/world/container simulation, or a new WebUI simulation panel.
 
@@ -73,8 +73,8 @@ This checkpoint still does not add a real Minecraft adapter, draft simulation, n
 - WebUI `测试玩家` edits display name, tags, and administrator status.
 - `POST /api/pixellogic/test/start` accepts optional `testContext.actor`; old no-body requests still use the default actor.
 - `SimulationRunner` receives the actor as run input and still delegates graph execution to `GraphRuntime`.
-- `condition.player.has_tag` reads the actor tags supplied for this run.
-- `action.player.add_tag` returns final tags in the run result, but does not persist tags or write them back into the WebUI input.
+- The generic entity-tag condition can read the actor tags supplied for this run by targeting `CURRENT_ENTITY`.
+- The generic add-tag action returns final tags in the run result, but does not persist tags or write them back into the WebUI input.
 - The MVP does not add named scenarios, scenario save/load, multiplayer, inventory, world, container, game mode, or real Minecraft adapter support.
 
 ## Implementation Checkpoint: Simulation Context Expansion v1
@@ -99,17 +99,17 @@ This checkpoint still does not add a real Minecraft adapter, draft simulation, n
 - New condition catalog entries default to `PASS_ONLY`, while the seeded demo graph explicitly stores `BRANCH`.
 - Condition outputs are optional in validation; an unconnected selected output ends the path and writes a trace step.
 - Condition inputs are also optional while editing, matching other placed blocks; an unconnected condition is saved but unreachable until attached to a trigger path.
-- `condition.player.has_tag` now belongs to `条件判断 / 玩家条件`; `action.player.add_tag` remains `玩家操作 / 标签`.
+- The current generic entity-tag condition/actions belong to the formal `玩家与实体 / 标签` category.
 
 ## Implementation Checkpoint: Catalog Expansion v1 Player + Message
 
 `feature/v1-catalog-expansion-player-message` expands the small player/message catalog slice without changing the graph model:
 
-- `condition.player.has_tag` keeps its stable block id and is renamed to `玩家是否拥有标签`.
+- This historical slice renamed the then-current player-tag condition; Entity Target Reference v1 later retired that identifier.
 - The tag condition uses block-specific output labels: `拥有标签时继续`, `不拥有标签时继续`, and `分开执行`.
 - `condition.player.is_admin` is added under `条件判断 / 玩家条件` and reads the per-run simulation actor administrator flag.
 - No separate `玩家没有标签` or `玩家不是管理员` block is added.
-- `action.player.remove_tag` is added beside `action.player.add_tag`; both mutate only the current run actor tags.
+- This historical slice added the matching remove action. The current generic add/remove actions mutate only the explicitly resolved entity for the current run.
 - `action.message.title`, `action.message.subtitle`, and `action.message.actionbar` are added under `消息显示 / 屏幕提示`.
 - The new message blocks reuse `rich_text_component`; color and formatting toolbar remain future work.
 - The title/subtitle/actionbar blocks are separate; there is no combined title+subtitle block.
@@ -330,7 +330,7 @@ trigger.player_join
 trigger.block_interact
 
 condition.state.equals
-condition.player.has_tag
+condition.entity.has_tag
 condition.player.is_admin
 condition.inventory.has_item
 
@@ -338,8 +338,8 @@ action.message.chat
 action.message.title
 action.message.subtitle
 action.message.actionbar
-action.player.add_tag
-action.player.remove_tag
+action.entity.add_tag
+action.entity.remove_tag
 action.player.teleport
 action.world.play_sound
 action.world.set_block
@@ -376,8 +376,8 @@ debug.trace_marker
 
 - `action.message.title`: 显示标题。
 - `action.message.actionbar`: 显示 actionbar。
-- `action.player.add_tag`: 给玩家添加标签。
-- `action.player.remove_tag`: 移除玩家标签。
+- `action.entity.add_tag`: 给所选实体添加标签。
+- `action.entity.remove_tag`: 移除所选实体标签。
 - `action.player.teleport`: 传送玩家。
 - `action.player.give_item`: 给予物品。
 - `action.world.play_sound`: 播放声音。
@@ -483,7 +483,7 @@ Loop Until + Condition Rack v1 adds two catalog-level capabilities:
 
 The first `PREDICATE` set is deliberately exact:
 
-- `condition.player.has_tag`
+- `condition.entity.has_tag`
 - `condition.player.is_admin`
 - `condition.player.dimension_is`
 - `condition.player.in_region`

@@ -33,6 +33,7 @@ public final class SimulationActor extends SimulationEntity {
         return new SimulationActor(id, displayName, true, false, Set.of());
     }
 
+    @Override
     public boolean online() {
         return online;
     }

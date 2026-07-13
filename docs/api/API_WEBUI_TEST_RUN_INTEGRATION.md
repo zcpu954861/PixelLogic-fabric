@@ -1,6 +1,6 @@
 # PixelLogic API + WebUI Test Run Integration
 
-This document records the v1 spike API used by the WebUI test-run panel.
+This document records the bounded local API used by the WebUI test-run panel and the Entity Target online-player picker.
 
 It is not the final graph persistence API. It only exposes the already merged manual simulation runtime spike.
 
@@ -15,6 +15,7 @@ Implemented:
 - WebUI demo actor for PLAYER-scoped state.
 - Spike-level pending timer capacity limit.
 - Suspended-run status lookup and finite WebUI polling for asynchronous continuation results.
+- On-demand online-player listing and exact selected-UUID lookup for Entity Target Reference.
 
 Not implemented:
 
@@ -29,6 +30,7 @@ Not implemented:
 
 ```text
 GET  /api/pixellogic/status
+GET  /api/pixellogic/runtime/online-players?query=<text>&limit=<1..50>&selectedUuid=<uuid>
 POST /api/pixellogic/test/reset
 POST /api/pixellogic/test/start
 GET  /api/pixellogic/test/runs/{runId}
@@ -41,6 +43,10 @@ All responses are JSON.
 `POST /test/start` reuses the trace id as `runId` and returns `runStatus` plus `terminal`. A suspended timer returns `WAITING`; the WebUI queries the run endpoint every 750 ms and replaces its bounded trace/result snapshot. Polling stops on `COMPLETED`, `FAILED`, `CANCELLED`, a new run, page exit, or three consecutive request failures. No WebSocket, SSE, persistent run history, or unbounded registry is used.
 
 Only the current simulation result is queryable. Reset, graph replacement, a newer run, and service stop cancel the prior non-terminal result; sequence guards prevent late callbacks and stale browser responses from replacing the current run.
+
+The online-player endpoint is not polled. The target editor calls it when the picker opens or the user requests a refresh. `query` is optional and limited to 64 characters, `limit` defaults to 20 and is capped at 50, and `selectedUuid` must be a canonical UUID. Listing returns only `uuid` and `name`; selected lookup also returns `ONLINE`, `OFFLINE`, or `UNRESOLVABLE`. Provider unavailability is a bounded `503 ENTITY_TARGET_PROVIDER_UNAVAILABLE` response, not an empty list or an inferred offline state.
+
+Names are display metadata only. Graph target identity remains the selected UUID; the API does not perform name fallback, offline-player mutation, world scans or chunk loading.
 
 Example success:
 

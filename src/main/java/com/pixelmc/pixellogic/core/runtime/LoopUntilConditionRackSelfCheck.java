@@ -13,6 +13,7 @@ import com.pixelmc.pixellogic.core.graph.ValidationIssue;
 import com.pixelmc.pixellogic.core.model.ConditionSlotDefinition;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.EdgeType;
+import com.pixelmc.pixellogic.core.model.EntityTargetRef;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
@@ -87,12 +88,11 @@ public final class LoopUntilConditionRackSelfCheck {
         require(untilBlock.outputSlots().stream().anyMatch(slot -> slot.id().equals("done")), "loop until should expose done");
 
         Set<String> expectedPredicates = Set.of(
-                BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG,
+                BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG,
                 BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN,
                 BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS,
                 BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION,
-                BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE,
-                BuiltInBlockCatalog.CONDITION_CONTEXT_ENTITY_HAS_TAG
+                BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE
         );
         Set<String> actualPredicates = new HashSet<>();
         BuiltInBlockCatalog.catalog().blocks().stream()
@@ -102,7 +102,7 @@ public final class LoopUntilConditionRackSelfCheck {
                     require(!item.predicateSummaryTemplate().isBlank(), "predicate should expose a capsule summary: " + item.id());
                     require(!item.predicateNegatedSummaryTemplate().isBlank(), "predicate should expose a negated capsule summary: " + item.id());
                 });
-        require(actualPredicates.equals(expectedPredicates), "predicate capability set should include contextual entity tags");
+        require(actualPredicates.equals(expectedPredicates), "predicate capability set should include generic entity tags");
 
         GraphDefinition graph = storageGraph("loop-until-model");
         GraphDefinition loaded = GraphDocument.fromGraphDefinition(graph, "Loop Until Model").toGraphDefinition();
@@ -438,16 +438,29 @@ public final class LoopUntilConditionRackSelfCheck {
     }
 
     private static void assertSharedPredicate(NodeDefinition condition, SimulationContext trueContext, SimulationContext falseContext) {
-        SimulationExecutionRegistry registry = SimulationExecutionRegistry.playerTags();
-        RuntimePredicateResult rawTrue = registry.evaluatePredicate(condition, trueContext, NOOP_SERVICES).orElseThrow();
-        RuntimePredicateResult rawFalse = registry.evaluatePredicate(condition, falseContext, NOOP_SERVICES).orElseThrow();
-        RuntimeNodeExecutionResult ordinaryTrue = registry.execute(condition, trueContext, NOOP_SERVICES).orElseThrow();
-        RuntimeNodeExecutionResult ordinaryFalse = registry.execute(condition, falseContext, NOOP_SERVICES).orElseThrow();
+        HarnessServices trueServices = new HarnessServices(trueContext);
+        HarnessServices falseServices = new HarnessServices(falseContext);
+        RuntimeExecutionContext trueRuntime = runtimeContext(trueContext);
+        RuntimeExecutionContext falseRuntime = runtimeContext(falseContext);
+        RuntimePredicateResult rawTrue = trueServices.evaluatePredicate(condition, trueRuntime).orElseThrow();
+        RuntimePredicateResult rawFalse = falseServices.evaluatePredicate(condition, falseRuntime).orElseThrow();
+        RuntimeNodeExecutionResult ordinaryTrue = trueServices.executeSimulationNode(condition, trueRuntime).orElseThrow();
+        RuntimeNodeExecutionResult ordinaryFalse = falseServices.executeSimulationNode(condition, falseRuntime).orElseThrow();
         require(rawTrue.value() && !rawFalse.value(), "predicate should expose both true and false facts: " + condition.blockId());
         require("pass".equals(ordinaryTrue.outputSlot()) && "fail".equals(ordinaryFalse.outputSlot()),
                 "ordinary BRANCH execution must map the same raw predicate result: " + condition.blockId());
         require(!rawTrue.traceMessage().isBlank() && !rawFalse.traceMessage().isBlank(),
                 "predicate results should retain readable trace text: " + condition.blockId());
+    }
+
+    private static RuntimeExecutionContext runtimeContext(SimulationContext context) {
+        return new RuntimeExecutionContext(
+                context.actor().id(),
+                "loop-until-self-check",
+                context.targetEntity().map(com.pixelmc.pixellogic.core.simulation.context.SimulationEntity::reference).orElse(null),
+                context.actor().reference(),
+                null
+        );
     }
 
     private static RunHarness runGraph(GraphDefinition graph, SimulationActor actor, SimulationWorld world) {
@@ -592,8 +605,8 @@ public final class LoopUntilConditionRackSelfCheck {
     }
 
     private static NodeDefinition hasTag(String id, String parentId, String parentSlot, String tag, String outputMode) {
-        return condition(id, NodeType.PLAYER_HAS_TAG_CONDITION, BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG,
-                parentId, parentSlot, Map.of("tag", tag, "outputMode", outputMode));
+        return condition(id, NodeType.ENTITY_HAS_TAG_CONDITION, BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG,
+                parentId, parentSlot, Map.of("target", EntityTargetRef.currentEntity().toJson(), "tag", tag, "outputMode", outputMode));
     }
 
     private static NodeDefinition isAdmin(String id, String parentId, String parentSlot, String outputMode) {
@@ -656,12 +669,12 @@ public final class LoopUntilConditionRackSelfCheck {
     private static NodeDefinition addTag(String id, String parentId, String parentSlot, String tag) {
         return new NodeDefinition(
                 id,
-                NodeType.PLAYER_ADD_TAG_ACTION,
-                BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG,
+                NodeType.ENTITY_ADD_TAG_ACTION,
+                BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG,
                 parentId,
                 parentSlot,
                 List.of(in("input"), out("done")),
-                Map.of("tag", tag)
+                Map.of("target", EntityTargetRef.currentEntity().toJson(), "tag", tag)
         );
     }
 
@@ -767,7 +780,8 @@ public final class LoopUntilConditionRackSelfCheck {
                 NodeDefinition node,
                 RuntimeExecutionContext runtimeContext
         ) {
-            return registry.execute(node, context, this);
+            return registry.execute(node, context, runtimeContext, this)
+                    .or(() -> RuntimeServices.super.executeSimulationNode(node, runtimeContext));
         }
 
         @Override
@@ -775,7 +789,18 @@ public final class LoopUntilConditionRackSelfCheck {
                 NodeDefinition node,
                 RuntimeExecutionContext runtimeContext
         ) {
-            return registry.evaluatePredicate(node, context, this);
+            return registry.evaluatePredicate(node, context, runtimeContext, this)
+                    .or(() -> RuntimeServices.super.evaluatePredicate(node, runtimeContext));
+        }
+
+        @Override
+        public java.util.Optional<RuntimeSubjectReference> initialCurrentEntity(UUID playerId, String sessionId) {
+            return java.util.Optional.of(context.actor().reference());
+        }
+
+        @Override
+        public RuntimeEntityProvider entityProvider() {
+            return context;
         }
 
         @Override

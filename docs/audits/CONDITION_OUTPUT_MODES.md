@@ -17,12 +17,13 @@
 - The demo graph explicitly keeps `BRANCH`.
 - Unconnected selected condition output means graceful end and trace records the end.
 - Unconnected condition input is valid during editing, matching other placed blocks; the condition only runs after it is connected into a trigger path.
-- Switching to a mode that makes an existing branch inactive asks for confirmation before removing the affected edge.
+- Switching directly between `PASS_ONLY` and `FAIL_ONLY` keeps the downstream edge and retargets it to the newly active output.
+- Leaving `BRANCH` for a single-output mode asks for confirmation before removing the branch that becomes inactive; entering `BRANCH` keeps the existing edge.
 
 ## Catalog Changes
 
-- `condition.player.has_tag` moved to `条件判断 / 玩家条件`.
-- `action.player.add_tag` remains under `玩家操作 / 标签`.
+- The current generic entity-tag condition belongs to `玩家与实体 / 标签` and remains predicate-compatible.
+- The current generic entity-tag actions remain under `玩家与实体 / 标签`.
 - Condition form schemas expose `条件用途` as Chinese segmented buttons.
 
 ## Validation

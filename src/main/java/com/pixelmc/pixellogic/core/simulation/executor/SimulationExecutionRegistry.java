@@ -15,7 +15,6 @@ import com.pixelmc.pixellogic.core.simulation.context.SimulationContext;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationRegionFact;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationActionResult;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationMessageResult;
-import com.pixelmc.pixellogic.core.simulation.result.SimulationStateChangeResult;
 
 import java.util.EnumMap;
 import java.util.List;
@@ -38,7 +37,6 @@ public final class SimulationExecutionRegistry {
     public static SimulationExecutionRegistry playerTags() {
         return new SimulationExecutionRegistry(List.of(
                 new MessageExecutor(),
-                new PlayerHasTagExecutor(),
                 new PlayerIsAdminExecutor(),
                 new PlayerDimensionExecutor(),
                 new PlayerInRegionExecutor(),
@@ -46,12 +44,7 @@ public final class SimulationExecutionRegistry {
                 new TargetBlockTypeExecutor(),
                 new TargetBlockInRegionExecutor(),
                 new TargetBlockYCompareExecutor(),
-                new PlayerNearTargetBlockExecutor(),
-                new PlayerAddTagExecutor(),
-                new PlayerRemoveTagExecutor(),
-                ContextEntityTagExecutors.hasTag(),
-                ContextEntityTagExecutors.addTag(),
-                ContextEntityTagExecutors.removeTag()
+                new PlayerNearTargetBlockExecutor()
         ));
     }
 
@@ -127,31 +120,6 @@ public final class SimulationExecutionRegistry {
                 case BuiltInBlockCatalog.ACTION_MESSAGE_ACTIONBAR -> "ACTIONBAR";
                 default -> "CHAT";
             };
-        }
-    }
-
-    private static final class PlayerHasTagExecutor implements SimulationPredicateEvaluator {
-        @Override
-        public NodeType nodeType() {
-            return NodeType.PLAYER_HAS_TAG_CONDITION;
-        }
-
-        @Override
-        public RuntimePredicateResult evaluatePredicate(NodeDefinition node, SimulationContext context, RuntimeServices services) {
-            String tag = tag(node);
-            boolean passed = context.actor().hasTag(tag);
-            String fact = "玩家 " + context.actor().displayName() + (passed ? " 拥有" : " 没有")
-                    + "标签「" + tag + "」";
-            return new RuntimePredicateResult(
-                    passed,
-                    fact + "。",
-                    new RuntimeConditionResult(node.id(), node.blockId(), context.actor().reference(), passed, fact)
-            );
-        }
-
-        @Override
-        public String outputModeTrace(ConditionOutputMode mode, boolean value) {
-            return SimulationPredicateEvaluator.contextualPathTrace(mode, value);
         }
     }
 
@@ -356,50 +324,6 @@ public final class SimulationExecutionRegistry {
                             + conditionModeTrace(mode, passed, "靠近", "不靠近")
             );
         }
-    }
-
-    private static final class PlayerAddTagExecutor implements SimulationBlockExecutor {
-        @Override
-        public NodeType nodeType() {
-            return NodeType.PLAYER_ADD_TAG_ACTION;
-        }
-
-        @Override
-        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
-            String tag = tag(node);
-            context.actor().addTag(tag);
-            String message = "玩家标签写入：给 " + context.actor().displayName() + " 添加标签 " + tag;
-            context.addActionResult(new SimulationActionResult(node.id(), "player_tag", message));
-            context.addStateChange(new SimulationStateChangeResult(node.id(), "actor.tags", String.join(",", context.actor().tags())));
-            return new RuntimeNodeExecutionResult("done", message);
-        }
-    }
-
-    private static final class PlayerRemoveTagExecutor implements SimulationBlockExecutor {
-        @Override
-        public NodeType nodeType() {
-            return NodeType.PLAYER_REMOVE_TAG_ACTION;
-        }
-
-        @Override
-        public RuntimeNodeExecutionResult execute(NodeDefinition node, SimulationContext context, RuntimeServices services) {
-            String tag = tag(node);
-            boolean removed = context.actor().removeTag(tag);
-            String message = removed
-                    ? "玩家标签移除：移除玩家「" + context.actor().displayName() + "」的标签「" + tag + "」。"
-                    : "玩家标签移除：玩家「" + context.actor().displayName() + "」没有标签「" + tag + "」，未发生变化。";
-            context.addActionResult(new SimulationActionResult(node.id(), "player_tag", message));
-            context.addStateChange(new SimulationStateChangeResult(node.id(), "actor.tags", String.join(",", context.actor().tags())));
-            return new RuntimeNodeExecutionResult("done", message);
-        }
-    }
-
-    static String tag(NodeDefinition node) {
-        String tag = node.config().getOrDefault("tag", "");
-        if (tag.isBlank()) {
-            throw new IllegalStateException("标签不能为空。");
-        }
-        return tag;
     }
 
     private static String config(NodeDefinition node, String key, String fallback) {

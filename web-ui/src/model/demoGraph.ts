@@ -1,4 +1,4 @@
-import type { GraphDocument, GraphEdge, GraphNode, GraphPosition, GraphSlot } from './graphTypes';
+import type { GraphConfig, GraphDocument, GraphEdge, GraphNode, GraphPosition, GraphSlot } from './graphTypes';
 
 export const graphId = 'demo-start-flow';
 export const fallbackGraph: GraphDocument = {
@@ -76,7 +76,7 @@ export function node(
   id: string,
   type: string,
   displayName: string,
-  config: Record<string, string>,
+  config: GraphConfig,
   position: GraphPosition,
   slots: GraphSlot[],
   blockId?: string,

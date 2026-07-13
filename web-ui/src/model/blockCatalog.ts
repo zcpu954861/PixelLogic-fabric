@@ -9,6 +9,7 @@ import type {
   LibraryFilter,
   LibraryLocation,
 } from './graphTypes';
+import { decodeCatalogEntityTarget } from './entityTargetReference';
 
 type SearchDocument = {
   block: CatalogBlock;
@@ -190,12 +191,22 @@ export function blockKindFromCatalogBlock(blockItem: CatalogBlock): BlockKind {
 }
 
 export function createCatalogNode(blockItem: CatalogBlock, id: string, position: GraphPosition): GraphNode {
+  const config = structuredClone(blockItem.defaultConfig);
+  for (const field of blockItem.formSchema) {
+    if (field.type !== 'entity_target') {
+      continue;
+    }
+    const target = decodeCatalogEntityTarget(config[field.key]);
+    if (target) {
+      config[field.key] = target;
+    }
+  }
   return {
     id,
     type: blockItem.nodeType,
     blockId: blockItem.id,
     displayName: blockItem.displayName,
-    config: { ...blockItem.defaultConfig },
+    config,
     conditionSlots: [],
     position,
     parentContainerId: '',

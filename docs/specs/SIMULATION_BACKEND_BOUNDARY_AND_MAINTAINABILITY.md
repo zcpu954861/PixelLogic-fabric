@@ -9,8 +9,8 @@ This was originally a docs-only design specification. By itself it does not auth
 - `core/simulation` now contains minimal context, event, runner, result, and executor registry classes.
 - `SimulationRunner` prepares one simulated actor/world/event context, calls the real `GraphRuntime`, and returns a bounded `SimulationExecutionResult`.
 - Existing manual/WebUI test-run paths still use the committed graph and are routed through `SimulationRunner`.
-- `condition.player.has_tag` and `action.player.add_tag` are the first simulation-backed non-demo catalog blocks.
-- Player tag behavior lives in `SimulationExecutionRegistry`; `GraphRuntime` remains the traversal core and fails closed if those nodes run without a simulation executor.
+- This historical checkpoint introduced the first player-specific tag pair; Entity Target Reference v1 later replaced it with generic target-aware tag blocks.
+- Generic entity-tag behavior is delegated through the simulation/runtime registry path; `GraphRuntime` remains the traversal core and fails closed without an executor.
 - Timer behavior stays on the existing wall-clock scheduler. `SimulationRunOptions` currently only preserves real-time timer scheduling; fast-forward remains a future boundary and no longer has a runtime switch.
 - Simulated node execution returns `RuntimeNodeExecutionResult` through `RuntimeServices`, keeping the optional simulation hook small without nesting result records inside the service interface.
 
@@ -31,7 +31,7 @@ Still not implemented:
 - The actor can provide display name, initial tags, and an administrator flag.
 - Missing request body still uses the default `WebUI 模拟玩家`.
 - The request actor is passed into `SimulationRunner`; `GraphRuntime` remains the execution engine.
-- `condition.player.has_tag` reads the actor's initial tags, and `action.player.add_tag` mutates only the current run actor.
+- The generic tag condition/action can resolve the test actor as `CURRENT_ENTITY` and mutate only the current run's copied entity state.
 - `SimulationExecutionResult` returns display name, administrator flag, initial tags, and final tags for the WebUI summary.
 - No named scenarios, persistence, draft simulation, Minecraft adapter, multiplayer, inventory, world, or container simulation are added.
 

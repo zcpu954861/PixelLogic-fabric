@@ -39,6 +39,7 @@ The current WebUI calls:
 
 ```text
 GET  /api/pixellogic/status
+GET  /api/pixellogic/runtime/online-players
 POST /api/pixellogic/test/reset
 POST /api/pixellogic/test/start
 GET  /api/pixellogic/traces/latest
@@ -112,7 +113,7 @@ Important user semantics:
   - `满足时继续` renders a normal-height single green output condition card.
   - `不满足时继续` renders a normal-height single red output condition card.
   - `分成两路` keeps the current dual-branch condition shape.
-- Player condition blocks override those labels through catalog schema, such as `拥有标签时继续` / `不拥有标签时继续` / `分开执行` and `是管理员时继续` / `不是管理员时继续` / `分开执行`.
+- Tag and administrator conditions override those labels through catalog schema, such as `拥有标签时继续` / `不拥有标签时继续` / `分开执行` and `是管理员时继续` / `不是管理员时继续` / `分开执行`.
 - Context condition blocks also override those labels through catalog schema:
   - `玩家所在维度是否为`: `在该维度时继续` / `不在该维度时继续` / `分开执行`.
   - `玩家是否在区域内`: `在区域内时继续` / `不在区域内时继续` / `分开执行`.
@@ -125,7 +126,8 @@ Important user semantics:
 - Spatial v3 condition blocks edit only compare mode/Y values or max distance/horizontal-only mode. They still read player/target coordinates from `编辑测试上下文` and do not write test context facts into graph JSON.
 - Y compare fields use the catalog schema with conditional field visibility: non-range modes show `目标 Y`, while `在范围内` shows `最低 Y 值` and `最高 Y 值`.
 - Container Control Flow v1 adds C-shaped control blocks. Loop nodes remain flat graph nodes, while body children store `parentContainerId` and `parentSlot=body`; internal body chains still use normal edges.
-- Entity Execution Context v1 reuses that same C-shaped body model. `context.entity.execute_as` edits one catalog-backed `entitySource` field with user-facing choices `当前条件对象`, `运行实体`, and `目标实体`; the graph stores only the enum value and body membership, never a runtime subject or mutable entity state.
+- Entity Target Reference v1 adds one shared `entity_target` editor used by the three generic entity-tag blocks and `context.entity.execute_as`. It edits one nested Graph `target` value with `当前执行实体`, `当前条件主体`, `当前目标实体`, or `指定在线玩家`; no runtime subject or mutable Minecraft object is persisted.
+- The online-player picker loads only when needed, exposes a manual `刷新` action, stores UUID plus an optional name hint, and retains a saved offline selection. It provides no raw UUID field, name fallback, background polling or offline-player search.
 - Switching condition usage removes inactive branch connections only after the user confirms `切换并断开`, and the config change plus edge removal share one undo history entry.
 - Card type labels and the right-panel selected-block badge show the formal Catalog category. Pack metadata is derived for styling and navigation instead of being copied into Graph nodes.
 - Block card titles stay on one line. If the rendered title actually overflows, it scrolls horizontally back and forth instead of wrapping or using a fixed ellipsis.
@@ -191,17 +193,21 @@ Static WebUI checks cover pure geometry, complete bounds, predicate-only drop ru
 
 Rack rows, capsules, toggles, selection, hit testing, nesting, and canvas bounds all consume the same complete geometry bounds; the rack is not a DOM-only overlay.
 
-## Entity Execution Context
+## Entity Target Reference and Execution Context
 
 `context.entity.execute_as` uses the existing container geometry, layout, drag insertion, ghost, and interaction-animation systems. A shared `isBodyContainerNode` classification covers loop and entity-context nodes so empty-body insertion, multi-node body chains, nested loop/context layouts, descendant dragging, and container growth use one `body` anchor contract. The derived `player-entity` pack styling distinguishes the block visually without introducing a second C-shape geometry.
 
-The entity-context editor is catalog driven. `entitySource` defaults to `当前条件对象` and stores one of `CONDITION_SUBJECT`, `RUN_ENTITY`, or `TARGET_ENTITY`; normal UI never exposes a subject identity or raw runtime object. Contextual condition trace/result text remains readable Chinese and shows the checked object and fact for both satisfied and unsatisfied paths.
+The shared entity-target editor is Catalog driven. Tag blocks explicitly default to `{ source: CURRENT_ENTITY }`; `context.entity.execute_as` explicitly defaults to `{ source: CONDITION_SUBJECT }`. The four source labels are `当前执行实体`, `当前条件主体`, `当前目标实体`, and `指定在线玩家`. Selecting `TARGET_ENTITY` shows `当前执行路径可能不提供目标实体。`; normal UI never exposes a subject identity, raw runtime object, or manual UUID input.
+
+Graph nodes keep `target` as one typed object rather than loose source/UUID/name fields. Catalog wire defaults may arrive as serialized composite metadata, but node creation decodes them into the nested Graph value. Missing or malformed targets are shown as unconfigured and rejected by backend validation; the UI does not invent a fallback.
+
+Opening the online-player picker performs one bounded request to `GET /api/pixellogic/runtime/online-players?limit=50&selectedUuid=...`; the refresh button performs another request. The selected UUID is authoritative while the saved name is display-only. A saved offline or unresolvable UUID remains visible with `当前不在线`, and list refresh or ordinary run-status polling does not clear the editor draft. The directory has no periodic poll.
 
 Drag preview follows the existing interaction contract: pointer move may calculate a candidate and render a ghost/placeholder or visual spacing, but must not change graph position, edges, membership, history, or autosave state. Pointer up applies one graph edit. Cancelling, leaving the candidate, or pressing Escape removes preview state without leaving a previous candidate in the graph.
 
-The Simulation Test Context modal adds one optional target entity with enabled state, namespaced entity type id, display name, and tag chips. The default is disabled `minecraft:zombie` / `测试僵尸` / no tags. These fields remain modal-local until save. Run results render test-player initial/final tags separately from target-entity initial/final tags and never feed final tags back into the next run's inputs.
+The Simulation Test Context modal adds one optional target entity with enabled state, namespaced entity type id, display name, and tag chips. The default is disabled `minecraft:zombie` / `测试僵尸` / no tags. These fields remain modal-local until save. The test actor may initialize current execution entity but is not exposed as a second permanent source. Run results render test-player initial/final tags separately from target-entity initial/final tags and never feed final tags back into the next run's inputs.
 
-`web-ui/checks/entityExecutionContextSelfCheck.mjs` guards source labels, shared loop/context body classification, empty-body placement, nested anchor alignment, target-entity defaults/clone/validation/payload, modal/result separation, preview-only pointer move, ghost reuse, and category styling hooks. It is a static/model self-check and does not claim browser E2E or user hand-testing.
+`web-ui/checks/entityExecutionContextSelfCheck.mjs` continues to guard shared loop/context body behavior. `web-ui/checks/entityTargetReferenceSelfCheck.mjs` guards the four sources, nested target value, shared editor, advanced-target warning, UUID-only player selection, on-demand/manual refresh, offline selection retention, generic tag blocks and absence of retired sources/blocks. They are static/model checks and do not claim browser E2E or user hand-testing.
 
 ## Frontend Structure
 
@@ -213,6 +219,8 @@ Current responsibility boundaries:
 - `model/`: graph/API types, seeded demo graph, pure graph layout, connection, and cloning helpers.
 - `model/blockCatalog.ts`: one cached index per Snapshot, visibility/capability projection, global search, location reconciliation, lookup helpers, graph-node conversion, and an empty offline Snapshot.
 - `model/richText.ts`: rich text component helpers for structured storage, named/hex color normalization, selected-range formatting, and plain text display.
+- `model/entityTargetReference.ts`: typed four-source target values, validation/labels and nested Graph-config helpers.
+- `ui/editor/entityTargetRefEditor.ts`: shared target source and on-demand online-player editor.
 - `ui/editor/richText/`: shared rich text editor toolbar, contenteditable rendering, and selection-offset helpers.
 - `model/simulationTestContext.ts`: per-run WebUI test context model, validation, tag normalization, simple world facts, and request payload.
 - `model/containerNodes.ts`: shared classification for loop and entity-context nodes that own an ordinary `body` slot.

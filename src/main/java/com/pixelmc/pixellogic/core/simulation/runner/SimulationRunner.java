@@ -3,6 +3,8 @@ package com.pixelmc.pixellogic.core.simulation.runner;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.runtime.GraphRuntime;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
+import com.pixelmc.pixellogic.core.runtime.RuntimeActionOutcome;
+import com.pixelmc.pixellogic.core.runtime.RuntimeEntityProvider;
 import com.pixelmc.pixellogic.core.runtime.RuntimeNodeExecutionResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimePredicateResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimeExecutionContext;
@@ -60,7 +62,8 @@ public final class SimulationRunner {
                 UUID.randomUUID().toString(),
                 request.generation(),
                 actor,
-                world
+                world,
+                delegateServices.entityProvider()
         );
         GraphRuntime runtime = runtimeFactory.create(new SimulationRuntimeServices(
                 delegateServices,
@@ -68,6 +71,7 @@ public final class SimulationRunner {
                 context,
                 initialActorTags,
                 initialTargetEntityTags,
+                request.initializeCurrentEntity(),
                 resultObserver
         ));
         RuntimeResult result = runtime.start(new TriggerEvent(
@@ -108,6 +112,7 @@ public final class SimulationRunner {
         private final SimulationContext context;
         private final Set<String> initialActorTags;
         private final Set<String> initialTargetEntityTags;
+        private final boolean initializeCurrentEntity;
         private final Consumer<SimulationExecutionResult> resultObserver;
 
         private SimulationRuntimeServices(
@@ -116,6 +121,7 @@ public final class SimulationRunner {
                 SimulationContext context,
                 Set<String> initialActorTags,
                 Set<String> initialTargetEntityTags,
+                boolean initializeCurrentEntity,
                 Consumer<SimulationExecutionResult> resultObserver
         ) {
             this.delegate = delegate;
@@ -123,6 +129,7 @@ public final class SimulationRunner {
             this.context = context;
             this.initialActorTags = initialActorTags;
             this.initialTargetEntityTags = initialTargetEntityTags;
+            this.initializeCurrentEntity = initializeCurrentEntity;
             this.resultObserver = resultObserver;
         }
 
@@ -131,7 +138,8 @@ public final class SimulationRunner {
                 NodeDefinition node,
                 RuntimeExecutionContext runtimeContext
         ) {
-            return registry.execute(node, context, runtimeContext, delegate);
+            return registry.execute(node, context, runtimeContext, delegate)
+                    .or(() -> RuntimeServices.super.executeSimulationNode(node, runtimeContext));
         }
 
         @Override
@@ -139,12 +147,13 @@ public final class SimulationRunner {
                 NodeDefinition node,
                 RuntimeExecutionContext runtimeContext
         ) {
-            return registry.evaluatePredicate(node, context, runtimeContext, delegate);
+            return registry.evaluatePredicate(node, context, runtimeContext, delegate)
+                    .or(() -> RuntimeServices.super.evaluatePredicate(node, runtimeContext));
         }
 
         @Override
-        public Optional<RuntimeSubjectReference> runEntity(UUID playerId, String sessionId) {
-            return Optional.of(context.actor().reference());
+        public Optional<RuntimeSubjectReference> initialCurrentEntity(UUID playerId, String sessionId) {
+            return initializeCurrentEntity ? Optional.of(context.actor().reference()) : Optional.empty();
         }
 
         @Override
@@ -153,8 +162,8 @@ public final class SimulationRunner {
         }
 
         @Override
-        public boolean entityResolvable(RuntimeSubjectReference entity, UUID playerId, String sessionId) {
-            return entity != null && context.entity(entity.id()).isPresent();
+        public RuntimeEntityProvider entityProvider() {
+            return context;
         }
 
         @Override
@@ -175,6 +184,23 @@ public final class SimulationRunner {
         @Override
         public void recordActionResult(String nodeId, String kind, String message) {
             context.addActionResult(new SimulationActionResult(nodeId, kind, message));
+        }
+
+        @Override
+        public void recordActionOutcome(String nodeId, RuntimeActionOutcome outcome) {
+            context.addActionResult(new SimulationActionResult(nodeId, "entity_tag", outcome.message(), outcome));
+        }
+
+        @Override
+        public void recordEntityTagState(
+                String nodeId,
+                RuntimeSubjectReference target,
+                Set<String> tags
+        ) {
+            String key = context.actor().reference().equals(target)
+                    ? "actor.tags"
+                    : "entity." + target.id() + ".tags";
+            context.addStateChange(new SimulationStateChangeResult(nodeId, key, String.join(",", tags)));
         }
 
         @Override

@@ -328,10 +328,9 @@ ExecutionContext represents one execution.
 It includes:
 
 - trigger source
-- actor/player when present
-- immutable run entity reference when present
+- actor/player or session metadata when present, for transport/security/audit only
 - optional target entity reference
-- current entity context
+- optional current entity context
 - current contextual condition result
 - session id when present
 - graph id
@@ -343,19 +342,20 @@ It includes:
 
 ### Contextual Condition Result and Entity Execution Context
 
-A contextual condition result is temporary runtime state for one run and its current control path. It contains enough information to identify the condition node/block, checked subject and subject kind, raw boolean, and readable fact. `condition.player.has_tag`, `condition.player.is_admin`, and `condition.context_entity.has_tag` are the first contextual conditions. Their true and false evaluations both retain the same checked object; a later ordinary condition replaces the current result, and an ordinary condition without a contextual result clears it.
+A contextual condition result is temporary runtime state for one run and its current control path. It contains enough information to identify the condition node/block, checked subject and subject kind, raw boolean, and readable fact. `condition.entity.has_tag` and `condition.player.is_admin` currently produce contextual subjects. Their true and false evaluations both retain the same checked object; a later ordinary condition replaces the current result, and an ordinary condition without a contextual result clears it.
 
 This state must not use a static/global last result, cross run boundaries, or be persisted in graph JSON, storage, draft, autosave, or history. Loop-until rack predicates consume the current runtime context for raw evaluation but do not overwrite the ordinary control path's current condition result.
 
-`context.entity.execute_as` is a flat single-body container with `input`, `done`, and `containerSlots=["body"]`. `entitySource` accepts exactly:
+`context.entity.execute_as` is a flat single-body container with `input`, `done`, and `containerSlots=["body"]`. Its shared composite `target` accepts exactly:
 
+- `CURRENT_ENTITY`: the optional current execution entity;
 - `CONDITION_SUBJECT`: the current path's latest condition subject;
-- `RUN_ENTITY`: the entity originally bound to the run;
-- `TARGET_ENTITY`: the optional target supplied by Simulation Test Context.
+- `TARGET_ENTITY`: the optional target supplied by the current path/trigger contract;
+- `ONLINE_PLAYER`: a selected currently online player resolved by canonical UUID.
 
-Entry saves the previous current entity, switches to the resolved entity, executes the body, restores the previous entity on natural completion, and then follows `done`. An empty body is a valid no-op that still restores the outer context. Nested entity contexts restore in stack order. This is execute-as, not execute-at: position, dimension, rotation, and facing are unchanged and are not part of the v1 entity frame.
+Entry resolves exactly the selected source through EntityTargetRef, saves the previous current entity, switches to the resolved entity, executes the body, restores the previous entity on natural completion, and then follows `done`. An empty body is a valid no-op that still restores the outer context. Nested entity contexts restore in stack order. This is execute-as, not execute-at: position, dimension, rotation, and facing are unchanged and are not part of the v1 entity frame.
 
-`ExecutionCursor` and `TimerContinuation` snapshot the run entity, optional target entity, current entity, current condition result, entity-context frames, and loop frames. A delay inside any loop/context nesting therefore resumes with the same subject and current entity. Resume validates entity resolvability, condition-node identity, body membership, mixed loop/context nesting, runtime generation, cancellation, and single consumption before state is restored.
+`ExecutionCursor` and `TimerContinuation` snapshot only stable optional target/current identities, the current condition result, entity-context frames, and loop frames. A delay inside any loop/context nesting therefore resumes with the same subject and current entity. Resume validates entity resolvability, condition-node identity, body membership, mixed loop/context nesting, runtime generation, cancellation, and single consumption before state is restored. There is no second permanent start-of-run entity source and no Minecraft object in the cursor.
 
 ### ExecutionTrace
 
@@ -494,7 +494,7 @@ The current implemented graph checkpoint uses:
 
 `demo-start-flow` is seeded on first startup. Writes use a temporary file and atomic replace where available. Graph ids are limited to `[A-Za-z0-9_-]+` so API paths cannot escape the PixelLogic storage root.
 
-Entity execution graphs persist only block id/config, typed edges, and flat container membership (`parentContainerId` / `parentSlot=body`). Runtime condition results, subject references, run/target/current entity identities, mutable simulation tags, and scope frames are ephemeral and must never enter graph or project storage.
+Entity execution graphs persist block id/config—including the nested EntityTargetRef object—typed edges, and flat container membership (`parentContainerId` / `parentSlot=body`). Runtime condition results, subject references, current/target entity state, mutable simulation tags, and scope frames are ephemeral and must never enter graph or project storage.
 
 ## Validation Spec
 
@@ -512,7 +512,7 @@ v1 validation must cover:
 - unknown block type
 - unknown action type
 - unknown condition type
-- unknown `entitySource`
+- missing, malformed, or unknown composite entity `target`
 - invalid entity-context membership or ancestor cycle
 - container nesting above the configured maximum
 - loop risk
@@ -520,7 +520,7 @@ v1 validation must cover:
 
 Unknown block or edge types fail closed.
 
-An empty `context.entity.execute_as` body is a saveable warning, not an error. Runtime source resolution remains strict even for a structurally valid graph: missing current condition subject, missing run/target entity, non-entity subject, unresolvable identity, invalid entity frame, or stale continuation fails closed and does not fall back to another entity source.
+An empty `context.entity.execute_as` body is a saveable warning, not an error. Runtime source resolution remains strict even for a structurally valid graph: missing current/condition/target source, offline or unresolvable online player, non-entity subject, type mismatch, invalid entity frame, or stale continuation fails closed and does not fall back to another entity source.
 
 The spike model uses enums for known node and edge types, then validates required slots, state config, timer duration, timer completion edge, and obvious loop risk before compilation/execution.
 

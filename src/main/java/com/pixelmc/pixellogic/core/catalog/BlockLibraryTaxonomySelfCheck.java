@@ -34,7 +34,7 @@ public final class BlockLibraryTaxonomySelfCheck {
                 Map.entry(BuiltInBlockCatalog.ACTION_MESSAGE_TITLE, "presentation-feedback.screen-prompts"),
                 Map.entry(BuiltInBlockCatalog.ACTION_MESSAGE_SUBTITLE, "presentation-feedback.screen-prompts"),
                 Map.entry(BuiltInBlockCatalog.ACTION_MESSAGE_ACTIONBAR, "presentation-feedback.screen-prompts"),
-                Map.entry(BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG, "player-entity.tags"),
+                Map.entry(BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, "player-entity.tags"),
                 Map.entry(BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN, "player-entity.identity-permissions"),
                 Map.entry(BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS, "location-region.dimensions-heights"),
                 Map.entry(BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION, "location-region.regions"),
@@ -43,15 +43,12 @@ public final class BlockLibraryTaxonomySelfCheck {
                 Map.entry(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IN_REGION, "location-region.regions"),
                 Map.entry(BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_Y_COMPARE, "location-region.dimensions-heights"),
                 Map.entry(BuiltInBlockCatalog.CONDITION_PLAYER_NEAR_TARGET_BLOCK, "location-region.spatial-relations"),
-                Map.entry(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG, "player-entity.tags"),
-                Map.entry(BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG, "player-entity.tags"),
+                Map.entry(BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "player-entity.tags"),
+                Map.entry(BuiltInBlockCatalog.ACTION_ENTITY_REMOVE_TAG, "player-entity.tags"),
                 Map.entry(BuiltInBlockCatalog.CONTROL_LOOP_COUNT, "logic-flow.loops"),
                 Map.entry(BuiltInBlockCatalog.CONTROL_LOOP_FOREVER, "logic-flow.loops"),
                 Map.entry(BuiltInBlockCatalog.CONTROL_LOOP_UNTIL, "logic-flow.loops"),
                 Map.entry(BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "player-entity.execution-context"),
-                Map.entry(BuiltInBlockCatalog.CONDITION_CONTEXT_ENTITY_HAS_TAG, "player-entity.tags"),
-                Map.entry(BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "player-entity.tags"),
-                Map.entry(BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_REMOVE_TAG, "player-entity.tags"),
                 Map.entry(BuiltInBlockCatalog.STATE_SET, "state-data.mutations"),
                 Map.entry(BuiltInBlockCatalog.STATE_ADD, "state-data.mutations"),
                 Map.entry(BuiltInBlockCatalog.TIMER_WAIT, "logic-flow.timing"),
@@ -85,7 +82,7 @@ public final class BlockLibraryTaxonomySelfCheck {
                                 && subcategory.displayName().equals(category.displayName())
                                 && subcategory.order() == category.order())),
                 "legacy subcategory metadata should be derived from formal categories");
-        require(catalog.blocks().size() == 28, "built-in taxonomy should explicitly classify all 28 blocks");
+        require(catalog.blocks().size() == 25, "built-in taxonomy should explicitly classify all 25 blocks");
         require(catalog.categories().stream().allMatch(category ->
                         category.displayName().equals(expectedCategoryNames.get(category.id()))),
                 "formal category display names should match the taxonomy specification");
@@ -146,6 +143,10 @@ public final class BlockLibraryTaxonomySelfCheck {
                 "entity context should expose as/entity-context search metadata");
         require(block(BuiltInBlockCatalog.STATE_SET).searchKeywords().containsAll(List.of("变量", "状态", "score", "计分")),
                 "state blocks should expose state/score search terms");
+        require(block(BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG).searchKeywords().contains("实体标签")
+                        && BuiltInBlockCatalog.block(String.join(".", "condition", "player", "has_tag")).isEmpty()
+                        && BuiltInBlockCatalog.block(String.join(".", "action", "context_entity", "add_tag")).isEmpty(),
+                "generic entity tags should replace removed tag ids without aliases");
 
         BlockDefinition manual = block(BuiltInBlockCatalog.TRIGGER_MANUAL_TEST);
         require(manual.aliases().equals(List.of("manual.test.start")),
@@ -346,7 +347,8 @@ public final class BlockLibraryTaxonomySelfCheck {
                 List.of(BlockSafetyFlag.READ_ONLY),
                 false,
                 visibility != BlockLibraryVisibility.BROWSE,
-                visibility
+                visibility,
+                null
         );
     }
 

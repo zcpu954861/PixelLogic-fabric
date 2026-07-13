@@ -1,5 +1,8 @@
 package com.pixelmc.pixellogic.core.catalog;
 
+import com.google.gson.annotations.JsonAdapter;
+import com.pixelmc.pixellogic.core.model.ConfigMapJsonAdapter;
+import com.pixelmc.pixellogic.core.model.EntityTargetRequirement;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.model.SlotDefinition;
 
@@ -19,7 +22,7 @@ public record BlockDefinition(
         List<BlockCapability> capabilities,
         String nodeKind,
         NodeType nodeType,
-        Map<String, String> defaultConfig,
+        @JsonAdapter(ConfigMapJsonAdapter.class) Map<String, String> defaultConfig,
         List<BlockFormFieldDefinition> formSchema,
         String summaryTemplate,
         String summaryFormatter,
@@ -33,7 +36,8 @@ public record BlockDefinition(
         List<BlockSafetyFlag> safetyFlags,
         boolean deprecated,
         boolean hidden,
-        BlockLibraryVisibility visibility
+        BlockLibraryVisibility visibility,
+        EntityTargetRequirement entityTargetRequirement
 ) {
     public BlockDefinition {
         categoryId = categoryId == null ? "" : categoryId;

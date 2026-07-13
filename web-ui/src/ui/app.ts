@@ -9,6 +9,7 @@ import {
   sanitizeLibraryLocation,
 } from '../model/blockCatalog';
 import { fallbackGraph, graphId } from '../model/demoGraph';
+import { entityTargetDraftRef, entityTargetSources, graphConfigString, targetForOnlinePlayer, targetForSource } from '../model/entityTargetReference';
 import {
   applyRichTextStyle,
   normalizeRichTextColor,
@@ -37,7 +38,7 @@ import {
   normalizeConditionBranchLayout,
   nodePosition,
 } from '../model/graphLayout';
-import { activeConditionOutputSlots, conditionOutputMode, conditionOutputModeKey } from '../model/conditionOutputMode';
+import { conditionOutputMode, conditionOutputModeKey, reconcileConditionOutputEdges } from '../model/conditionOutputMode';
 import { escapeHtml, shortFingerprint, shortTraceId } from '../utils/dom';
 import type {
   ApiResponse,
@@ -48,6 +49,7 @@ import type {
   GraphHistoryEntry,
   GraphNode,
   GraphPosition,
+  EntityTargetSource,
   SlotBlock,
 } from '../model/graphTypes';
 import {
@@ -319,7 +321,7 @@ function renderApp(): void {
           <section data-trace-scroll><ol class="trace-list" data-trace-list>${renderTrace(state.latestTrace)}</ol></section>
         </details>
       </footer>
-      ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation && !state.validation.valid), modalIssue: state.error || validationSummaryText(state), steady: editorWasOpen, simulationTestContext: state.simulationTestContext, graph: rackEditorSession?.draftGraph ?? graph, rackChildEditing: Boolean(rackEditorSession && rackEditorSession.currentNodeId !== rackEditorSession.rootId) }) : ''}
+      ${state.editorOpen && editorNode ? renderEditorModal(editorNode, activeCatalog(), { editorClosing: state.editorClosing, error: state.error, hasValidation: Boolean(state.validation && !state.validation.valid), modalIssue: state.error || validationSummaryText(state), steady: editorWasOpen, simulationTestContext: state.simulationTestContext, graph: rackEditorSession?.draftGraph ?? graph, rackChildEditing: Boolean(rackEditorSession && rackEditorSession.currentNodeId !== rackEditorSession.rootId), onlinePlayerDirectory: state.onlinePlayerDirectory }) : ''}
       ${state.simulationEditorOpen && state.simulationDraftContext ? renderSimulationTestContextModal(state.simulationDraftContext, { closing: state.simulationEditorClosing, error: state.simulationTestContextError, steady: simulationEditorWasOpen }) : ''}
     </section>
   `;
@@ -873,6 +875,7 @@ function bindInteractions(): void {
     });
   });
   bindCustomSelectControls();
+  bindEntityTargetControls();
   bindRichTextToolbar();
 
   document.querySelectorAll<HTMLElement>('.slot-join').forEach((joinEl) => {
@@ -2043,7 +2046,7 @@ function richTextPickerContext(controlEl: HTMLElement): {
     fieldEl,
     editorEl,
     key,
-    raw: state.editorDraftNode.config[key] ?? '',
+    raw: graphConfigString(state.editorDraftNode.config, key),
     start: activeSelection.start,
     end: activeSelection.end,
   };
@@ -2140,7 +2143,7 @@ function richTextToolbarContext(controlEl: HTMLElement): {
     fieldEl,
     editorEl,
     key,
-    raw: state.editorDraftNode.config[key] ?? '',
+    raw: graphConfigString(state.editorDraftNode.config, key),
     start: activeSelection.start,
     end: activeSelection.end,
   };
@@ -2197,7 +2200,7 @@ function updateRichTextToolbarState(root: Element | null): void {
     return;
   }
   storeRichTextSelection(root as HTMLElement, selection);
-  const selectionState = richTextSelectionState(state.editorDraftNode.config[key] ?? '', selection.start, selection.end);
+  const selectionState = richTextSelectionState(graphConfigString(state.editorDraftNode.config, key), selection.start, selection.end);
   root.querySelectorAll<HTMLButtonElement>('[data-rich-style]').forEach((buttonEl) => {
     const keyName = buttonEl.dataset.richStyle as RichTextStyleKey | undefined;
     buttonEl.setAttribute('aria-pressed', String(Boolean(keyName && selectionState.styles[keyName])));
@@ -2246,13 +2249,13 @@ function updateEditorDraftValue(key: string, value: string, target: 'config' | '
     }
     draftNode.config[key] = value;
     if (key === 'valueType') {
-      if (value === 'BOOLEAN' && !['true', 'false'].includes(draftNode.config.value ?? '')) {
+      if (value === 'BOOLEAN' && !['true', 'false'].includes(graphConfigString(draftNode.config, 'value'))) {
         draftNode.config.value = 'true';
       }
-      if (value === 'INTEGER' && ['true', 'false', ''].includes(draftNode.config.value ?? '')) {
+      if (value === 'INTEGER' && ['true', 'false', ''].includes(graphConfigString(draftNode.config, 'value'))) {
         draftNode.config.value = '1';
       }
-      if (value === 'STRING' && ['true', 'false'].includes(draftNode.config.value ?? '')) {
+      if (value === 'STRING' && ['true', 'false'].includes(graphConfigString(draftNode.config, 'value'))) {
         draftNode.config.value = '';
       }
     }
@@ -2268,6 +2271,90 @@ function updateEditorDraftValue(key: string, value: string, target: 'config' | '
     return;
   }
   refreshEditorDraftIndicators();
+}
+
+function bindEntityTargetControls(): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-entity-target-source]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      const source = buttonEl.dataset.entityTargetSource;
+      const key = buttonEl.dataset.entityTargetKey ?? 'target';
+      if (!isEntityTargetSource(source) || !state.editorDraftNode) {
+        return;
+      }
+      state.editorDraftNode.config[key] = targetForSource(source);
+      state.error = '';
+      hideUnsavedConfirm();
+      renderApp();
+      if (source === 'ONLINE_PLAYER') {
+        void loadOnlinePlayers();
+      }
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-entity-target-player]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      const uuid = buttonEl.dataset.entityTargetPlayer;
+      const name = buttonEl.dataset.entityTargetPlayerName;
+      const key = buttonEl.dataset.entityTargetKey ?? 'target';
+      if (!uuid || !name || !state.editorDraftNode) {
+        return;
+      }
+      state.editorDraftNode.config[key] = targetForOnlinePlayer(uuid, name);
+      state.error = '';
+      hideUnsavedConfirm();
+      renderApp();
+    });
+  });
+  document.querySelector<HTMLButtonElement>('[data-entity-target-refresh]')?.addEventListener('click', () => {
+    void loadOnlinePlayers(true);
+  });
+  document.querySelector<HTMLButtonElement>('[data-entity-target-player-toggle]')?.addEventListener('click', () => {
+    void loadOnlinePlayers();
+  });
+}
+
+function isEntityTargetSource(value: string | undefined): value is EntityTargetSource {
+  return entityTargetSources.some((source) => source.value === value);
+}
+
+async function loadOnlinePlayers(force = false): Promise<void> {
+  const target = state.editorDraftNode ? entityTargetDraftRef(state.editorDraftNode.config) : null;
+  const directory = state.onlinePlayerDirectory;
+  const selectedUuid = target?.source === 'ONLINE_PLAYER' ? target.playerUuid?.trim() ?? '' : '';
+  const selectedKnown = !selectedUuid
+    || directory.players.some((player) => player.uuid === selectedUuid)
+    || directory.selected?.uuid === selectedUuid;
+  if (target?.source !== 'ONLINE_PLAYER'
+      || directory.loading
+      || (!force && directory.loaded && selectedKnown)) {
+    return;
+  }
+  const wasLoaded = directory.loaded;
+  directory.loading = true;
+  directory.error = '';
+  renderApp();
+  try {
+    const query = new URLSearchParams({ query: '', limit: '50' });
+    if (selectedUuid) {
+      query.set('selectedUuid', selectedUuid);
+    }
+    const data = await api(`/api/pixellogic/runtime/online-players?${query.toString()}`);
+    directory.players = data.players ?? [];
+    const current = state.editorDraftNode ? entityTargetDraftRef(state.editorDraftNode.config) : null;
+    directory.selected = current?.source === 'ONLINE_PLAYER'
+      && current.playerUuid === selectedUuid
+      && data.selected?.uuid === selectedUuid
+      ? data.selected
+      : null;
+    directory.loaded = true;
+  } catch (error) {
+    directory.loaded = wasLoaded;
+    directory.error = error instanceof Error ? error.message : '在线玩家列表加载失败。';
+  } finally {
+    directory.loading = false;
+    if (state.editorOpen && !state.editorClosing) {
+      renderApp();
+    }
+  }
 }
 
 function editorDraftKeyNeedsRerender(key: string): boolean {
@@ -2313,8 +2400,10 @@ async function saveEditorDraft(): Promise<void> {
       return;
     }
     const child = state.editorDraftNode;
-    rackEditorSession.draftGraph.edges = rackEditorSession.draftGraph.edges.filter((graphEdge) =>
-      graphEdge.sourceNodeId !== child.id || activeConditionOutputSlots(child).includes(graphEdge.sourceSlotId),
+    rackEditorSession.draftGraph.edges = reconcileConditionOutputEdges(
+      rackEditorSession.draftGraph.edges,
+      state.editorOriginalNode,
+      child,
     );
     returnToRackEditor(false);
     return;
@@ -2342,11 +2431,9 @@ async function saveEditorDraft(): Promise<void> {
   }
 
   nextNode.displayName = state.editorDraftNode.displayName;
-  nextNode.config = { ...state.editorDraftNode.config };
+  nextNode.config = structuredClone(state.editorDraftNode.config);
   nextNode.conditionSlots = conditionSlots(state.editorDraftNode).map((slot) => ({ ...slot }));
-  nextGraph.edges = nextGraph.edges.filter((graphEdge) =>
-    graphEdge.sourceNodeId !== nextNode.id || activeConditionOutputSlots(nextNode).includes(graphEdge.sourceSlotId),
-  );
+  nextGraph.edges = reconcileConditionOutputEdges(nextGraph.edges, state.editorOriginalNode, nextNode);
   state.editorOriginalNode = cloneNode(state.editorDraftNode);
   state.editorSaving = true;
   confirmedModeSwitchSignature = null;
@@ -2752,7 +2839,7 @@ function selectedNodeFrom(graph: GraphDocument): GraphNode | null {
 function cloneNode(nodeItem: GraphNode): GraphNode {
   return {
     ...nodeItem,
-    config: { ...nodeItem.config },
+    config: structuredClone(nodeItem.config),
     conditionSlots: conditionSlots(nodeItem).map((slot) => ({ ...slot })),
     position: nodeItem.position ? { ...nodeItem.position } : undefined,
     slots: nodeItem.slots.map((slot) => ({ ...slot })),
@@ -2784,9 +2871,10 @@ function conditionModeRemovalSignature(): string | null {
   if (conditionOutputMode(draftNode) === conditionOutputMode(originalNode)) {
     return null;
   }
-  const activeSlots = new Set(activeConditionOutputSlots(draftNode));
-  const removedEdgeIds = currentGraph().edges
-    .filter((graphEdge) => graphEdge.sourceNodeId === originalNode.id && !activeSlots.has(graphEdge.sourceSlotId))
+  const graph = rackEditorSession?.draftGraph ?? currentGraph();
+  const remainingEdgeIds = new Set(reconcileConditionOutputEdges(graph.edges, originalNode, draftNode).map((graphEdge) => graphEdge.id));
+  const removedEdgeIds = graph.edges
+    .filter((graphEdge) => graphEdge.sourceNodeId === originalNode.id && !remainingEdgeIds.has(graphEdge.id))
     .map((graphEdge) => graphEdge.id)
     .sort();
   return removedEdgeIds.length > 0 ? `${originalNode.id}:${conditionOutputMode(originalNode)}:${conditionOutputMode(draftNode)}:${removedEdgeIds.join(',')}` : null;

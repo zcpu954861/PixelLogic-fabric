@@ -6,9 +6,9 @@
 - simulation event: first slice supports manual trigger requests through `SimulationEvent`.
 - simulation runner: `SimulationRunner` wraps one graph run by preparing a simulated context and calling the real `GraphRuntime`.
 - simulation result: result includes success, trace id, action results, message results, state changes, actor tags, timer scheduling, and errors.
-- player tag block: added `condition.player.has_tag` and `action.player.add_tag`.
+- player tag block: this historical slice added the first player-specific tag pair; Entity Target Reference v1 later replaced it with generic target-aware tag blocks.
 - existing manual test migration: `/pixellogic test start` and WebUI test-run still use the committed graph, now through `SimulationRunner`.
-- follow-up in `feature/v1-condition-output-modes`: `condition.player.has_tag` is categorized under `条件判断 / 玩家条件`, and both state/tag conditions support condition output modes.
+- follow-up in `feature/v1-condition-output-modes`: the tag condition gained condition output modes; its current generic replacement remains predicate-compatible.
 
 ## Architecture
 

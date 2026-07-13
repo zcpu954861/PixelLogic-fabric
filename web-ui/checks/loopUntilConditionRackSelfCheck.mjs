@@ -128,14 +128,15 @@ try {
     blocks: [
       catalogBlock({ id: 'control.loop.until', nodeType: 'CONTROL_LOOP_UNTIL', nodeKind: 'control', categoryId: 'logic-flow.loops', capabilities: ['PREDICATE_RACK'] }),
       catalogBlock({
-        id: 'condition.player.has_tag',
-        nodeType: 'PLAYER_HAS_TAG_CONDITION',
+        id: 'condition.entity.has_tag',
+        nodeType: 'ENTITY_HAS_TAG_CONDITION',
         nodeKind: 'condition',
         categoryId: 'player-entity.tags',
         capabilities: ['PREDICATE'],
-        predicateSummaryTemplate: '玩家拥有标签「{tag}」',
-        predicateNegatedSummaryTemplate: '玩家没有标签「{tag}」',
+        predicateSummaryTemplate: '{target}拥有标签「{tag}」',
+        predicateNegatedSummaryTemplate: '{target}没有标签「{tag}」',
         formSchema: [
+          formField('target', '目标', 'entity_target', ''),
           formField('outputMode', '条件用途', 'segmented', 'PASS_ONLY', [
             { value: 'PASS_ONLY', label: '拥有标签时继续' },
             { value: 'FAIL_ONLY', label: '不拥有标签时继续' },
@@ -166,7 +167,7 @@ try {
     parentSlot: '',
   });
   const predicate = (id, position, parentContainerId = '', parentSlot = '') => ({
-    ...node(id, 'PLAYER_HAS_TAG_CONDITION', '玩家是否拥有标签', { outputMode: 'PASS_ONLY', tag: 'ready' }, position, [input('input'), out('pass'), out('fail')], 'condition.player.has_tag'),
+    ...node(id, 'ENTITY_HAS_TAG_CONDITION', '实体是否拥有标签', { target: { source: 'CURRENT_ENTITY' }, outputMode: 'PASS_ONLY', tag: 'ready' }, position, [input('input'), out('pass'), out('fail')], 'condition.entity.has_tag'),
     parentContainerId,
     parentSlot,
     conditionSlots: [],
@@ -457,8 +458,8 @@ try {
     predicate('negated-capsule', { x: 0, y: 0 }, 'negated-loop', 'condition-negated'),
   ]);
   const negatedLoopBlock = buildBlocks(negatedGraph, catalog, '')[0];
-  assert.equal(negatedLoopBlock.conditionRack.rows[0].capsule.title, '玩家没有标签「ready」', 'NOT must use the catalog negated summary');
-  assert.match(renderConditionRackEditor(negatedGraph.nodes[0], negatedGraph, catalog), /玩家没有标签「ready」/);
+  assert.equal(negatedLoopBlock.conditionRack.rows[0].capsule.title, '当前执行实体没有标签「ready」', 'NOT must use the catalog negated summary');
+  assert.match(renderConditionRackEditor(negatedGraph.nodes[0], negatedGraph, catalog), /当前执行实体没有标签「ready」/);
   const modalOptions = {
     editorClosing: false,
     error: '',
@@ -469,14 +470,14 @@ try {
     graph: negatedGraph,
   };
   const capsuleModalHtml = renderEditorModal(negatedGraph.nodes[1], catalog, modalOptions);
-  assert.match(capsuleModalHtml, /data-modal-summary>玩家没有标签「ready」</, 'capsule modal must keep the rack-aware NOT summary');
+  assert.match(capsuleModalHtml, /data-modal-summary>当前执行实体没有标签「ready」</, 'capsule modal must keep the rack-aware NOT summary');
   assert.doesNotMatch(capsuleModalHtml, /条件用途|data-config-key="outputMode"/, 'capsule modal must hide ordinary chain output mode');
   assert.match(capsuleModalHtml, /data-config-key="tag"/, 'capsule modal must keep predicate fields');
   const ordinaryGraph = graph([predicate('ordinary-condition', { x: 800, y: 300 })]);
   const ordinaryModalHtml = renderEditorModal(ordinaryGraph.nodes[0], catalog, { ...modalOptions, graph: ordinaryGraph });
   assert.match(ordinaryModalHtml, /条件用途[\s\S]*data-config-key="outputMode"/, 'ordinary condition cards must retain output mode');
   const capsuleSidebarHtml = renderNodeInfo(negatedGraph.nodes[1], negatedGraph, 'negated-capsule', catalog);
-  assert.match(capsuleSidebarHtml, /玩家没有标签「ready」/, 'capsule sidebar must use the rack-aware NOT summary');
+  assert.match(capsuleSidebarHtml, /当前执行实体没有标签「ready」/, 'capsule sidebar must use the rack-aware NOT summary');
   assert.doesNotMatch(capsuleSidebarHtml, /条件用途/, 'capsule sidebar must hide ordinary chain output mode');
   const legacyCatalog = {
     ...catalog,
@@ -485,7 +486,7 @@ try {
       return legacyItem;
     }),
   };
-  assert.equal(predicateNodeSummary(negatedGraph.nodes[1], legacyCatalog, true), '非（玩家拥有标签「ready」）', 'old catalogs must not show a negated slot as positive');
+  assert.equal(predicateNodeSummary(negatedGraph.nodes[1], legacyCatalog, true), '非（当前执行实体拥有标签「ready」）', 'old catalogs must not show a negated slot as positive');
 
   // Modal edits stay in a cloned graph and delete owned nodes/edges only in the saved draft graph.
   assert.match(appSource, /const draftGraph = cloneGraph\(graph\);[\s\S]*rackEditorSession = \{[\s\S]*draftGraph,[\s\S]*originalGraph: cloneGraph\(graph\)/, 'rack editor must begin with isolated draft and original snapshots');

@@ -1,6 +1,7 @@
 package com.pixelmc.pixellogic.core.simulation.runner;
 
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
+import com.pixelmc.pixellogic.core.runtime.EntityTargetError;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationBlockFact;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationContext;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationPosition;
@@ -33,7 +34,8 @@ public record SimulationExecutionResult(
         Set<String> targetEntityTags,
         boolean timerScheduled,
         Status status,
-        List<String> errors
+        List<String> errors,
+        EntityTargetError targetError
 ) {
     public static SimulationExecutionResult from(
             RuntimeResult result,
@@ -63,7 +65,8 @@ public record SimulationExecutionResult(
                 targetEntity == null ? Set.of() : targetEntity.tags(),
                 context.timerScheduled(),
                 result.suspended() ? Status.WAITING : result.success() ? Status.COMPLETED : Status.FAILED,
-                result.success() ? List.of() : List.of(result.message())
+                result.success() ? List.of() : List.of(result.message()),
+                result.targetError()
         );
     }
 
@@ -89,7 +92,8 @@ public record SimulationExecutionResult(
                 targetEntityTags,
                 timerScheduled,
                 Status.CANCELLED,
-                List.of(message)
+                List.of(message),
+                targetError
         );
     }
 

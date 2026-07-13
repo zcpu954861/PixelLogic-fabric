@@ -45,5 +45,12 @@ export const state: UiState = {
   editorDraftNode: null,
   editorOriginalNode: null,
   editorSaving: false,
+  onlinePlayerDirectory: {
+    players: [],
+    selected: null,
+    loaded: false,
+    loading: false,
+    error: '',
+  },
   recentNodeId: null,
 };

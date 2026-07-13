@@ -24,7 +24,8 @@ try {
   const { containerMinimumHeight, containerMinimumWidth } = await server.ssrLoadModule('/src/model/containerGeometry.ts');
   const { computeDragDrop, findInsertCandidate } = await server.ssrLoadModule('/src/ui/canvas/dragInsert.ts');
   const { edge, input, node, out } = await server.ssrLoadModule('/src/model/demoGraph.ts');
-  const { blockKind, entitySourceLabel } = await server.ssrLoadModule('/src/ui/humanize/labels.ts');
+  const { blockKind } = await server.ssrLoadModule('/src/ui/humanize/labels.ts');
+  const { entityTargetLabel } = await server.ssrLoadModule('/src/model/entityTargetReference.ts');
 
   let context = defaultSimulationTestContext();
   assert.deepEqual(context.world.targetEntity, {
@@ -118,7 +119,7 @@ try {
     edges,
   });
   const action = (id, position, parentContainerId = '') => ({
-    ...node(id, 'CONTEXT_ENTITY_ADD_TAG_ACTION', id, { tag: 'ready' }, position, [input('input'), out('done')], 'action.context_entity.add_tag'),
+    ...node(id, 'ENTITY_ADD_TAG_ACTION', id, { target: { source: 'CURRENT_ENTITY' }, tag: 'ready' }, position, [input('input'), out('done')], 'action.entity.add_tag'),
     parentContainerId,
     parentSlot: parentContainerId ? 'body' : '',
   });
@@ -127,7 +128,7 @@ try {
       id,
       'CONTEXT_ENTITY_EXECUTE_AS',
       id,
-      { entitySource: 'CONDITION_SUBJECT' },
+      { target: { source: 'CONDITION_SUBJECT' } },
       position,
       [input('input'), out('done')],
       'context.entity.execute_as',
@@ -162,9 +163,10 @@ try {
   assert.equal(blockKind(emptyContext.type), 'control');
   assert.equal(blockMetrics(graph([emptyContext]), emptyContext).width, containerMinimumWidth);
   assert.equal(blockMetrics(graph([emptyContext]), emptyContext).height, containerMinimumHeight);
-  assert.equal(entitySourceLabel('CONDITION_SUBJECT'), '当前条件对象');
-  assert.equal(entitySourceLabel('RUN_ENTITY'), '运行实体');
-  assert.equal(entitySourceLabel('TARGET_ENTITY'), '目标实体');
+  assert.equal(entityTargetLabel({ source: 'CURRENT_ENTITY' }), '当前执行实体');
+  assert.equal(entityTargetLabel({ source: 'CONDITION_SUBJECT' }), '当前条件主体');
+  assert.equal(entityTargetLabel({ source: 'TARGET_ENTITY' }), '当前目标实体');
+  assert.equal(entityTargetLabel({ source: 'ONLINE_PLAYER', playerUuid: 'uuid', playerNameHint: 'Steve' }), '玩家 Steve');
 
   const bodyGraph = graph([emptyContext, action('dragged', { x: 900, y: 100 })]);
   const bodyDrag = drag('dragged', { x: 900, y: 100 }, { x: 170, y: 100 });

@@ -1,16 +1,21 @@
 import { catalogBlock } from '../../model/blockCatalog';
-import type { BlockCatalog, CatalogFormField, EditableField, EditorSection, FieldOption, GraphNode } from '../../model/graphTypes';
+import { entityTargetDraftRef, graphConfigString } from '../../model/entityTargetReference';
+import type { BlockCatalog, CatalogFormField, EditableField, EditorSection, FieldOption, GraphConfig, GraphNode, OnlinePlayerDirectory } from '../../model/graphTypes';
 import { richTextPlainText } from '../../model/richText';
 import type { SimulationTestContext } from '../../model/simulationTestContext';
 import { escapeAttr, escapeHtml } from '../../utils/dom';
 import { booleanLabel, booleanOptions, conditionOutputModeLabel, nodeTypeMetaLabel, stateScopeOptions, targetLabel, valueTypeOptions } from '../humanize/labels';
 import { renderRichTextEditor } from './richText/richTextEditor';
+import { entityTargetFieldSummary, renderEntityTargetRefEditor } from './entityTargetRefEditor';
+
+const emptyOnlinePlayerDirectory: OnlinePlayerDirectory = { players: [], selected: null, loaded: false, loading: false, error: '' };
 
 export function renderNodeEditor(
   nodeItem: GraphNode,
   catalog: BlockCatalog,
   simulationTestContext?: SimulationTestContext,
   hideOutputMode = false,
+  onlinePlayerDirectory: OnlinePlayerDirectory = emptyOnlinePlayerDirectory,
 ): string {
   const section = editorSection(nodeItem, catalog, simulationTestContext);
   const fields = hideOutputMode ? section.fields.filter((field) => field.key !== 'outputMode') : section.fields;
@@ -27,14 +32,14 @@ export function renderNodeEditor(
       <b>${escapeHtml(section.title)}</b>
       ${fields.length > 0 ? `
         <div class="field-grid">
-          ${fields.map(renderEditableField).join('')}
+          ${fields.map((field) => renderEditableField(field, onlinePlayerDirectory)).join('')}
         </div>
       ` : '<p class="field-hint">这个积木当前只需要修改名称。</p>'}
     </section>
   `;
 }
 
-export function renderEditableField(field: EditableField): string {
+export function renderEditableField(field: EditableField, onlinePlayerDirectory: OnlinePlayerDirectory = emptyOnlinePlayerDirectory): string {
   if (field.control === 'hidden') {
     return '';
   }
@@ -46,6 +51,9 @@ export function renderEditableField(field: EditableField): string {
         ${field.description ? `<small>${escapeHtml(field.description)}</small>` : ''}
       </div>
     `;
+  }
+  if (field.control === 'entity_target') {
+    return renderEntityTargetRefEditor(field, onlinePlayerDirectory);
   }
 
   const describedBy = field.description ? `field-help-${escapeAttr(field.key)}` : '';
@@ -167,8 +175,8 @@ function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[],
       const options = fieldOptionsForSchema(field, value, simulationTestContext, nodeItem);
       const control = field.key === 'regionName' && options.length > 0
         ? 'select'
-        : field.key === 'value' && nodeItem.config.valueType && nodeItem.config.valueType !== 'BOOLEAN'
-        ? nodeItem.config.valueType === 'INTEGER' ? 'integer' : 'string'
+        : field.key === 'value' && graphConfigString(nodeItem.config, 'valueType') && graphConfigString(nodeItem.config, 'valueType') !== 'BOOLEAN'
+        ? graphConfigString(nodeItem.config, 'valueType') === 'INTEGER' ? 'integer' : 'string'
         : field.type;
       return {
         label: schemaFieldLabel(field, nodeItem),
@@ -186,23 +194,27 @@ function schemaDrivenFields(nodeItem: GraphNode, formSchema: CatalogFormField[],
         step: field.step,
         ui: field.ui,
         suffix: field.suffix,
+        entityTarget: field.type === 'entity_target' ? entityTargetDraftRef(nodeItem.config, field.key) : undefined,
       };
     });
 }
 
 function schemaFieldValue(field: CatalogFormField, nodeItem: GraphNode): string {
-  const value = nodeItem.config[field.key] ?? field.defaultValue ?? '';
+  if (field.type === 'entity_target') {
+    return entityTargetDraftRef(nodeItem.config, field.key)?.source ?? '';
+  }
+  const value = graphConfigString(nodeItem.config, field.key, field.defaultValue ?? '');
   if (!isYCompareCondition(nodeItem)) {
     return value;
   }
   if (field.key === 'compareMode' && value === 'AT_OR_BELOW') {
     return 'AT_OR_ABOVE';
   }
-  if (field.key === 'outputMode' && ['AT_OR_ABOVE', 'AT_OR_BELOW'].includes(nodeItem.config.compareMode ?? 'AT_OR_ABOVE')) {
+  if (field.key === 'outputMode' && ['AT_OR_ABOVE', 'AT_OR_BELOW'].includes(graphConfigString(nodeItem.config, 'compareMode', 'AT_OR_ABOVE'))) {
     if (value === 'BRANCH') {
       return 'BRANCH';
     }
-    return nodeItem.config.compareMode === 'AT_OR_BELOW' ? 'Y_AT_OR_BELOW' : 'Y_AT_OR_ABOVE';
+    return graphConfigString(nodeItem.config, 'compareMode') === 'AT_OR_BELOW' ? 'Y_AT_OR_BELOW' : 'Y_AT_OR_ABOVE';
   }
   return value;
 }
@@ -220,7 +232,7 @@ function schemaFieldLabel(field: CatalogFormField, nodeItem: GraphNode): string 
   return field.label;
 }
 
-function fieldVisible(field: CatalogFormField, config: Record<string, string>, formSchema: CatalogFormField[]): boolean {
+function fieldVisible(field: CatalogFormField, config: GraphConfig, formSchema: CatalogFormField[]): boolean {
   const showWhen = field.ui.split(/\s+/).find((token) => token.startsWith('showWhen:'));
   if (!showWhen) {
     return true;
@@ -230,7 +242,7 @@ function fieldVisible(field: CatalogFormField, config: Record<string, string>, f
   if (!key || !rawValues) {
     return true;
   }
-  const currentValue = config[key] ?? formSchema.find((schemaField) => schemaField.key === key)?.defaultValue ?? '';
+  const currentValue = graphConfigString(config, key, formSchema.find((schemaField) => schemaField.key === key)?.defaultValue ?? '');
   return rawValues.split(',').includes(currentValue);
 }
 
@@ -242,7 +254,7 @@ function fieldOptionsForSchema(field: CatalogFormField, currentValue = '', simul
     return yCompareModeOptions();
   }
   if (field.key === 'outputMode' && isYCompareCondition(nodeItem)) {
-    return yCompareConditionOptions(nodeItem?.config.compareMode);
+    return yCompareConditionOptions(nodeItem ? graphConfigString(nodeItem.config, 'compareMode') : undefined);
   }
   if (field.type === 'boolean' || field.type === 'segmented') {
     return field.options.length > 0 ? field.options : booleanOptions();
@@ -330,33 +342,34 @@ function legacyNodeTypeEditorSection(nodeItem: GraphNode): EditorSection {
 
 function legacyNodeTypeEditableFields(nodeItem: GraphNode): EditableField[] {
   const config = nodeItem.config;
+  const value = (key: string, fallback = '') => graphConfigString(config, key, fallback);
   switch (nodeItem.type) {
     case 'STATE_COMPARE_CONDITION':
       return [
-        { label: '作用对象', key: 'scope', value: config.scope ?? 'PLAYER', control: 'scope', options: stateScopeOptions() },
-        { label: '状态名', key: 'key', value: config.key ?? '', control: 'string' },
-        { label: '目标值', key: 'expected', value: config.expected ?? 'false', control: 'boolean', options: booleanOptions() },
-        { label: '缺失时视为', key: 'missing', value: config.missing ?? 'false', control: 'boolean', options: booleanOptions() },
+        { label: '作用对象', key: 'scope', value: value('scope', 'PLAYER'), control: 'scope', options: stateScopeOptions() },
+        { label: '状态名', key: 'key', value: value('key'), control: 'string' },
+        { label: '目标值', key: 'expected', value: value('expected', 'false'), control: 'boolean', options: booleanOptions() },
+        { label: '缺失时视为', key: 'missing', value: value('missing', 'false'), control: 'boolean', options: booleanOptions() },
       ];
     case 'MESSAGE_ACTION':
-      return [{ label: '消息内容', key: 'message', value: config.message ?? '', control: 'rich_text_component', full: true }];
+      return [{ label: '消息内容', key: 'message', value: value('message'), control: 'rich_text_component', full: true }];
     case 'DEBUG_LOG_ACTION':
-      return [{ label: '记录内容', key: 'message', value: config.message ?? '', control: 'textarea', full: true }];
+      return [{ label: '记录内容', key: 'message', value: value('message'), control: 'textarea', full: true }];
     case 'STATE_SET_ACTION':
       return [
-        { label: '作用对象', key: 'scope', value: config.scope ?? 'PLAYER', control: 'scope', options: stateScopeOptions() },
-        { label: '状态名', key: 'key', value: config.key ?? '', control: 'string' },
-        { label: '数据类型', key: 'valueType', value: config.valueType ?? 'BOOLEAN', control: 'select', options: valueTypeOptions() },
-        { label: '设置为', key: 'value', value: config.value ?? '', control: config.valueType === 'BOOLEAN' ? 'boolean' : 'string', options: booleanOptions() },
+        { label: '作用对象', key: 'scope', value: value('scope', 'PLAYER'), control: 'scope', options: stateScopeOptions() },
+        { label: '状态名', key: 'key', value: value('key'), control: 'string' },
+        { label: '数据类型', key: 'valueType', value: value('valueType', 'BOOLEAN'), control: 'select', options: valueTypeOptions() },
+        { label: '设置为', key: 'value', value: value('value'), control: value('valueType') === 'BOOLEAN' ? 'boolean' : 'string', options: booleanOptions() },
       ];
     case 'STATE_ADD_ACTION':
       return [
-        { label: '作用对象', key: 'scope', value: config.scope ?? 'PLAYER', control: 'scope', options: stateScopeOptions() },
-        { label: '状态名', key: 'key', value: config.key ?? '', control: 'string' },
-        { label: '增加数值', key: 'amount', value: config.amount ?? '1', control: 'integer' },
+        { label: '作用对象', key: 'scope', value: value('scope', 'PLAYER'), control: 'scope', options: stateScopeOptions() },
+        { label: '状态名', key: 'key', value: value('key'), control: 'string' },
+        { label: '增加数值', key: 'amount', value: value('amount', '1'), control: 'integer' },
       ];
     case 'TIMER_START_ACTION':
-      return [{ label: '等待时间', key: 'durationSeconds', value: config.durationSeconds ?? '30', control: 'integer', suffix: '秒' }];
+      return [{ label: '等待时间', key: 'durationSeconds', value: value('durationSeconds', '30'), control: 'integer', suffix: '秒' }];
     default:
       return [];
   }
@@ -374,6 +387,9 @@ export function nodeConfigItems(
 }
 
 export function displayFieldValue(field: EditableField): string {
+  if (field.control === 'entity_target') {
+    return entityTargetFieldSummary(field);
+  }
   const value = field.value || field.defaultValue || '';
   if (!value) {
     return '未填写';

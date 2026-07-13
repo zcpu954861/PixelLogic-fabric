@@ -2,6 +2,8 @@ package com.pixelmc.pixellogic.core.catalog;
 
 import com.pixelmc.pixellogic.core.model.EdgeType;
 import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
+import com.pixelmc.pixellogic.core.model.EntityTargetRef;
+import com.pixelmc.pixellogic.core.model.EntityTargetRequirement;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.model.SlotDefinition;
 import com.pixelmc.pixellogic.core.model.SlotDirection;
@@ -19,7 +21,7 @@ public final class BuiltInBlockCatalog {
     public static final String ACTION_MESSAGE_TITLE = "action.message.title";
     public static final String ACTION_MESSAGE_SUBTITLE = "action.message.subtitle";
     public static final String ACTION_MESSAGE_ACTIONBAR = "action.message.actionbar";
-    public static final String CONDITION_PLAYER_HAS_TAG = "condition.player.has_tag";
+    public static final String CONDITION_ENTITY_HAS_TAG = "condition.entity.has_tag";
     public static final String CONDITION_PLAYER_IS_ADMIN = "condition.player.is_admin";
     public static final String CONDITION_PLAYER_DIMENSION_IS = "condition.player.dimension_is";
     public static final String CONDITION_PLAYER_IN_REGION = "condition.player.in_region";
@@ -28,15 +30,12 @@ public final class BuiltInBlockCatalog {
     public static final String CONDITION_TARGET_BLOCK_IN_REGION = "condition.target_block.in_region";
     public static final String CONDITION_TARGET_BLOCK_Y_COMPARE = "condition.target_block.y_compare";
     public static final String CONDITION_PLAYER_NEAR_TARGET_BLOCK = "condition.player.near_target_block";
-    public static final String ACTION_PLAYER_ADD_TAG = "action.player.add_tag";
-    public static final String ACTION_PLAYER_REMOVE_TAG = "action.player.remove_tag";
+    public static final String ACTION_ENTITY_ADD_TAG = "action.entity.add_tag";
+    public static final String ACTION_ENTITY_REMOVE_TAG = "action.entity.remove_tag";
     public static final String CONTROL_LOOP_COUNT = "control.loop.count";
     public static final String CONTROL_LOOP_FOREVER = "control.loop.forever";
     public static final String CONTROL_LOOP_UNTIL = "control.loop.until";
     public static final String CONTEXT_ENTITY_EXECUTE_AS = "context.entity.execute_as";
-    public static final String CONDITION_CONTEXT_ENTITY_HAS_TAG = "condition.context_entity.has_tag";
-    public static final String ACTION_CONTEXT_ENTITY_ADD_TAG = "action.context_entity.add_tag";
-    public static final String ACTION_CONTEXT_ENTITY_REMOVE_TAG = "action.context_entity.remove_tag";
     public static final String STATE_SET = "state.set";
     public static final String STATE_ADD = "state.add";
     public static final String TIMER_WAIT = "timer.wait";
@@ -52,7 +51,7 @@ public final class BuiltInBlockCatalog {
             Map.entry(NodeType.MANUAL_TRIGGER, TRIGGER_MANUAL_TEST),
             Map.entry(NodeType.STATE_COMPARE_CONDITION, CONDITION_STATE_EQUALS),
             Map.entry(NodeType.MESSAGE_ACTION, ACTION_MESSAGE_CHAT),
-            Map.entry(NodeType.PLAYER_HAS_TAG_CONDITION, CONDITION_PLAYER_HAS_TAG),
+            Map.entry(NodeType.ENTITY_HAS_TAG_CONDITION, CONDITION_ENTITY_HAS_TAG),
             Map.entry(NodeType.PLAYER_IS_ADMIN_CONDITION, CONDITION_PLAYER_IS_ADMIN),
             Map.entry(NodeType.PLAYER_DIMENSION_CONDITION, CONDITION_PLAYER_DIMENSION_IS),
             Map.entry(NodeType.PLAYER_IN_REGION_CONDITION, CONDITION_PLAYER_IN_REGION),
@@ -61,15 +60,12 @@ public final class BuiltInBlockCatalog {
             Map.entry(NodeType.TARGET_BLOCK_IN_REGION_CONDITION, CONDITION_TARGET_BLOCK_IN_REGION),
             Map.entry(NodeType.TARGET_BLOCK_Y_COMPARE_CONDITION, CONDITION_TARGET_BLOCK_Y_COMPARE),
             Map.entry(NodeType.PLAYER_NEAR_TARGET_BLOCK_CONDITION, CONDITION_PLAYER_NEAR_TARGET_BLOCK),
-            Map.entry(NodeType.PLAYER_ADD_TAG_ACTION, ACTION_PLAYER_ADD_TAG),
-            Map.entry(NodeType.PLAYER_REMOVE_TAG_ACTION, ACTION_PLAYER_REMOVE_TAG),
+            Map.entry(NodeType.ENTITY_ADD_TAG_ACTION, ACTION_ENTITY_ADD_TAG),
+            Map.entry(NodeType.ENTITY_REMOVE_TAG_ACTION, ACTION_ENTITY_REMOVE_TAG),
             Map.entry(NodeType.CONTROL_LOOP_COUNT, CONTROL_LOOP_COUNT),
             Map.entry(NodeType.CONTROL_LOOP_FOREVER, CONTROL_LOOP_FOREVER),
             Map.entry(NodeType.CONTROL_LOOP_UNTIL, CONTROL_LOOP_UNTIL),
             Map.entry(NodeType.CONTEXT_ENTITY_EXECUTE_AS, CONTEXT_ENTITY_EXECUTE_AS),
-            Map.entry(NodeType.CONTEXT_ENTITY_HAS_TAG_CONDITION, CONDITION_CONTEXT_ENTITY_HAS_TAG),
-            Map.entry(NodeType.CONTEXT_ENTITY_ADD_TAG_ACTION, ACTION_CONTEXT_ENTITY_ADD_TAG),
-            Map.entry(NodeType.CONTEXT_ENTITY_REMOVE_TAG_ACTION, ACTION_CONTEXT_ENTITY_REMOVE_TAG),
             Map.entry(NodeType.STATE_SET_ACTION, STATE_SET),
             Map.entry(NodeType.STATE_ADD_ACTION, STATE_ADD),
             Map.entry(NodeType.TIMER_START_ACTION, TIMER_WAIT),
@@ -236,27 +232,36 @@ public final class BuiltInBlockCatalog {
                         "向「{target}」显示快捷栏消息「{message.plainText}」。",
                         "action.message.actionbar"
                 ),
-                blockWithCapabilities(
-                        CONDITION_PLAYER_HAS_TAG,
-                        "玩家是否拥有标签",
-                        "按当前模拟玩家是否拥有指定标签继续流程。",
+                targetBlockWithCapabilities(
+                        CONDITION_ENTITY_HAS_TAG,
+                        "实体是否拥有标签",
+                        "按所选实体是否拥有指定标签继续流程。",
                         "player-entity.tags",
                         "condition",
-                        NodeType.PLAYER_HAS_TAG_CONDITION,
-                        Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "tag", "runner"),
-                        List.of(conditionMode("拥有标签时继续", "不拥有标签时继续", "分开执行"), text("tag", "标签", false, "例如 runner")),
-                        "按当前玩家是否拥有标签「{tag}」继续。",
-                        "condition.player.has_tag",
+                        NodeType.ENTITY_HAS_TAG_CONDITION,
+                        Map.of(
+                                "outputMode", ConditionOutputMode.PASS_ONLY.name(),
+                                "target", EntityTargetRef.currentEntity().toJson(),
+                                "tag", "ready"
+                        ),
+                        List.of(
+                                conditionMode("拥有标签时继续", "不拥有标签时继续", "分开执行"),
+                                entityTarget("目标", EntityTargetRef.currentEntity()),
+                                text("tag", "标签", false, "例如 ready")
+                        ),
+                        "按「{target}」是否拥有标签「{tag}」继续。",
+                        "condition.entity.has_tag",
                         List.of(BlockCapability.PREDICATE),
-                        "玩家拥有标签「{tag}」",
-                        "玩家没有标签「{tag}」",
+                        "「{target}」拥有标签「{tag}」",
+                        "「{target}」没有标签「{tag}」",
                         List.of(),
                         List.of(in("input")),
                         List.of(out("pass"), out("fail")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
                         BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
-                        List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_PLAYER),
-                        List.of()
+                        List.of(BlockSafetyFlag.READ_ONLY),
+                        List.of(),
+                        EntityTargetRequirement.ANY_ENTITY
                 ),
                 blockWithCapabilities(
                         CONDITION_PLAYER_IS_ADMIN,
@@ -450,41 +455,45 @@ public final class BuiltInBlockCatalog {
                         List.of(BlockSafetyFlag.READ_ONLY, BlockSafetyFlag.REQUIRES_WORLD),
                         List.of()
                 ),
-                block(
-                        ACTION_PLAYER_ADD_TAG,
-                        "添加玩家标签",
-                        "给当前模拟玩家添加一个标签。",
+                targetBlock(
+                        ACTION_ENTITY_ADD_TAG,
+                        "添加实体标签",
+                        "给所选实体添加一个标签。",
                         "player-entity.tags",
                         "action",
-                        NodeType.PLAYER_ADD_TAG_ACTION,
-                        Map.of("tag", "runner"),
-                        List.of(text("tag", "标签", false, "例如 runner")),
-                        "给当前玩家添加标签「{tag}」。",
-                        "action.player.add_tag",
+                        NodeType.ENTITY_ADD_TAG_ACTION,
+                        Map.of("target", EntityTargetRef.currentEntity().toJson(), "tag", "ready"),
+                        List.of(entityTarget("目标", EntityTargetRef.currentEntity()), text("tag", "标签", false, "例如 ready")),
+                        "给「{target}」添加标签「{tag}」。",
+                        "action.entity.add_tag",
+                        List.of(),
                         List.of(in("input")),
                         List.of(out("done")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
                         BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
-                        List.of(BlockSafetyFlag.PLAYER_MUTATING, BlockSafetyFlag.REQUIRES_PLAYER),
-                        List.of()
+                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
+                        List.of(),
+                        EntityTargetRequirement.ANY_ENTITY
                 ),
-                block(
-                        ACTION_PLAYER_REMOVE_TAG,
-                        "移除玩家标签",
-                        "从当前模拟玩家移除一个标签。",
+                targetBlock(
+                        ACTION_ENTITY_REMOVE_TAG,
+                        "移除实体标签",
+                        "从所选实体移除一个标签。",
                         "player-entity.tags",
                         "action",
-                        NodeType.PLAYER_REMOVE_TAG_ACTION,
-                        Map.of("tag", "runner"),
-                        List.of(text("tag", "标签", false, "例如 runner")),
-                        "移除当前玩家的标签「{tag}」。",
-                        "action.player.remove_tag",
+                        NodeType.ENTITY_REMOVE_TAG_ACTION,
+                        Map.of("target", EntityTargetRef.currentEntity().toJson(), "tag", "ready"),
+                        List.of(entityTarget("目标", EntityTargetRef.currentEntity()), text("tag", "标签", false, "例如 ready")),
+                        "移除「{target}」的标签「{tag}」。",
+                        "action.entity.remove_tag",
+                        List.of(),
                         List.of(in("input")),
                         List.of(out("done")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
                         BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
-                        List.of(BlockSafetyFlag.PLAYER_MUTATING, BlockSafetyFlag.REQUIRES_PLAYER),
-                        List.of()
+                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
+                        List.of(),
+                        EntityTargetRequirement.ANY_ENTITY
                 ),
                 block(
                         CONTROL_LOOP_COUNT,
@@ -551,20 +560,16 @@ public final class BuiltInBlockCatalog {
                         List.of(BlockSafetyFlag.READ_ONLY),
                         List.of()
                 ),
-                block(
+                targetBlock(
                         CONTEXT_ENTITY_EXECUTE_AS,
                         "以实体为上下文执行",
                         "在内部积木执行期间切换当前实体上下文，完成后恢复外层实体。",
                         "player-entity.execution-context",
                         "control",
                         NodeType.CONTEXT_ENTITY_EXECUTE_AS,
-                        Map.of("entitySource", "CONDITION_SUBJECT"),
-                        List.of(select("entitySource", "实体来源", List.of(
-                                option("CONDITION_SUBJECT", "当前条件对象"),
-                                option("RUN_ENTITY", "运行实体"),
-                                option("TARGET_ENTITY", "目标实体")
-                        ))),
-                        "以「{entitySource}」为上下文执行。",
+                        Map.of("target", EntityTargetRef.conditionSubject().toJson()),
+                        List.of(entityTarget("目标", EntityTargetRef.conditionSubject())),
+                        "以「{target}」为上下文执行。",
                         "context.entity.execute_as",
                         List.of("body"),
                         List.of(in("input")),
@@ -572,68 +577,8 @@ public final class BuiltInBlockCatalog {
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
                         BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
                         List.of(BlockSafetyFlag.READ_ONLY),
-                        List.of()
-                ),
-                blockWithCapabilities(
-                        CONDITION_CONTEXT_ENTITY_HAS_TAG,
-                        "上下文实体是否拥有标签",
-                        "按当前实体上下文是否拥有指定标签继续流程。",
-                        "player-entity.tags",
-                        "condition",
-                        NodeType.CONTEXT_ENTITY_HAS_TAG_CONDITION,
-                        Map.of("outputMode", ConditionOutputMode.PASS_ONLY.name(), "tag", "ready"),
-                        List.of(
-                                conditionMode("拥有标签时继续", "没有标签时继续", "分开执行"),
-                                text("tag", "标签", false, "例如 ready")
-                        ),
-                        "按上下文实体是否拥有标签「{tag}」继续。",
-                        "condition.context_entity.has_tag",
-                        List.of(BlockCapability.PREDICATE),
-                        "上下文实体拥有标签「{tag}」",
-                        "上下文实体没有标签「{tag}」",
                         List.of(),
-                        List.of(in("input")),
-                        List.of(out("pass"), out("fail")),
-                        BlockCapabilityLevel.FULLY_SIMULATABLE,
-                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
-                        List.of(BlockSafetyFlag.READ_ONLY),
-                        List.of()
-                ),
-                block(
-                        ACTION_CONTEXT_ENTITY_ADD_TAG,
-                        "为上下文实体添加标签",
-                        "给当前实体上下文添加一个标签。",
-                        "player-entity.tags",
-                        "action",
-                        NodeType.CONTEXT_ENTITY_ADD_TAG_ACTION,
-                        Map.of("tag", "ready"),
-                        List.of(text("tag", "标签", false, "例如 ready")),
-                        "为上下文实体添加标签「{tag}」。",
-                        "action.context_entity.add_tag",
-                        List.of(in("input")),
-                        List.of(out("done")),
-                        BlockCapabilityLevel.FULLY_SIMULATABLE,
-                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
-                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
-                        List.of()
-                ),
-                block(
-                        ACTION_CONTEXT_ENTITY_REMOVE_TAG,
-                        "移除上下文实体标签",
-                        "从当前实体上下文移除一个标签。",
-                        "player-entity.tags",
-                        "action",
-                        NodeType.CONTEXT_ENTITY_REMOVE_TAG_ACTION,
-                        Map.of("tag", "ready"),
-                        List.of(text("tag", "标签", false, "例如 ready")),
-                        "移除上下文实体标签「{tag}」。",
-                        "action.context_entity.remove_tag",
-                        List.of(in("input")),
-                        List.of(out("done")),
-                        BlockCapabilityLevel.FULLY_SIMULATABLE,
-                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
-                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
-                        List.of()
+                        EntityTargetRequirement.ANY_ENTITY
                 ),
                 block(
                         STATE_SET,
@@ -839,6 +784,112 @@ public final class BuiltInBlockCatalog {
             List<BlockSafetyFlag> safetyFlags,
             List<String> aliases
     ) {
+        return blockWithCapabilities(
+                id,
+                displayName,
+                description,
+                categoryId,
+                nodeKind,
+                nodeType,
+                defaultConfig,
+                formSchema,
+                summaryTemplate,
+                summaryFormatter,
+                capabilities,
+                predicateSummaryTemplate,
+                predicateNegatedSummaryTemplate,
+                containerSlots,
+                inputSlots,
+                outputSlots,
+                simulationCapability,
+                mcCapability,
+                safetyFlags,
+                aliases,
+                null
+        );
+    }
+
+    private static BlockDefinition targetBlock(
+            String id,
+            String displayName,
+            String description,
+            String categoryId,
+            String nodeKind,
+            NodeType nodeType,
+            Map<String, String> defaultConfig,
+            List<BlockFormFieldDefinition> formSchema,
+            String summaryTemplate,
+            String summaryFormatter,
+            List<String> containerSlots,
+            List<SlotDefinition> inputSlots,
+            List<SlotDefinition> outputSlots,
+            BlockCapabilityLevel simulationCapability,
+            BlockCapabilityLevel mcCapability,
+            List<BlockSafetyFlag> safetyFlags,
+            List<String> aliases,
+            EntityTargetRequirement requirement
+    ) {
+        return blockWithCapabilities(
+                id, displayName, description, categoryId, nodeKind, nodeType, defaultConfig, formSchema,
+                summaryTemplate, summaryFormatter, List.of(), "", "", containerSlots, inputSlots, outputSlots,
+                simulationCapability, mcCapability, safetyFlags, aliases, requirement
+        );
+    }
+
+    private static BlockDefinition targetBlockWithCapabilities(
+            String id,
+            String displayName,
+            String description,
+            String categoryId,
+            String nodeKind,
+            NodeType nodeType,
+            Map<String, String> defaultConfig,
+            List<BlockFormFieldDefinition> formSchema,
+            String summaryTemplate,
+            String summaryFormatter,
+            List<BlockCapability> capabilities,
+            String predicateSummaryTemplate,
+            String predicateNegatedSummaryTemplate,
+            List<String> containerSlots,
+            List<SlotDefinition> inputSlots,
+            List<SlotDefinition> outputSlots,
+            BlockCapabilityLevel simulationCapability,
+            BlockCapabilityLevel mcCapability,
+            List<BlockSafetyFlag> safetyFlags,
+            List<String> aliases,
+            EntityTargetRequirement requirement
+    ) {
+        return blockWithCapabilities(
+                id, displayName, description, categoryId, nodeKind, nodeType, defaultConfig, formSchema,
+                summaryTemplate, summaryFormatter, capabilities, predicateSummaryTemplate,
+                predicateNegatedSummaryTemplate, containerSlots, inputSlots, outputSlots, simulationCapability,
+                mcCapability, safetyFlags, aliases, requirement
+        );
+    }
+
+    private static BlockDefinition blockWithCapabilities(
+            String id,
+            String displayName,
+            String description,
+            String categoryId,
+            String nodeKind,
+            NodeType nodeType,
+            Map<String, String> defaultConfig,
+            List<BlockFormFieldDefinition> formSchema,
+            String summaryTemplate,
+            String summaryFormatter,
+            List<BlockCapability> capabilities,
+            String predicateSummaryTemplate,
+            String predicateNegatedSummaryTemplate,
+            List<String> containerSlots,
+            List<SlotDefinition> inputSlots,
+            List<SlotDefinition> outputSlots,
+            BlockCapabilityLevel simulationCapability,
+            BlockCapabilityLevel mcCapability,
+            List<BlockSafetyFlag> safetyFlags,
+            List<String> aliases,
+            EntityTargetRequirement requirement
+    ) {
         return new BlockDefinition(
                 id,
                 1,
@@ -866,7 +917,8 @@ public final class BuiltInBlockCatalog {
                 safetyFlags,
                 false,
                 false,
-                BlockLibraryVisibility.BROWSE
+                BlockLibraryVisibility.BROWSE,
+                requirement
         );
     }
 
@@ -908,7 +960,8 @@ public final class BuiltInBlockCatalog {
             case ACTION_MESSAGE_TITLE -> List.of("消息", "屏幕提示", "title");
             case ACTION_MESSAGE_SUBTITLE -> List.of("消息", "屏幕提示", "subtitle");
             case ACTION_MESSAGE_ACTIONBAR -> List.of("消息", "屏幕提示", "actionbar");
-            case CONDITION_PLAYER_HAS_TAG, ACTION_PLAYER_ADD_TAG, ACTION_PLAYER_REMOVE_TAG -> List.of("玩家标签", "标签");
+            case CONDITION_ENTITY_HAS_TAG, ACTION_ENTITY_ADD_TAG, ACTION_ENTITY_REMOVE_TAG ->
+                    List.of("实体标签", "玩家标签", "标签", "entity tag");
             case CONDITION_PLAYER_IS_ADMIN -> List.of("管理员", "权限");
             case CONDITION_PLAYER_DIMENSION_IS -> List.of("世界", "维度");
             case CONDITION_PLAYER_IN_REGION, CONDITION_TARGET_BLOCK_IN_REGION -> List.of("区域", "范围");
@@ -919,8 +972,6 @@ public final class BuiltInBlockCatalog {
             case CONTROL_LOOP_FOREVER -> List.of("循环", "loop", "while");
             case CONTROL_LOOP_UNTIL -> List.of("循环", "loop", "until");
             case CONTEXT_ENTITY_EXECUTE_AS -> List.of("实体上下文", "执行实体", "as");
-            case CONDITION_CONTEXT_ENTITY_HAS_TAG, ACTION_CONTEXT_ENTITY_ADD_TAG, ACTION_CONTEXT_ENTITY_REMOVE_TAG ->
-                    List.of("实体上下文", "标签");
             case TIMER_WAIT -> List.of("等待", "延迟", "timer", "delay");
             case DEBUG_LOG -> List.of("调试", "诊断", "日志", "log");
             default -> List.of();
@@ -1026,6 +1077,24 @@ public final class BuiltInBlockCatalog {
 
     private static BlockFormFieldDefinition richText(String key, String label, String description) {
         return field(key, "rich_text_component", label, description, true, RichTextComponentValue.fromPlainText(""), "欢迎开始游戏\n任务开始！", List.of(), "", "", "", "fullWidth textareaRows:4", "");
+    }
+
+    private static BlockFormFieldDefinition entityTarget(String label, EntityTargetRef defaultValue) {
+        return field(
+                "target",
+                "entity_target",
+                label,
+                "选择当前实体、条件主体、目标实体或指定在线玩家。",
+                true,
+                defaultValue.toJson(),
+                "",
+                List.of(),
+                "",
+                "",
+                "",
+                "fullWidth",
+                ""
+        );
     }
 
     private static BlockFormFieldDefinition field(

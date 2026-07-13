@@ -11,7 +11,6 @@ public record ExecutionCursor(
         int steps,
         String nodeId,
         List<LoopFrame> loopFrames,
-        RuntimeSubjectReference runEntity,
         RuntimeSubjectReference targetEntity,
         RuntimeSubjectReference currentEntity,
         RuntimeConditionResult currentCondition,

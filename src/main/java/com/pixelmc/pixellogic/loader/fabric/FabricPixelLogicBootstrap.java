@@ -36,7 +36,8 @@ public final class FabricPixelLogicBootstrap {
                     server::executeSync,
                     PixelLogicMod.LOGGER::info,
                     java.time.Duration.ofSeconds(30),
-                    server.getSavePath(WorldSavePath.ROOT).resolve("pixellogic")
+                    server.getSavePath(WorldSavePath.ROOT).resolve("pixellogic"),
+                    new FabricRuntimeEntityProvider(server)
             );
         }
         return service;

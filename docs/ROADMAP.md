@@ -15,25 +15,26 @@
 - Contextual Entity Execution；
 - Polling、Runtime/API、Catalog/Validation、拖拽性能与文档治理收口；
 - Block Library Taxonomy v1 的积木包 → 一级分类 → 具体积木导航、搜索与 visibility；
+- Entity Target Reference v1：四来源复合目标、共享 resolver/错误、在线玩家 UUID 选择、通用实体标签与 execute-as 接入；
 - 独立 Vanilla TypeScript WebUI 和有界 trace/runtime 安全机制。
 
 这些能力仍以 simulation-first 为主；目前只有 plain chat 等少量真实 Minecraft adapter，大部分积木尚未接入真实服务器行为。
 
-## 当前设计候选
+## 当前基础状态
 
-Block Library Taxonomy v1 已独立合并主线。当前基础积木能力盘点确认：
+Block Library Taxonomy v1 已独立合并主线，Entity Target Reference v1 的 Stage B 实现已形成待手测工作区。当前基础积木能力盘点确认：
 
-- 正式 Catalog 当前为 7 个 pack、15 个 category、28 张 built-in block；
+- 正式 Catalog 当前为 7 个 pack、15 个 category、25 张 built-in block；
 - Simulation 能力不等于真实 Minecraft adapter 已完成；
-- Entity Target Reference 是生命、状态效果和玩家设置动作的共同前置；
-- Player & Entity Foundation v1-A 设计已经确定，下一步从 Slice 1 开始实现。
+- Entity Target Reference 已成为生命、状态效果和玩家设置动作的共同前置；
+- Player & Entity Foundation v1-A 设计已经确定，下一实现切片是 Health and Termination。
 
-Entity Target Reference Slice 1 的产品决策已经确定，当前尚未在产品代码实现：
+Entity Target Reference Slice 1 的实现边界：
 
-- 目标来源固定为当前执行实体、当前条件主体、当前目标实体、指定在线玩家；删除 `RUN_ENTITY`；
+- 目标来源固定为当前执行实体、当前条件主体、当前目标实体、指定在线玩家；不存在永久运行起始实体来源；
 - Graph 使用一个复合 `target` 对象，不使用松散 sibling 字段或隐式缺省解码；
-- 当前主线仍有六张玩家/上下文标签积木；Slice 1 将直接删除并替换为三张通用实体标签积木；
-- 旧 blockId、alias、迁移器和兼容 wrapper 均不保留；
+- Catalog 只保留三张通用实体标签积木，六张退役标签积木及其 NodeType 已删除；
+- 退役 blockId、alias、迁移器和兼容 wrapper 均不保留；
 - `context.entity.execute_as` 使用同一目标控件与 resolver；
 - 指定在线玩家只保存 UUID，名字仅作提示，离线时结构化失败且不按名字回退。
 
@@ -43,11 +44,11 @@ Entity Target Reference Slice 1 的产品决策已经确定，当前尚未在产
 
 以下是候选方向，不是已承诺功能：
 
-- Entity Target Reference v1 的复合目标、四来源 resolver、结构化错误、在线玩家与标签改革；
-- 玩家与实体基础包的生命动作、状态效果、玩家设置和条件胶囊；
+- Health and Termination：伤害、恢复生命、设置生命值、杀死与移除非玩家实体；
+- 后续玩家与实体基础包的状态效果、玩家设置和条件胶囊；
 - 在现有 condition rack 中增加经过明确产品确认的 predicate capsule；
 - 为真实 Minecraft adapter 建立权限、执行上下文和行为对照前置；
-- Slice 1 验收后，下一实现候选是 Health and Termination；
+- Slice 1 自动验证与用户手测通过后，才创建 Health and Termination 实现切片；
 - Position Reference、传送和执行位置上下文留给 v1-B 或更晚阶段。
 
 新增方向继续复用 Catalog、GraphValidator、SimulationExecutionRegistry、Direct Edge runtime 和现有 WebUI editor，不另建平行模型。

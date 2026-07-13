@@ -2,7 +2,7 @@
 
 ## Status and decision
 
-This specification is the approved contract for Slice 1. It answers one question for an action or condition:
+This specification is the implemented Slice 1 contract. It answers one question for an action or condition:
 
 > Which single entity or online player does this block operate on?
 
@@ -16,7 +16,7 @@ The approved reform is intentionally breaking:
 - remove old block IDs, NodeTypes, aliases and implicit defaults;
 - do not add a migrator, deprecated Catalog entry or compatibility wrapper.
 
-The current design branch documents this contract only. Product code still reflects the 28-block `ab0bf4d` baseline until Slice 1 is implemented.
+The Stage B implementation has a 25-block Catalog (`28 - 6 + 3`), the shared target model/resolver, the generic tag blocks and the online-player boundary described below. User hand-testing remains the final release gate.
 
 ## Non-goals
 
@@ -32,7 +32,7 @@ v1 does not provide:
 
 ## Runtime context reform
 
-After Slice 1, the runtime identities are:
+The runtime identities are:
 
 | Value | Meaning |
 |---|---|
@@ -99,7 +99,7 @@ For a selected online player:
 }
 ```
 
-The current string-only config/Form Schema path must gain one formal composite serializer for `entity_target`. The editor, Graph parser, validator, summaries and executors consume that one object. Long-lived `targetSource/targetUuid/targetName` sibling fields are not permitted.
+The existing string-backed in-memory config path uses one formal `entity_target` serializer so persisted Graph JSON still contains a real nested object. The editor, Graph parser, validator, summaries and executors consume that one logical value. Long-lived `targetSource/targetUuid/targetName` sibling fields are not permitted.
 
 Catalog fields declare:
 
@@ -292,13 +292,14 @@ Simulation follows the same four-source resolver and error codes.
 - the test actor may initialize `currentEntity`, but is not exposed as `RUN_ENTITY`;
 - a scenario may deliberately initialize no current entity;
 - the existing optional target fixture supplies `TARGET_ENTITY`;
-- the current actor UUID may act as the one online-player fixture when it matches; otherwise a single optional online-player fixture is sufficient;
-- no online-player collection or world scan is introduced;
-- mutable test facts are copied per run and retained by the in-run Continuation only.
+- an `ONLINE_PLAYER` UUID matching the test actor resolves to the existing per-run actor copy;
+- the first different UUID is resolved lazily through the delegate provider and binds the run's only additional online-player fixture; a successful lookup copies that exact player's identity, display name and current tags into Simulation;
+- later resolutions of that same UUID, including after an in-run Continuation, reuse the bound lookup and mutable simulation copy without querying or mutating the provider entity;
+- after that fixture slot is bound, a second different UUID is unresolvable and fails closed; no online-player collection or world scan is introduced.
 
 ## Breaking tag-block reform
 
-Slice 1 deletes:
+The following IDs are the formal removed-ID history for this breaking change:
 
 ```text
 condition.player.has_tag
@@ -309,7 +310,7 @@ action.context_entity.add_tag
 action.context_entity.remove_tag
 ```
 
-It adds:
+The Catalog now contains:
 
 ```text
 condition.entity.has_tag
@@ -340,7 +341,7 @@ The condition uses the same evaluator for ordinary execution and Predicate Rack,
 
 ## Repository-internal migration
 
-The lack of external old-Graph compatibility does not permit stale repository fixtures. Slice 1 removes or updates every old tag-specific:
+The lack of external old-Graph compatibility does not permit stale repository fixtures. Stage B removes or updates every retired tag-specific:
 
 - Block Definition and NodeType;
 - executor and predicate evaluator;
@@ -367,10 +368,15 @@ Outside formal historical “removed ID” documentation, repository searches fo
 - repository examples, Prefabs, help, snapshots, fallbacks and self-checks contain no live old-tag reference;
 - selected-player responses preserve configured offline/unresolvable selections without using paged-list absence as availability evidence;
 - Runtime and Simulation distinguish provider unavailable, unresolvable UUID and known-but-offline UUID with the specified one-to-one error codes;
+- Simulation snapshots at most one non-actor online player per run, reuses it through Continuation, isolates tag mutations from the provider entity and rejects a second UUID;
 - WebUI uses one compact accessible target editor for tag blocks and execute-as;
 - no selector, collection, position context, offline player or success/failure graph port is added.
 
-## Evidence to verify during implementation
+## Next slice
+
+After Stage B automatic validation and the explicit user hand-test gate, the next implementation slice is **Health and Termination**: damage, heal, set health, kill and non-player removal. This specification does not implement or pre-register those blocks.
+
+## Implementation evidence
 
 - `RuntimeExecutionContext`, `RuntimeConditionResult`, `RuntimeSubjectReference`;
 - `ExecutionCursor`, `EntityContextFrame`, `ExecutionScopes` and `GraphRuntime`;

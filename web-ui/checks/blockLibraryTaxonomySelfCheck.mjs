@@ -11,7 +11,7 @@ try {
   const block = (id, categoryId, visibility = 'BROWSE', capabilities = [], aliases = [], searchKeywords = []) => ({
     id, version: 1, displayName: id === 'action.player.tag' ? '添加玩家标签' : id === 'context.tag' ? '上下文标签条件' : id,
     description: `${id} description`, categoryId, subcategoryId: categoryId, tags: [], capabilities, nodeKind: id.includes('condition') || id === 'context.tag' ? 'condition' : 'action',
-    nodeType: id.includes('condition') || id === 'context.tag' ? 'PLAYER_HAS_TAG_CONDITION' : 'PLAYER_ADD_TAG_ACTION',
+    nodeType: id.includes('condition') || id === 'context.tag' ? 'ENTITY_HAS_TAG_CONDITION' : 'ENTITY_ADD_TAG_ACTION',
     defaultConfig: {}, formSchema: [], summaryTemplate: id, summaryFormatter: '', predicateSummaryTemplate: '', predicateNegatedSummaryTemplate: '',
     containerSlots: [], inputSlots: [], outputSlots: [], simulationCapability: 'FULLY_SIMULATABLE', mcCapability: 'REQUIRES_MINECRAFT_RUNTIME',
     safetyFlags: [], deprecated: false, hidden: visibility !== 'BROWSE', visibility, aliases, searchKeywords,

@@ -13,6 +13,7 @@ import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.ConditionSlotDefinition;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.EdgeType;
+import com.pixelmc.pixellogic.core.model.EntityTargetRef;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
@@ -72,6 +73,7 @@ public final class EntityExecutionContextSelfCheck {
             laterConditionReplacesTheSubject();
             nestedContextsRestoreEntities();
             delayKeepsEntityAndConditionContext();
+            nullRootContinuationRestoresEmptyCurrent();
             interleavedLoopContextFramesResume();
             loopUntilUsesCurrentEntityPredicate();
             runsAreIsolatedAndCancellationIsSafe();
@@ -86,21 +88,21 @@ public final class EntityExecutionContextSelfCheck {
         require(context.containerSlots().equals(List.of("body")), "execute-as should expose one body slot");
         require(context.inputSlots().stream().anyMatch(slot -> slot.id().equals("input")), "execute-as input missing");
         require(context.outputSlots().stream().anyMatch(slot -> slot.id().equals("done")), "execute-as done missing");
-        require(context.formSchema().stream().anyMatch(field -> field.key().equals("entitySource")
-                        && field.options().stream().map(option -> option.value()).collect(java.util.stream.Collectors.toSet())
-                        .equals(Set.of("CONDITION_SUBJECT", "RUN_ENTITY", "TARGET_ENTITY"))),
-                "execute-as should expose exactly three entity sources");
-        require(block(BuiltInBlockCatalog.CONDITION_CONTEXT_ENTITY_HAS_TAG).capabilities().stream()
+        require(context.formSchema().stream().anyMatch(field -> field.key().equals("target")
+                        && field.type().equals("entity_target")
+                        && field.defaultValue().equals(EntityTargetRef.conditionSubject().toJson())),
+                "execute-as should expose the shared entity target field");
+        require(block(BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG).capabilities().stream()
                         .anyMatch(capability -> capability.name().equals("PREDICATE")),
-                "context entity tag condition should be predicate-compatible");
+                "generic entity tag condition should be predicate-compatible");
 
         GraphDefinition invalid = graph(
                 "invalid-source",
-                List.of(trigger(), node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("entitySource", "OTHER"))),
+                List.of(trigger(), node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("target", "{\"source\":\"OTHER\"}"))),
                 List.of(edge("trigger", "started", "context"))
         );
-        require(new GraphValidator().validate(invalid).stream().anyMatch(issue -> issue.code().equals("config_option_invalid")),
-                "unknown entitySource should block commit");
+        require(new GraphValidator().validate(invalid).stream().anyMatch(issue -> issue.code().startsWith("entity_target_")),
+                "unknown entity target source should block commit");
     }
 
     private static void conditionResultsCarrySubjects() {
@@ -109,9 +111,11 @@ public final class EntityExecutionContextSelfCheck {
         SimulationActor tagged = actor("Steve", true, Set.of("ready"));
         SimulationContext taggedContext = simulationContext(tagged, world(null));
         RuntimeExecutionContext taggedRuntime = runtimeContext(tagged, null, tagged.reference(), null);
-        NodeDefinition tagCondition = node("tag", BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG, "", "",
+        NodeDefinition tagCondition = node("tag", BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, "", "",
                 Map.of("tag", "ready", "outputMode", "BRANCH"));
-        RuntimePredicateResult tagTrue = registry.evaluatePredicate(tagCondition, taggedContext, taggedRuntime, noop).orElseThrow();
+        RuntimePredicateResult tagTrue = entityServices(taggedContext)
+                .evaluatePredicate(tagCondition, taggedRuntime)
+                .orElseThrow();
         require(tagTrue.value() && tagTrue.conditionResult() != null
                         && tagTrue.conditionResult().subject().equals(tagged.reference())
                         && tagTrue.conditionResult().rawResult()
@@ -121,7 +125,9 @@ public final class EntityExecutionContextSelfCheck {
         SimulationActor untagged = actor("Alex", false, Set.of());
         SimulationContext untaggedContext = simulationContext(untagged, world(null));
         RuntimeExecutionContext untaggedRuntime = runtimeContext(untagged, null, untagged.reference(), null);
-        RuntimePredicateResult tagFalse = registry.evaluatePredicate(tagCondition, untaggedContext, untaggedRuntime, noop).orElseThrow();
+        RuntimePredicateResult tagFalse = entityServices(untaggedContext)
+                .evaluatePredicate(tagCondition, untaggedRuntime)
+                .orElseThrow();
         require(!tagFalse.value() && tagFalse.conditionResult() != null
                         && tagFalse.conditionResult().subject().equals(untagged.reference())
                         && !tagFalse.conditionResult().rawResult(),
@@ -137,12 +143,10 @@ public final class EntityExecutionContextSelfCheck {
                 "admin false should retain actor");
 
         for (ConditionOutputMode mode : ConditionOutputMode.values()) {
-            RuntimeNodeExecutionResult result = block(BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG).nodeType() == tagCondition.type()
-                    ? registry.execute(
+            RuntimeNodeExecutionResult result = block(BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG).nodeType() == tagCondition.type()
+                    ? entityServices(taggedContext).executeSimulationNode(
                     withConfig(tagCondition, Map.of("tag", "ready", "outputMode", mode.name())),
-                    taggedContext,
-                    taggedRuntime,
-                    noop
+                    taggedRuntime
             ).orElseThrow() : null;
             require(result != null && result.conditionResult() != null,
                     "every output mode should return the contextual condition result: " + mode);
@@ -155,7 +159,7 @@ public final class EntityExecutionContextSelfCheck {
         SimulationExecutionResult trueResult = trueRun.start();
         require(trueResult.success() && trueResult.actorTags().contains("done"),
                 "true path should add done to the checked player");
-        require(trueRun.trace().contains("玩家 Steve 拥有标签「ready」") && trueRun.trace().contains("进入“满足”路径"),
+        require(trueRun.trace().contains("实体 Steve 拥有标签「ready」") && trueRun.trace().contains("进入“满足”路径"),
                 "true trace should show actor, fact and selected path");
 
         GraphDefinition falseGraph = conditionContextGraph("false-path", "fail", "waiting");
@@ -163,7 +167,7 @@ public final class EntityExecutionContextSelfCheck {
         SimulationExecutionResult falseResult = falseRun.start();
         require(falseResult.success() && falseResult.actorTags().contains("waiting"),
                 "false path should retain the checked player and add waiting");
-        require(falseRun.trace().contains("玩家 Alex 没有标签「ready」") && falseRun.trace().contains("进入“不满足”路径"),
+        require(falseRun.trace().contains("实体 Alex 没有标签「ready」") && falseRun.trace().contains("进入“不满足”路径"),
                 "false trace should show actor, fact and selected path");
     }
 
@@ -173,8 +177,8 @@ public final class EntityExecutionContextSelfCheck {
                 "target-source",
                 List.of(
                         trigger(),
-                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("entitySource", "TARGET_ENTITY")),
-                        node("tag", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "boss"))
+                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("target", EntityTargetRef.targetEntity().toJson())),
+                        node("tag", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "boss"))
                 ),
                 List.of(edge("trigger", "started", "context"))
         );
@@ -188,21 +192,21 @@ public final class EntityExecutionContextSelfCheck {
                 "run-source",
                 List.of(
                         trigger(),
-                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("entitySource", "RUN_ENTITY")),
-                        node("tag", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "runner"))
+                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("target", EntityTargetRef.currentEntity().toJson())),
+                        node("tag", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "runner"))
                 ),
                 List.of(edge("trigger", "started", "context"))
         );
         SimulationExecutionResult runResult = scenario(runGraph, actor("Steve", false, Set.of()), world(target("目标", Set.of()))).start();
         require(runResult.actorTags().contains("runner") && !runResult.targetEntityTags().contains("runner"),
-                "RUN_ENTITY should resolve the run actor");
+                "CURRENT_ENTITY should resolve the initial current actor");
 
         GraphDefinition missingTargetGraph = graph(
                 "missing-target-source",
                 List.of(
                         trigger(),
-                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("entitySource", "TARGET_ENTITY")),
-                        node("tag", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "wrong"))
+                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("target", EntityTargetRef.targetEntity().toJson())),
+                        node("tag", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "wrong"))
                 ),
                 List.of(edge("trigger", "started", "context"))
         );
@@ -212,7 +216,7 @@ public final class EntityExecutionContextSelfCheck {
 
         GraphDefinition emptyBody = graph(
                 "empty-context-body",
-                List.of(trigger(), node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("entitySource", "RUN_ENTITY"))),
+                List.of(trigger(), node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("target", EntityTargetRef.currentEntity().toJson()))),
                 List.of(edge("trigger", "started", "context"))
         );
         require(scenario(emptyBody, actor("Steve", false, Set.of()), world(null)).start().success(),
@@ -222,26 +226,26 @@ public final class EntityExecutionContextSelfCheck {
                 "missing-condition-subject",
                 List.of(
                         trigger(),
-                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("entitySource", "CONDITION_SUBJECT")),
-                        node("tag", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "wrong"))
+                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("target", EntityTargetRef.conditionSubject().toJson())),
+                        node("tag", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "wrong"))
                 ),
                 List.of(edge("trigger", "started", "context"))
         );
         Scenario missingRun = scenario(missing, actor("Steve", false, Set.of()), world(null));
         SimulationExecutionResult missingResult = missingRun.start();
         require(!missingResult.success() && !missingResult.actorTags().contains("wrong")
-                        && missingRun.trace().contains("当前路径没有可用的条件对象"),
+                        && missingRun.trace().contains("当前路径没有可用的条件主体"),
                 "missing condition subject should fail closed before body execution");
     }
 
     private static void invalidConditionSubjectsFailClosed() {
         assertInvalidConditionSubject(
                 new RuntimeSubjectReference("block", RuntimeSubjectReference.Kind.BLOCK, "目标方块"),
-                "当前条件对象不是实体"
+                "所选目标不是实体"
         );
         assertInvalidConditionSubject(
                 new RuntimeSubjectReference("missing-entity", RuntimeSubjectReference.Kind.ENTITY, "已消失实体"),
-                "实体无法解析"
+                "所选实体无法解析"
         );
     }
 
@@ -250,15 +254,16 @@ public final class EntityExecutionContextSelfCheck {
                 "invalid-subject-" + subject.kind(),
                 List.of(
                         trigger(),
-                        node("condition", BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG, "", "",
+                        node("condition", BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, "", "",
                                 Map.of("tag", "ready", "outputMode", "BRANCH")),
                         node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "",
-                                Map.of("entitySource", "CONDITION_SUBJECT")),
-                        node("body", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "wrong"))
+                                Map.of("target", EntityTargetRef.conditionSubject().toJson())),
+                        node("body", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "wrong"))
                 ),
                 List.of(edge("trigger", "started", "condition"), edge("condition", "pass", "context"))
         );
         SimulationActor actor = actor("Steve", false, Set.of());
+        SimulationContext entityProvider = simulationContext(actor, world(null));
         BoundedTraceBuffer traces = new BoundedTraceBuffer(2, 64);
         boolean[] bodyRan = {false};
         RuntimeServices services = new RuntimeServices() {
@@ -282,13 +287,13 @@ public final class EntityExecutionContextSelfCheck {
             }
 
             @Override
-            public java.util.Optional<RuntimeSubjectReference> runEntity(UUID playerId, String sessionId) {
+            public java.util.Optional<RuntimeSubjectReference> initialCurrentEntity(UUID playerId, String sessionId) {
                 return java.util.Optional.of(actor.reference());
             }
 
             @Override
-            public boolean entityResolvable(RuntimeSubjectReference entity, UUID playerId, String sessionId) {
-                return actor.reference().equals(entity);
+            public RuntimeEntityProvider entityProvider() {
+                return entityProvider;
             }
 
             @Override
@@ -323,15 +328,15 @@ public final class EntityExecutionContextSelfCheck {
                 "replace-condition",
                 List.of(
                         trigger(),
-                        node("player-condition", BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG, "", "",
+                        node("player-condition", BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, "", "",
                                 Map.of("tag", "ready", "outputMode", "FAIL_ONLY")),
                         node("target-context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "",
-                                Map.of("entitySource", "TARGET_ENTITY")),
-                        node("entity-condition", BuiltInBlockCatalog.CONDITION_CONTEXT_ENTITY_HAS_TAG, "target-context", "body",
+                                Map.of("target", EntityTargetRef.targetEntity().toJson())),
+                        node("entity-condition", BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, "target-context", "body",
                                 Map.of("tag", "ready", "outputMode", "FAIL_ONLY")),
                         node("subject-context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "target-context", "body",
-                                Map.of("entitySource", "CONDITION_SUBJECT")),
-                        node("mark", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "subject-context", "body", Map.of("tag", "latest"))
+                                Map.of("target", EntityTargetRef.conditionSubject().toJson())),
+                        node("mark", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "subject-context", "body", Map.of("tag", "latest"))
                 ),
                 List.of(
                         edge("trigger", "started", "player-condition"),
@@ -350,11 +355,11 @@ public final class EntityExecutionContextSelfCheck {
                 "nested-context",
                 List.of(
                         trigger(),
-                        node("outer", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("entitySource", "TARGET_ENTITY")),
-                        node("target-before", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "outer", "body", Map.of("tag", "before")),
-                        node("inner", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "outer", "body", Map.of("entitySource", "RUN_ENTITY")),
-                        node("player", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "inner", "body", Map.of("tag", "inner")),
-                        node("target-after", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "outer", "body", Map.of("tag", "after"))
+                        node("outer", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("target", EntityTargetRef.targetEntity().toJson())),
+                        node("target-before", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "outer", "body", Map.of("tag", "before")),
+                        node("inner", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "outer", "body", Map.of("target", EntityTargetRef.onlinePlayer(PLAYER_ID, "Steve").toJson())),
+                        node("player", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "inner", "body", Map.of("tag", "inner")),
+                        node("target-after", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "outer", "body", Map.of("tag", "after"))
                 ),
                 List.of(
                         edge("trigger", "started", "outer"),
@@ -374,12 +379,12 @@ public final class EntityExecutionContextSelfCheck {
                 "context-delay",
                 List.of(
                         trigger(),
-                        node("condition", BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG, "", "",
+                        node("condition", BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, "", "",
                                 Map.of("tag", "ready", "outputMode", "FAIL_ONLY")),
                         node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "",
-                                Map.of("entitySource", "CONDITION_SUBJECT")),
+                                Map.of("target", EntityTargetRef.conditionSubject().toJson())),
                         node("delay", BuiltInBlockCatalog.TIMER_WAIT, "context", "body", Map.of("durationSeconds", "1")),
-                        node("tag", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "delayed"))
+                        node("tag", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "delayed"))
                 ),
                 List.of(
                         edge("trigger", "started", "condition"),
@@ -393,7 +398,7 @@ public final class EntityExecutionContextSelfCheck {
         SimulationExecutionResult completed = scenario.drain();
         require(completed.success() && completed.actorTags().contains("delayed")
                         && scenario.trace().contains("计时器完成")
-                        && scenario.trace().contains("上下文实体 Alex"),
+                        && scenario.trace().contains("实体 Alex"),
                 "delay resume should keep current entity and condition subject");
     }
 
@@ -404,10 +409,10 @@ public final class EntityExecutionContextSelfCheck {
                 List.of(
                         trigger(),
                         node("outer-loop", BuiltInBlockCatalog.CONTROL_LOOP_COUNT, "", "", Map.of("count", "1")),
-                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "outer-loop", "body", Map.of("entitySource", "TARGET_ENTITY")),
+                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "outer-loop", "body", Map.of("target", EntityTargetRef.targetEntity().toJson())),
                         node("inner-loop", BuiltInBlockCatalog.CONTROL_LOOP_COUNT, "context", "body", Map.of("count", "1")),
                         node("delay", BuiltInBlockCatalog.TIMER_WAIT, "inner-loop", "body", Map.of("durationSeconds", "1")),
-                        node("tag", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "inner-loop", "body", Map.of("tag", "deep"))
+                        node("tag", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "inner-loop", "body", Map.of("tag", "deep"))
                 ),
                 List.of(
                         edge("trigger", "started", "outer-loop"),
@@ -436,18 +441,18 @@ public final class EntityExecutionContextSelfCheck {
                 "context-loop-until",
                 List.of(
                         trigger(),
-                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("entitySource", "TARGET_ENTITY")),
+                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("target", EntityTargetRef.targetEntity().toJson())),
                         until,
-                        node("predicate", BuiltInBlockCatalog.CONDITION_CONTEXT_ENTITY_HAS_TAG, "until", "condition-1",
+                        node("predicate", BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, "until", "condition-1",
                                 Map.of("tag", "ready", "outputMode", "BRANCH")),
-                        node("body", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "until", "body", Map.of("tag", "should-not-run"))
+                        node("body", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "until", "body", Map.of("tag", "should-not-run"))
                 ),
                 List.of(edge("trigger", "started", "context"))
         );
         Scenario scenario = scenario(graph, actor("Steve", false, Set.of()), world(target));
         SimulationExecutionResult result = scenario.start();
         require(result.success() && !result.targetEntityTags().contains("should-not-run")
-                        && scenario.trace().contains("上下文实体 就绪目标 拥有标签「ready」"),
+                        && scenario.trace().contains("实体 就绪目标 拥有标签「ready」"),
                 "loop-until rack should evaluate the current context entity without entering body");
     }
 
@@ -457,10 +462,10 @@ public final class EntityExecutionContextSelfCheck {
                 "run-isolation",
                 List.of(
                         trigger(),
-                        node("condition", BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG, "", "",
+                        node("condition", BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, "", "",
                                 Map.of("tag", "done", "outputMode", "BRANCH")),
-                        node("leaked", BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG, "", "", Map.of("tag", "leaked")),
-                        node("clean", BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG, "", "", Map.of("tag", "done"))
+                        node("leaked", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "", "", Map.of("tag", "leaked")),
+                        node("clean", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "", "", Map.of("tag", "done"))
                 ),
                 List.of(
                         edge("trigger", "started", "condition"),
@@ -478,9 +483,9 @@ public final class EntityExecutionContextSelfCheck {
                 "cancel-context",
                 List.of(
                         trigger(),
-                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("entitySource", "RUN_ENTITY")),
+                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "", Map.of("target", EntityTargetRef.currentEntity().toJson())),
                         node("delay", BuiltInBlockCatalog.TIMER_WAIT, "context", "body", Map.of("durationSeconds", "1")),
-                        node("tag", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "stale"))
+                        node("tag", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "context", "body", Map.of("tag", "stale"))
                 ),
                 List.of(edge("trigger", "started", "context"), edge("delay", "timer_completed", "tag"))
         );
@@ -527,10 +532,10 @@ public final class EntityExecutionContextSelfCheck {
                     "real API condition-subject run should complete after polling");
             require(apiTags(delayedSimulation, "actorTags").contains("waiting"),
                     "false condition subject should still receive waiting after API delay resume");
-            require(delayedTrace.contains("玩家 API玩家 没有标签「ready」")
-                            && delayedTrace.contains("使用条件对象 API玩家 进入实体执行上下文")
+            require(delayedTrace.contains("实体 API玩家 没有标签「ready」")
+                            && delayedTrace.contains("使用当前条件主体 API玩家 进入实体执行上下文")
                             && delayedTrace.contains("计时器完成")
-                            && delayedTrace.contains("为上下文实体 API玩家 添加标签「waiting」"),
+                            && delayedTrace.contains("为实体 API玩家 添加标签「waiting」"),
                     "real API trace should retain the false condition subject across delay");
 
             installApiGraph(client, base, apiTargetEntityGraph());
@@ -557,8 +562,8 @@ public final class EntityExecutionContextSelfCheck {
                             && apiTags(targetSimulation, "targetEntityTags").containsAll(List.of("seed", "target"))
                             && !apiTags(targetSimulation, "actorTags").contains("target"),
                     "TARGET_ENTITY should normalize request tags and mutate only the target result");
-            require(apiTrace(targetRun).contains("使用目标实体 API目标 进入实体执行上下文")
-                            && apiTrace(targetRun).contains("为上下文实体 API目标 添加标签「target」"),
+            require(apiTrace(targetRun).contains("使用当前目标实体 API目标 进入实体执行上下文")
+                            && apiTrace(targetRun).contains("为实体 API目标 添加标签「target」"),
                     "real API TARGET_ENTITY trace should name the selected target");
 
             JsonObject nullTagsRun = apiJson(client, "POST", base + "/api/pixellogic/test/start", """
@@ -584,13 +589,13 @@ public final class EntityExecutionContextSelfCheck {
                 "demo-start-flow",
                 List.of(
                         trigger(),
-                        node("condition", BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG, "", "",
+                        node("condition", BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, "", "",
                                 Map.of("tag", "ready", "outputMode", "BRANCH")),
                         node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "",
-                                Map.of("entitySource", "CONDITION_SUBJECT")),
+                                Map.of("target", EntityTargetRef.conditionSubject().toJson())),
                         node("delay", BuiltInBlockCatalog.TIMER_WAIT, "context", "body",
                                 Map.of("durationSeconds", "1")),
-                        node("waiting", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "context", "body",
+                        node("waiting", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "context", "body",
                                 Map.of("tag", "waiting"))
                 ),
                 List.of(
@@ -607,8 +612,8 @@ public final class EntityExecutionContextSelfCheck {
                 List.of(
                         trigger(),
                         node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "",
-                                Map.of("entitySource", "TARGET_ENTITY")),
-                        node("target", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "context", "body",
+                                Map.of("target", EntityTargetRef.targetEntity().toJson())),
+                        node("target", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "context", "body",
                                 Map.of("tag", "target"))
                 ),
                 List.of(edge("trigger", "started", "context"))
@@ -693,11 +698,11 @@ public final class EntityExecutionContextSelfCheck {
                 id,
                 List.of(
                         trigger(),
-                        node("condition", BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG, "", "",
+                        node("condition", BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, "", "",
                                 Map.of("tag", "ready", "outputMode", "BRANCH")),
                         node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "",
-                                Map.of("entitySource", "CONDITION_SUBJECT")),
-                        node("tag", BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG, "context", "body", Map.of("tag", tag))
+                                Map.of("target", EntityTargetRef.conditionSubject().toJson())),
+                        node("tag", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "context", "body", Map.of("tag", tag))
                 ),
                 List.of(edge("trigger", "started", "condition"), edge("condition", conditionOutput, "context"))
         );
@@ -744,7 +749,6 @@ public final class EntityExecutionContextSelfCheck {
         return new RuntimeExecutionContext(
                 actor.id(),
                 "entity-context-self-check",
-                actor.reference(),
                 target == null ? null : target.reference(),
                 current,
                 condition
@@ -791,9 +795,11 @@ public final class EntityExecutionContextSelfCheck {
     }
 
     private static NodeDefinition withConfig(NodeDefinition node, Map<String, String> config) {
+        Map<String, String> merged = new LinkedHashMap<>(node.config());
+        merged.putAll(config);
         return new NodeDefinition(
                 node.id(), node.type(), node.blockId(), node.parentContainerId(), node.parentSlot(),
-                node.conditionSlots(), node.slots(), config
+                node.conditionSlots(), node.slots(), merged
         );
     }
 
@@ -817,7 +823,84 @@ public final class EntityExecutionContextSelfCheck {
     }
 
     private static RuntimeServices noopServices() {
+        return entityServices(RuntimeEntityProvider.UNAVAILABLE);
+    }
+
+    private static void nullRootContinuationRestoresEmptyCurrent() {
+        SimulationActor actor = actor("元数据玩家", false, Set.of());
+        SimulationEntity target = target("无根上下文目标", Set.of());
+        SimulationContext provider = simulationContext(actor, world(target));
+        ArrayDeque<TimerContinuation> timers = new ArrayDeque<>();
+        GraphDefinition graph = graph(
+                "null-root-context-delay",
+                List.of(
+                        trigger(),
+                        node("context", BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS, "", "",
+                                Map.of("target", EntityTargetRef.targetEntity().toJson())),
+                        node("delay", BuiltInBlockCatalog.TIMER_WAIT, "context", "body",
+                                Map.of("durationSeconds", "1")),
+                        node("tag", BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "context", "body",
+                                Map.of("tag", "null-root"))
+                ),
+                List.of(
+                        edge("trigger", "started", "context"),
+                        edge("delay", "timer_completed", "tag")
+                )
+        );
+        RuntimeServices services = new RuntimeServices() {
+            @Override
+            public java.util.Optional<RuntimeSubjectReference> targetEntity(UUID playerId, String sessionId) {
+                return java.util.Optional.of(target.reference());
+            }
+
+            @Override
+            public RuntimeEntityProvider entityProvider() {
+                return provider;
+            }
+
+            @Override
+            public void sendPlayerMessage(UUID playerId, String message) {
+            }
+
+            @Override
+            public void debug(String message) {
+            }
+
+            @Override
+            public void scheduleTimer(Duration delay, TimerContinuation continuation) {
+                timers.addLast(continuation);
+            }
+        };
+        BoundedTraceBuffer traces = new BoundedTraceBuffer(2, 64);
+        GraphRuntime runtime = new GraphRuntime(
+                new GraphCompiler().compile(graph),
+                new InMemoryStateStore(),
+                traces,
+                services,
+                new RuntimeLimits(64, 8),
+                1L
+        );
+        RuntimeResult waiting = runtime.start(new TriggerEvent("manual.test.start", "", actor.id(), "null-root"));
+        require(waiting.suspended() && timers.size() == 1, "null-root execute-as should suspend inside its body");
+        TimerContinuation continuation = timers.removeFirst();
+        require(continuation.cursor().entityContextFrames().getFirst().previousEntity() == null
+                        && continuation.cursor().currentEntity().equals(target.reference()),
+                "continuation should retain selected entity while preserving an empty outer current entity");
+        RuntimeResult completed = runtime.resumeTimer(continuation);
+        String trace = traces.get(completed.traceId()).orElseThrow().steps().stream()
+                .map(step -> step.message()).reduce("", (left, right) -> left + "\n" + right);
+        require(completed.success() && target.tags().contains("null-root")
+                        && trace.contains("退出实体执行上下文，恢复外层实体上下文。"),
+                "null-root execute-as should resume, mutate the target, and restore empty current on exit");
+    }
+
+    private static RuntimeServices entityServices(RuntimeEntityProvider provider) {
         return new RuntimeServices() {
+            @Override
+            public RuntimeEntityProvider entityProvider() {
+                return provider;
+            }
+
             @Override
             public void sendPlayerMessage(UUID playerId, String message) {
             }

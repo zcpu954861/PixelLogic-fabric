@@ -20,13 +20,13 @@ Implementation status: this mapping is now registered by the Java built-in catal
 | --- | --- | --- | --- | --- | --- |
 | `trigger.manual_test` | 手动测试触发 | 触发事件 | 测试 | `FULLY_SIMULATABLE` | 当前 WebUI/命令测试入口 |
 | `condition.state.equals` | 状态等于 | 条件判断 | 状态条件 | `FULLY_SIMULATABLE` | 当前 demo 只比较 BOOLEAN；支持 满足时继续 / 不满足时继续 / 分成两路 |
-| `condition.player.has_tag` | 玩家拥有标签 | 条件判断 | 玩家条件 | `FULLY_SIMULATABLE` | 模拟玩家 tags；支持条件输出形态 |
+| `condition.entity.has_tag` | 实体拥有标签 | 玩家与实体 | 标签 | `FULLY_SIMULATABLE` | EntityTargetRef + 模拟实体 tags；支持条件输出形态 |
 | `action.message.chat` | 发送聊天消息 | 消息显示 | 聊天 | `APPROXIMATE_SIMULATION` | `message` 已采用 `rich_text_component` MVP；模拟环境记录 plain text，真实 adapter 后转换为 Minecraft Text / tellraw equivalent |
 | `state.set` | 设置状态 | 状态数据 | 写入 | `FULLY_SIMULATABLE` | 写入 GLOBAL/PLAYER/SESSION state |
 | `state.add` | 累加状态 | 状态数据 | 写入 | `FULLY_SIMULATABLE` | 只用于 INTEGER |
 | `timer.wait` | 等待一段时间 | 时间调度 | 等待 | `FULLY_SIMULATABLE` | 当前为 wall-clock spike timer |
 | `debug.log` | 写入调试记录 | 调试诊断 | Trace | `FULLY_SIMULATABLE` | 生成调试 trace/log |
-| `action.player.add_tag` | 添加玩家标签 | 玩家操作 | 标签 | `FULLY_SIMULATABLE` | 给模拟玩家写入 tag；不属于条件分类 |
+| `action.entity.add_tag` | 添加实体标签 | 玩家与实体 | 标签 | `FULLY_SIMULATABLE` | 给显式目标实体写入 tag；不属于条件分类 |
 
 ## vNext candidate blocks
 
@@ -43,7 +43,7 @@ Implementation status: this mapping is now registered by the Java built-in catal
 | Block ID | 中文名 | Priority | Simulation level | Notes |
 | --- | --- | --- | --- | --- |
 | `condition.state.equals` | 状态等于 | P0 | `FULLY_SIMULATABLE` | 当前 demo 条件 |
-| `condition.player.has_tag` | 玩家拥有标签 | P1 | `FULLY_SIMULATABLE` | 位于 条件判断 / 玩家条件；模拟玩家 tags，真实 adapter 后接 MC tag/scoreboard 决策 |
+| `condition.entity.has_tag` | 实体拥有标签 | P1 | `FULLY_SIMULATABLE` | 位于 玩家与实体 / 标签；共享目标解析，真实 adapter 使用实体 tag |
 | `condition.inventory.has_item` | 背包包含物品 | P2 | `APPROXIMATE_SIMULATION` | 先做抽象 item id + count，不做完整 NBT |
 
 ### 消息显示
@@ -58,8 +58,8 @@ Implementation status: this mapping is now registered by the Java built-in catal
 
 | Block ID | 中文名 | Priority | Simulation level | Notes |
 | --- | --- | --- | --- | --- |
-| `action.player.add_tag` | 给玩家添加标签 | P1 | `FULLY_SIMULATABLE` | 位于 玩家操作 / 标签，便于小游戏阶段标记 |
-| `action.player.remove_tag` | 移除玩家标签 | P1 | `APPROXIMATE_SIMULATION` | 与 add_tag 成对 |
+| `action.entity.add_tag` | 给实体添加标签 | P1 | `FULLY_SIMULATABLE` | 位于 玩家与实体 / 标签，便于小游戏阶段标记 |
+| `action.entity.remove_tag` | 移除实体标签 | P1 | `FULLY_SIMULATABLE` | 与 add_tag 成对，共享 EntityTargetRef |
 | `action.player.teleport` | 传送玩家 | P2 | `REQUIRES_MINECRAFT_RUNTIME` | 需要世界、位置和安全检查 |
 
 ### 状态数据

@@ -453,7 +453,7 @@ export function cloneGraph(graph: GraphDocument): GraphDocument {
     ...graph,
     nodes: graph.nodes.map((nodeItem) => ({
       ...nodeItem,
-      config: { ...nodeItem.config },
+      config: structuredClone(nodeItem.config),
       conditionSlots: conditionSlots(nodeItem).map((slot) => ({ ...slot })),
       position: nodeItem.position ? { ...nodeItem.position } : undefined,
       parentContainerId: nodeItem.parentContainerId ?? '',

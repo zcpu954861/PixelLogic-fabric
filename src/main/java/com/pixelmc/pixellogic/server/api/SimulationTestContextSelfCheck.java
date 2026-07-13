@@ -8,6 +8,7 @@ import com.google.gson.JsonParser;
 import com.pixelmc.pixellogic.core.graph.DemoGraphFactory;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.EdgeType;
+import com.pixelmc.pixellogic.core.model.EntityTargetRef;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
@@ -55,8 +56,8 @@ public final class SimulationTestContextSelfCheck {
             require(tags(defaultSimulation, "initialActorTags").isEmpty(),
                     "default actor should start with no tags");
             require(tags(defaultSimulation, "actorTags").contains("ready"),
-                    "action.player.add_tag should add ready during the run");
-            require(trace(defaultRun).contains("玩家 WebUI 模拟玩家 没有标签「runner」"),
+                    "generic add-tag should add ready during the run");
+            require(trace(defaultRun).contains("实体 WebUI 模拟玩家 没有标签「runner」"),
                     "empty default tags should fail the runner condition");
 
             JsonObject taggedRun = postJson(client, base + "/api/pixellogic/test/start", """
@@ -71,7 +72,7 @@ public final class SimulationTestContextSelfCheck {
                     "initial tags should include request tags");
             require(!tags(taggedSimulation, "actorTags").contains("ready"),
                     "pass branch should not run add_tag action");
-            require(trace(taggedRun).contains("玩家 测试逃生者 拥有标签「runner」"),
+            require(trace(taggedRun).contains("实体 测试逃生者 拥有标签「runner」"),
                     "trace should use the configured displayName");
 
             JsonObject secondEmptyRun = postJson(client, base + "/api/pixellogic/test/start", """
@@ -82,7 +83,7 @@ public final class SimulationTestContextSelfCheck {
                     "previous action tags should not persist into the next run");
             require(tags(secondEmptySimulation, "actorTags").contains("ready"),
                     "empty-tag run should add ready again");
-            require(trace(secondEmptyRun).contains("玩家 无标签玩家 没有标签「runner」"),
+            require(trace(secondEmptyRun).contains("实体 无标签玩家 没有标签「runner」"),
                     "empty request tags should fail the condition");
 
             JsonObject duplicateRun = postJson(client, base + "/api/pixellogic/test/start", """
@@ -146,9 +147,9 @@ public final class SimulationTestContextSelfCheck {
                 "demo-start-flow",
                 List.of(
                         node("manual-trigger", NodeType.MANUAL_TRIGGER, out("started"), Map.of()),
-                        node("has-runner-tag", NodeType.PLAYER_HAS_TAG_CONDITION, in("input"), out("pass"), out("fail"), Map.of("tag", "runner")),
+                        node("has-runner-tag", NodeType.ENTITY_HAS_TAG_CONDITION, in("input"), out("pass"), out("fail"), Map.of("target", EntityTargetRef.currentEntity().toJson(), "tag", "runner")),
                         node("debug-has-tag", NodeType.DEBUG_LOG_ACTION, in("input"), out("done"), Map.of("message", "已有 runner 标签")),
-                        node("add-ready-tag", NodeType.PLAYER_ADD_TAG_ACTION, in("input"), out("done"), Map.of("tag", "ready")),
+                        node("add-ready-tag", NodeType.ENTITY_ADD_TAG_ACTION, in("input"), out("done"), Map.of("target", EntityTargetRef.currentEntity().toJson(), "tag", "ready")),
                         node("debug-added-ready", NodeType.DEBUG_LOG_ACTION, in("input"), out("done"), Map.of("message", "已添加 ready 标签"))
                 ),
                 List.of(

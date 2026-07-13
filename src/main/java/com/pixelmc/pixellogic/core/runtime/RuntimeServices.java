@@ -6,6 +6,7 @@ import com.pixelmc.pixellogic.core.timer.TimerContinuation;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface RuntimeServices {
@@ -13,32 +14,26 @@ public interface RuntimeServices {
             NodeDefinition node,
             RuntimeExecutionContext context
     ) {
-        return Optional.empty();
+        return EntityTagExecution.execute(node, context, this);
     }
 
     default Optional<RuntimePredicateResult> evaluatePredicate(
             NodeDefinition node,
             RuntimeExecutionContext context
     ) {
-        return Optional.empty();
+        return EntityTagExecution.evaluatePredicate(node, context, this);
     }
 
-    default Optional<RuntimeSubjectReference> runEntity(UUID playerId, String sessionId) {
-        return playerId == null
-                ? Optional.empty()
-                : Optional.of(new RuntimeSubjectReference(
-                        playerId.toString(),
-                        RuntimeSubjectReference.Kind.PLAYER,
-                        "运行实体"
-                ));
+    default Optional<RuntimeSubjectReference> initialCurrentEntity(UUID playerId, String sessionId) {
+        return Optional.empty();
     }
 
     default Optional<RuntimeSubjectReference> targetEntity(UUID playerId, String sessionId) {
         return Optional.empty();
     }
 
-    default boolean entityResolvable(RuntimeSubjectReference entity, UUID playerId, String sessionId) {
-        return entity != null && entity.isEntity() && !entity.id().isBlank();
+    default RuntimeEntityProvider entityProvider() {
+        return RuntimeEntityProvider.UNAVAILABLE;
     }
 
     void sendPlayerMessage(UUID playerId, String message);
@@ -48,6 +43,17 @@ public interface RuntimeServices {
     void scheduleTimer(Duration delay, TimerContinuation continuation);
 
     default void recordActionResult(String nodeId, String kind, String message) {
+    }
+
+    default void recordActionOutcome(String nodeId, RuntimeActionOutcome outcome) {
+        recordActionResult(nodeId, "entity_tag", outcome.message());
+    }
+
+    default void recordEntityTagState(
+            String nodeId,
+            RuntimeSubjectReference target,
+            Set<String> tags
+    ) {
     }
 
     default void recordMessageResult(String nodeId, UUID playerId, String message, String channel) {

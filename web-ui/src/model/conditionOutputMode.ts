@@ -1,11 +1,12 @@
-import type { GraphNode, GraphSlot } from './graphTypes';
+import type { GraphEdge, GraphNode, GraphSlot } from './graphTypes';
+import { graphConfigString } from './entityTargetReference';
 
 export type ConditionOutputMode = 'PASS_ONLY' | 'FAIL_ONLY' | 'BRANCH';
 
 export const conditionOutputModeKey = 'outputMode';
 
 export function conditionOutputMode(nodeItem: GraphNode): ConditionOutputMode {
-  const value = nodeItem.config[conditionOutputModeKey];
+  const value = graphConfigString(nodeItem.config, conditionOutputModeKey);
   return value === 'PASS_ONLY' || value === 'FAIL_ONLY' || value === 'BRANCH' ? value : 'BRANCH';
 }
 
@@ -45,4 +46,29 @@ export function activeOutputSlots(nodeItem: GraphNode): GraphSlot[] {
 
 export function isActiveOutputSlot(nodeItem: GraphNode, slotId: string): boolean {
   return activeConditionOutputSlots(nodeItem).includes(slotId);
+}
+
+export function reconcileConditionOutputEdges(
+  edges: GraphEdge[],
+  originalNode: GraphNode,
+  nextNode: GraphNode,
+): GraphEdge[] {
+  const originalMode = conditionOutputMode(originalNode);
+  const nextMode = conditionOutputMode(nextNode);
+  if (originalMode !== 'BRANCH' && nextMode !== 'BRANCH') {
+    const [originalSlot] = activeConditionOutputSlots(originalNode);
+    const [nextSlot] = activeConditionOutputSlots(nextNode);
+    return edges.flatMap((graphEdge) => {
+      if (graphEdge.sourceNodeId !== nextNode.id) {
+        return [graphEdge];
+      }
+      return graphEdge.sourceSlotId === originalSlot
+        ? [{ ...graphEdge, sourceSlotId: nextSlot }]
+        : [];
+    });
+  }
+  const activeSlots = new Set(activeConditionOutputSlots(nextNode));
+  return edges.filter((graphEdge) =>
+    graphEdge.sourceNodeId !== nextNode.id || activeSlots.has(graphEdge.sourceSlotId),
+  );
 }

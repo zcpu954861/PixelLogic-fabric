@@ -10,10 +10,10 @@ This matrix classifies current Simulation capabilities and the boundary of later
 | trace | debug steps, action summaries, branch path | `FULLY_SIMULATABLE` | yes | no | Trace is a PixelLogic output and must stay bounded. |
 | message/chat component | `action.message.chat`, rich text plain output | `APPROXIMATE_SIMULATION` | yes | yes, for real delivery | Simulation records target and plain text; real adapter later converts to Minecraft Text/tellraw-equivalent. |
 | title/actionbar | title, subtitle, actionbar | `APPROXIMATE_SIMULATION` | yes | yes, for real display | Model visible output and channel summary; do not implement client rendering, timing, fade, or combo blocks yet. |
-| player tag | has/add/remove tag | `FULLY_SIMULATABLE` | yes | yes, for real server tags | Good first expansion because it is state-like and common in minigames. |
+| entity tag | target-aware has/add/remove tag | `FULLY_SIMULATABLE` | yes | yes, for real server tags | Uses the shared four-source EntityTargetRef and one generic execution path. |
 | contextual condition result | checked subject + raw result + readable fact | `FULLY_SIMULATABLE` | yes | yes, for real-world subjects | True and false evaluations retain the checked object on the current run/path; the result is temporary cursor state, not graph or global state. |
-| entity execution context | execute as current condition/run/target entity | `FULLY_SIMULATABLE` | yes | yes, for real entities | Simulation switches one current entity and restores it across nesting/delay/loop; v1 is not execute-at and does not scan or fan out entities. |
-| simulated target entity | optional type id, display name, tags | `FULLY_SIMULATABLE` | yes | yes, for real entity lookup | Per-run Test Context fact only; initial/final target tags are reported separately from the run actor. |
+| entity execution context | execute as current/condition/target/online-player source | `FULLY_SIMULATABLE` | yes | yes, for real entities | Simulation switches one current entity and restores it across nesting/delay/loop; v1 is not execute-at and does not scan or fan out entities. |
+| simulated target entity | optional type id, display name, tags | `FULLY_SIMULATABLE` | yes | yes, for real entity lookup | Per-run Test Context fact only; initial/final target tags are reported separately from the optional initial current entity. |
 | player gamemode | check/set gamemode | `APPROXIMATE_SIMULATION` | maybe | yes | Check can be simulated; mutation must be clearly approximate until MC adapter. |
 | player position | check position, teleport result | `APPROXIMATE_SIMULATION` | maybe | yes | Simulate dimension/coordinates and teleport result, not collision safety. |
 | inventory simple items | has/give/take item id + count | `APPROXIMATE_SIMULATION` | yes | yes | Use item id/count/display summary; defer NBT/data-component exactness. |
@@ -41,21 +41,21 @@ This matrix classifies current Simulation capabilities and the boundary of later
 
 ## Skeleton MVP Status
 
-`feature/v1-simulation-backend-skeleton` implements the first player tag slice:
+The original skeleton implemented the first player-tag slice. Entity Target Reference v1 now exposes the current generic form:
 
-- `condition.player.has_tag`: fully simulatable against `SimulationActor.tags`.
-- `action.player.add_tag`: fully simulatable by mutating the per-run simulated actor and recording action/state results.
-- `action.player.remove_tag`: fully simulatable by removing a tag from the per-run simulated actor and recording action/state results.
-- Real server tag read/write remains future Minecraft adapter work.
+- `condition.entity.has_tag`: fully simulatable against the explicitly resolved target tags.
+- `action.entity.add_tag`: fully simulatable with typed changed/no-change outcomes.
+- `action.entity.remove_tag`: fully simulatable with typed changed/no-change outcomes.
+- The Fabric provider supports exact online-player tag access; general non-player world lookup remains future adapter work.
 
 ## Simulation Test Context MVP Status
 
 `feature/v1-simulation-test-context` lets the WebUI send a per-run simulated actor into the existing test-run API:
 
 - display name: returned in the simulation result and used by player-tag trace messages.
-- tags: used as the initial actor tag set for `condition.player.has_tag`.
+- tags: used as the initial current-entity tag set when the generic tag condition targets `CURRENT_ENTITY`.
 - administrator flag: accepted and returned for future permission blocks; no OP-sensitive behavior exists yet.
-- `action.player.add_tag`: still mutates only the current run actor and returns final tags.
+- the generic add-tag action mutates only the resolved entity for the current run and returns final tags/outcome.
 - no scenario persistence, multiplayer, inventory, world, container, or game mode context is implemented.
 
 ## Simulation Context Expansion v1 Status
@@ -105,20 +105,20 @@ This matrix classifies current Simulation capabilities and the boundary of later
 
 - `control.loop.until` pre-checks an ordered condition rack before every body iteration.
 - v1 combines all slot results with AND and applies each slot's independent NOT after raw predicate evaluation.
-- The predicate capsule set now includes `condition.player.has_tag`, `condition.player.is_admin`, `condition.player.dimension_is`, `condition.player.in_region`, `condition.target_block.is_type`, and `condition.context_entity.has_tag`.
+- The predicate capsule set includes `condition.entity.has_tag`, `condition.player.is_admin`, `condition.player.dimension_is`, `condition.player.in_region`, and `condition.target_block.is_type`.
 - These blocks reuse their existing Simulation Test Context facts and the same raw evaluator used by ordinary condition execution.
 - Zero slots, empty slots, illegal predicate membership/evaluation, and a false condition with an empty body fail closed at runtime; incomplete graph states remain saveable warnings where structurally safe.
 - `timer.wait` in the body reuses the existing continuation cursor/frame and does not reset the 20-round loop-until cap.
 - OR, condition groups, asynchronous predicates, cross-restart continuation, and real Minecraft condition/runtime adapters remain deferred.
 
-## Entity Execution Context + Contextual Condition Results v1 Status
+## Entity Target Reference + Execution Context v1 Status
 
-- `condition.player.has_tag`, `condition.player.is_admin`, and `condition.context_entity.has_tag` return the checked subject, raw boolean, and readable fact on true and false evaluations. Existing `PASS_ONLY`, `FAIL_ONLY`, and `BRANCH` routing is unchanged.
+- `condition.entity.has_tag` and `condition.player.is_admin` return the checked subject, raw boolean, and readable fact on true and false evaluations. Existing `PASS_ONLY`, `FAIL_ONLY`, and `BRANCH` routing is unchanged.
 - The latest ordinary contextual result is scoped to the current run/control path. A later condition replaces it, and a condition without a contextual result clears it; no static/global last-result state is used. Loop-until predicate evaluation does not overwrite the ordinary path result.
-- `context.entity.execute_as` resolves exactly one of `CONDITION_SUBJECT`, `RUN_ENTITY`, or `TARGET_ENTITY`, switches the current entity for its body, and restores the outer entity on empty or natural body completion.
-- `ExecutionCursor` carries run/target/current entity references, the current condition result, entity-context frames, and loop frames through `timer.wait`. Invalid, cancelled, duplicate, or stale resumes fail closed before entity mutation.
-- `condition.context_entity.has_tag`, `action.context_entity.add_tag`, and `action.context_entity.remove_tag` operate on the current entity. Existing `player.*` blocks remain bound to the run actor and do not silently retarget to a non-player entity.
+- `context.entity.execute_as` resolves exactly one of `CURRENT_ENTITY`, `CONDITION_SUBJECT`, `TARGET_ENTITY`, or `ONLINE_PLAYER`, switches the current entity for its body, and restores the outer entity on empty or natural body completion.
+- `ExecutionCursor` carries optional target/current stable identities, the current condition result, entity-context frames, and loop frames through `timer.wait`. Invalid, cancelled, duplicate, or stale resumes fail closed before entity mutation.
+- The three generic tag blocks operate on the resolved EntityTargetRef; there is no split player/context tag executor or permanent start-of-run target fallback.
 - Simulation Test Context optionally supplies one target entity (`minecraft:zombie`, `测试僵尸`, no tags by default). Each run copies actor and target tag state, and results expose actor and target initial/final tags separately.
-- Graph/storage persists only block/config, edges, and flat `body` membership. Runtime subjects, condition facts, entity identity/state, and scope frames are not persisted.
+- Graph/storage persists one nested target object plus block/config, edges, and flat `body` membership. Runtime subjects, condition facts, entity state, and scope frames are not persisted.
 - Save-time validation rejects unknown sources and invalid/deep/cyclic membership while allowing an empty body as a warning. Runtime fails closed on missing/non-entity/unresolvable subjects or targets and never falls back to another source.
-- Not implemented: execute-at, real Minecraft entity adapters, online-player/world-entity scanning, detector/event blocks, multi-entity arrays or fan-out, and cross-restart continuation. A future detector must produce one isolated path/run and condition result per matched entity.
+- Not implemented: execute-at, general non-player world lookup, world-entity scanning, offline-player actions, detector/event blocks, multi-entity arrays or fan-out, and cross-restart continuation. A future detector must produce one isolated path/run and condition result per matched entity.

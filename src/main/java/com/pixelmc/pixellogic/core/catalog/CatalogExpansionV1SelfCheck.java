@@ -7,6 +7,7 @@ import com.pixelmc.pixellogic.core.graph.ValidationIssue;
 import com.pixelmc.pixellogic.core.model.ConditionOutputMode;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.EdgeType;
+import com.pixelmc.pixellogic.core.model.EntityTargetRef;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
@@ -53,12 +54,12 @@ public final class CatalogExpansionV1SelfCheck {
 
     private static void checkCatalog() {
         BlockCatalog catalog = BuiltInBlockCatalog.catalog();
-        BlockDefinition hasTag = block(BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG);
-        require(hasTag.displayName().equals("玩家是否拥有标签"), "has_tag should use the updated user-facing title");
+        BlockDefinition hasTag = block(BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG);
+        require(hasTag.displayName().equals("实体是否拥有标签"), "has_tag should use the generic user-facing title");
         require(modeLabels(hasTag).equals(List.of("拥有标签时继续", "不拥有标签时继续", "分开执行")),
                 "has_tag should expose player-specific condition mode labels");
-        require(hasTag.formSchema().stream().map(BlockFormFieldDefinition::key).toList().equals(List.of("outputMode", "tag")),
-                "has_tag should not add an extra positive/negative field");
+        require(hasTag.formSchema().stream().map(BlockFormFieldDefinition::key).toList().equals(List.of("outputMode", "target", "tag")),
+                "has_tag should expose one shared target and no extra positive/negative field");
 
         BlockDefinition isAdmin = block(BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN);
         require(isAdmin.categoryId().equals("player-entity.identity-permissions"),
@@ -74,9 +75,9 @@ public final class CatalogExpansionV1SelfCheck {
                 "catalog should not add a negative player tag block");
         require(catalog.blocks().stream().noneMatch(block -> block.displayName().equals(negativeAdminName)),
                 "catalog should not add a negative admin block");
-        require(block(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG).categoryId().equals("player-entity.tags"),
+        require(block(BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG).categoryId().equals("player-entity.tags"),
                 "add_tag should remain under player/entity tags");
-        require(block(BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG).categoryId().equals("player-entity.tags"),
+        require(block(BuiltInBlockCatalog.ACTION_ENTITY_REMOVE_TAG).categoryId().equals("player-entity.tags"),
                 "remove_tag should live under player/entity tags");
 
         List.of(
@@ -202,7 +203,7 @@ public final class CatalogExpansionV1SelfCheck {
                 "catalog-expansion-has-tag",
                 List.of(
                         node("manual-trigger", NodeType.MANUAL_TRIGGER, BuiltInBlockCatalog.TRIGGER_MANUAL_TEST, out("started"), Map.of()),
-                        node("has-tag", NodeType.PLAYER_HAS_TAG_CONDITION, BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG, in("input"), out("pass"), out("fail"), Map.of("outputMode", outputMode, "tag", "runner")),
+                        node("has-tag", NodeType.ENTITY_HAS_TAG_CONDITION, BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG, in("input"), out("pass"), out("fail"), Map.of("outputMode", outputMode, "target", EntityTargetRef.currentEntity().toJson(), "tag", "runner")),
                         node("debug-pass", NodeType.DEBUG_LOG_ACTION, BuiltInBlockCatalog.DEBUG_LOG, in("input"), out("done"), Map.of("message", "拥有标签")),
                         node("debug-fail", NodeType.DEBUG_LOG_ACTION, BuiltInBlockCatalog.DEBUG_LOG, in("input"), out("done"), Map.of("message", "不拥有标签"))
                 ),
@@ -236,7 +237,7 @@ public final class CatalogExpansionV1SelfCheck {
                 "catalog-expansion-remove-tag",
                 List.of(
                         node("manual-trigger", NodeType.MANUAL_TRIGGER, BuiltInBlockCatalog.TRIGGER_MANUAL_TEST, out("started"), Map.of()),
-                        node("remove-tag", NodeType.PLAYER_REMOVE_TAG_ACTION, BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG, in("input"), out("done"), Map.of("tag", "runner"))
+                        node("remove-tag", NodeType.ENTITY_REMOVE_TAG_ACTION, BuiltInBlockCatalog.ACTION_ENTITY_REMOVE_TAG, in("input"), out("done"), Map.of("target", EntityTargetRef.currentEntity().toJson(), "tag", "runner"))
                 ),
                 List.of(edge("e1", "manual-trigger", "started", "remove-tag", "input")),
                 Map.of(TRIGGER_TYPE, "manual-trigger")

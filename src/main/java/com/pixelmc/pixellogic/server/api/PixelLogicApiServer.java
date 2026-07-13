@@ -8,6 +8,8 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
+import com.pixelmc.pixellogic.core.runtime.RuntimeEntityLookup;
+import com.pixelmc.pixellogic.core.runtime.RuntimeSubjectReference;
 import com.pixelmc.pixellogic.core.simulation.runner.SimulationExecutionResult;
 import com.pixelmc.pixellogic.core.trace.ExecutionTrace;
 import com.pixelmc.pixellogic.core.trace.TraceStep;
@@ -20,6 +22,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -122,14 +125,19 @@ public final class PixelLogicApiServer implements AutoCloseable {
     private void handle(HttpExchange exchange) throws IOException {
         try (exchange) {
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-            ApiResponse response = dispatch(exchange.getRequestMethod(), exchange.getRequestURI().getPath(), body);
+            ApiResponse response = dispatch(
+                    exchange.getRequestMethod(),
+                    exchange.getRequestURI().getPath(),
+                    exchange.getRequestURI().getRawQuery(),
+                    body
+            );
             send(exchange, response.status(), response.body());
         } catch (Exception exception) {
             send(exchange, 500, errorBody("INTERNAL_ERROR", "API 处理失败。"));
         }
     }
 
-    private ApiResponse dispatch(String method, String path, String body) {
+    private ApiResponse dispatch(String method, String path, String rawQuery, String body) {
         if ("GET".equals(method) && "/api/pixellogic/status".equals(path)) {
             return onServerThread(() -> ok(Map.of(
                     "message", service.status(),
@@ -191,6 +199,29 @@ public final class PixelLogicApiServer implements AutoCloseable {
         }
         if ("GET".equals(method) && "/api/pixellogic/catalog".equals(path)) {
             return ok(Map.of("catalog", BuiltInBlockCatalog.catalog()));
+        }
+        if ("GET".equals(method) && "/api/pixellogic/runtime/online-players".equals(path)) {
+            OnlinePlayerQuery query;
+            try {
+                query = parseOnlinePlayerQuery(rawQuery);
+            } catch (IllegalArgumentException exception) {
+                return error(400, "BAD_ONLINE_PLAYER_QUERY", exception.getMessage());
+            }
+            return onServerThread(() -> {
+                var listed = service.onlinePlayers(query.query(), query.limit());
+                if (!listed.providerAvailable()) {
+                    return error(503, "ENTITY_TARGET_PROVIDER_UNAVAILABLE", "在线玩家提供器当前不可用。");
+                }
+                Object selected = null;
+                if (query.selectedUuid() != null) {
+                    RuntimeEntityLookup lookup = service.onlinePlayer(query.selectedUuid());
+                    if (lookup.status() == RuntimeEntityLookup.Status.PROVIDER_UNAVAILABLE) {
+                        return error(503, "ENTITY_TARGET_PROVIDER_UNAVAILABLE", "在线玩家提供器当前不可用。");
+                    }
+                    selected = selectedPlayerView(query.selectedUuid(), lookup);
+                }
+                return ok(fields("players", listed.players(), "selected", selected));
+            });
         }
 
         Matcher graphMatcher = GRAPH_PATH.matcher(path);
@@ -367,6 +398,98 @@ public final class PixelLogicApiServer implements AutoCloseable {
         }
     }
 
+    private static OnlinePlayerQuery parseOnlinePlayerQuery(String rawQuery) {
+        Map<String, String> parameters = new LinkedHashMap<>();
+        if (rawQuery != null && !rawQuery.isBlank()) {
+            for (String pair : rawQuery.split("&", -1)) {
+                int separator = pair.indexOf('=');
+                if (separator < 0) {
+                    throw new IllegalArgumentException("查询参数格式无效。");
+                }
+                String key = decodeQueryPart(pair.substring(0, separator));
+                String value = decodeQueryPart(pair.substring(separator + 1));
+                if (!List.of("query", "limit", "selectedUuid").contains(key)) {
+                    throw new IllegalArgumentException("不支持的查询参数：" + key);
+                }
+                if (parameters.putIfAbsent(key, value) != null) {
+                    throw new IllegalArgumentException("查询参数不能重复：" + key);
+                }
+            }
+        }
+
+        String query = parameters.getOrDefault("query", "");
+        if (query.length() > 64 || query.chars().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException("query 必须不超过 64 个字符且不能包含控制字符。");
+        }
+        int limit = parseOnlinePlayerLimit(parameters.get("limit"));
+        UUID selectedUuid = parseSelectedUuid(parameters.get("selectedUuid"));
+        return new OnlinePlayerQuery(query, limit, selectedUuid);
+    }
+
+    private static String decodeQueryPart(String value) {
+        try {
+            return URLDecoder.decode(value, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("查询参数编码无效。", exception);
+        }
+    }
+
+    private static int parseOnlinePlayerLimit(String value) {
+        if (value == null) {
+            return 20;
+        }
+        try {
+            int limit = Integer.parseInt(value);
+            if (limit < 1 || limit > 50) {
+                throw new IllegalArgumentException("limit 必须在 1 到 50 之间。");
+            }
+            return limit;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("limit 必须是 1 到 50 之间的整数。", exception);
+        }
+    }
+
+    private static UUID parseSelectedUuid(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            UUID uuid = UUID.fromString(value);
+            if (!uuid.toString().equals(value)) {
+                throw new IllegalArgumentException("selectedUuid 必须是 canonical UUID。");
+            }
+            return uuid;
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("selectedUuid 必须是 canonical UUID。", exception);
+        }
+    }
+
+    private static Map<String, Object> selectedPlayerView(UUID uuid, RuntimeEntityLookup lookup) {
+        return switch (lookup.status()) {
+            case RESOLVED -> {
+                var entity = lookup.entity();
+                var reference = entity.reference();
+                if (reference == null
+                        || reference.kind() != RuntimeSubjectReference.Kind.PLAYER
+                        || !uuid.toString().equals(reference.id())) {
+                    yield fields("uuid", uuid, "name", null, "availability", "UNRESOLVABLE");
+                }
+                yield fields(
+                        "uuid", uuid,
+                        "name", lookup.displayName(),
+                        "availability", entity.online() ? "ONLINE" : "OFFLINE"
+                );
+            }
+            case OFFLINE -> fields(
+                    "uuid", uuid,
+                    "name", lookup.displayName().isBlank() ? null : lookup.displayName(),
+                    "availability", "OFFLINE"
+            );
+            case UNRESOLVABLE -> fields("uuid", uuid, "name", null, "availability", "UNRESOLVABLE");
+            case PROVIDER_UNAVAILABLE -> throw new IllegalStateException("在线玩家提供器当前不可用。");
+        };
+    }
+
     private static void send(HttpExchange exchange, int status, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
@@ -449,6 +572,9 @@ public final class PixelLogicApiServer implements AutoCloseable {
     }
 
     private record TraceView(String id, boolean truncated, List<TraceStepView> steps) {
+    }
+
+    private record OnlinePlayerQuery(String query, int limit, UUID selectedUuid) {
     }
 
     private record TraceStepView(String timestamp, String nodeId, String message) {

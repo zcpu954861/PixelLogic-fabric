@@ -2,10 +2,10 @@
 
 ## Scope
 
-- 玩家是否拥有标签: existing `condition.player.has_tag` keeps its block id and updates the user-facing title.
+- 玩家标签条件: this historical slice renamed the then-current player-specific condition; Entity Target Reference later retired that identifier.
 - contextual condition mode labels: `拥有标签时继续`, `不拥有标签时继续`, `分开执行` for tag checks; `是管理员时继续`, `不是管理员时继续`, `分开执行` for admin checks.
 - 玩家是否为管理员: new `condition.player.is_admin` under `条件判断 / 玩家条件`.
-- 移除玩家标签: new `action.player.remove_tag` under `玩家操作 / 标签`.
+- 移除玩家标签: this historical slice added the then-current player-specific action; the generic entity-tag action now replaces it.
 - 显示标题: new `action.message.title` under `消息显示 / 屏幕提示`.
 - 显示副标题: new `action.message.subtitle` under `消息显示 / 屏幕提示`.
 - 显示快捷栏消息: new `action.message.actionbar` under `消息显示 / 屏幕提示`.
@@ -22,7 +22,7 @@
 
 ## Simulation
 
-- actor tags: `condition.player.has_tag`, `action.player.add_tag`, and `action.player.remove_tag` operate on the per-run actor tags.
+- actor tags: the historical player-tag condition/actions operated on per-run actor tags. The current generic entity-tag blocks instead resolve one explicit EntityTargetRef.
 - administrator flag: `condition.player.is_admin` reads the per-run actor administrator flag.
 - remove tag result: missing tags do not fail; the action records no state change beyond the current run result.
 - message result channels: title/subtitle/actionbar simulation results are recorded as `TITLE`, `SUBTITLE`, and `ACTIONBAR`.

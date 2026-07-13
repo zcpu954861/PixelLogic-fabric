@@ -1,6 +1,7 @@
 package com.pixelmc.pixellogic.core.simulation.context;
 
 import com.pixelmc.pixellogic.core.runtime.RuntimeSubjectReference;
+import com.pixelmc.pixellogic.core.runtime.RuntimeEntityAccess;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -8,7 +9,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 
-public class SimulationEntity {
+public class SimulationEntity implements RuntimeEntityAccess {
     private final UUID id;
     private final String entityTypeId;
     private final String displayName;
@@ -35,18 +36,22 @@ public class SimulationEntity {
         return displayName;
     }
 
+    @Override
     public RuntimeSubjectReference reference() {
         return new RuntimeSubjectReference(id.toString(), RuntimeSubjectReference.Kind.ENTITY, displayName);
     }
 
+    @Override
     public synchronized boolean hasTag(String tag) {
         return tags.contains(tag);
     }
 
+    @Override
     public synchronized boolean addTag(String tag) {
         return tags.add(tag);
     }
 
+    @Override
     public synchronized boolean removeTag(String tag) {
         return tags.remove(tag);
     }

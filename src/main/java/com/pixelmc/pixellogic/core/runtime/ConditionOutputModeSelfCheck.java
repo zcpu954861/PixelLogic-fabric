@@ -32,15 +32,15 @@ public final class ConditionOutputModeSelfCheck {
     public static void main(String[] args) {
         run("conditionOutputModeSelfCheck", () -> {
         BlockDefinition stateCondition = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_STATE_EQUALS).orElseThrow();
-        BlockDefinition hasTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG).orElseThrow();
-        BlockDefinition addTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG).orElseThrow();
+        BlockDefinition hasTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG).orElseThrow();
+        BlockDefinition addTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG).orElseThrow();
 
         require(stateCondition.defaultConfig().get(ConditionOutputMode.CONFIG_KEY).equals(ConditionOutputMode.PASS_ONLY.name()),
                 "new state conditions should default to PASS_ONLY");
         require(hasTag.categoryId().equals("player-entity.tags"),
-                "player tag condition should live under player/entity tags");
+                "entity tag condition should live under player/entity tags");
         require(addTag.categoryId().equals("player-entity.tags"),
-                "player add tag action should remain under player/entity tags");
+                "entity add tag action should remain under player/entity tags");
         require(DemoGraphFactory.create(Duration.ofSeconds(1)).nodes().stream()
                         .filter(node -> node.id().equals("condition-started"))
                         .findFirst()

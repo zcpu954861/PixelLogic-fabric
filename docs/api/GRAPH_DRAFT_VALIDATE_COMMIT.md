@@ -110,6 +110,24 @@ Known condition config compatibility:
   - `condition.target_block.in_region`: `regionName`.
   - `condition.target_block.y_compare`: `compareMode`, `targetY`, `minY`, `maxY`.
   - `condition.player.near_target_block`: `maxDistance`, `horizontalOnly`.
+
+Known entity-target config:
+
+- The three generic entity-tag blocks and `context.entity.execute_as` store one real nested `config.target` object.
+- `target.source` is exactly `CURRENT_ENTITY`, `CONDITION_SUBJECT`, `TARGET_ENTITY`, or `ONLINE_PLAYER`.
+- `ONLINE_PLAYER` stores canonical `playerUuid` and may store `playerNameHint`; other sources reject both companion fields.
+- Missing or malformed target config is invalid. There is no implicit default when decoding a saved Graph and no loose target source/UUID/name sibling fields.
+- Retired tag block IDs are unknown; no alias, wrapper or graph migrator accepts them.
+
+```json
+{
+  "blockId": "action.entity.add_tag",
+  "config": {
+    "target": { "source": "CURRENT_ENTITY" },
+    "tag": "ready"
+  }
+}
+```
 - These blocks read per-run `testContext.world` facts during simulation; those facts are not stored in graph JSON.
 
 Known container control-flow compatibility:
@@ -240,9 +258,7 @@ The response includes the simulation summary:
 - initial actor tags.
 - final actor tags after simulated actions.
 
-`action.player.add_tag` changes only this run's actor result. It does not persist to graph storage and does not become the next run's initial tags unless the user manually edits the test-player input.
-
-`action.player.remove_tag` follows the same boundary: it only changes the current run result and does not rewrite graph JSON or the WebUI test-player input.
+Generic entity-tag actions change only the resolved entity state for the current run. They do not rewrite graph JSON or the WebUI test-context input; repeated add/remove operations report typed changed/no-change outcomes.
 
 ## Lifecycle / Capacity Safety
 

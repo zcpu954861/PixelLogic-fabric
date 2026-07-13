@@ -6,6 +6,7 @@ const server = await createServer({ appType: 'custom', logLevel: 'silent', serve
 try {
   const { containerFrame, containerMinimumHeight, containerMinimumWidth } = await server.ssrLoadModule('/src/model/containerGeometry.ts');
   const { edge, input, node, out } = await server.ssrLoadModule('/src/model/demoGraph.ts');
+  const { reconcileConditionOutputEdges } = await server.ssrLoadModule('/src/model/conditionOutputMode.ts');
   const { blockMetrics, containerBodyEntryAnchor } = await server.ssrLoadModule('/src/model/graphLayout.ts');
   const { appendCandidates, computeDragDrop, draggedTailOutput, findInsertCandidate } = await server.ssrLoadModule('/src/ui/canvas/dragInsert.ts');
   const { canAssignContainerMembership } = await server.ssrLoadModule('/src/ui/canvas/containerPlacement.ts');
@@ -157,6 +158,20 @@ try {
   assert.equal(draggedTailOutput(graph([branch]), new Set(['branch'])), null, 'BRANCH must not be a single chain tail');
   const passOnly = { ...branch, id: 'pass-only', config: { outputMode: 'PASS_ONLY' } };
   assert.equal(draggedTailOutput(graph([passOnly]), new Set(['pass-only']))?.slot.id, 'pass');
+  const failOnly = { ...passOnly, config: { outputMode: 'FAIL_ONLY' } };
+  const downstreamEdge = edge('condition-next', 'pass-only', 'pass', 'next', 'input');
+  const switchedToFail = reconcileConditionOutputEdges([downstreamEdge], passOnly, failOnly);
+  assert.deepEqual(switchedToFail, [{ ...downstreamEdge, sourceSlotId: 'fail' }], 'single-output mode switches must preserve and retarget the downstream edge');
+  assert.deepEqual(reconcileConditionOutputEdges(switchedToFail, failOnly, passOnly), [downstreamEdge], 'the reverse single-output switch must preserve the same edge');
+  const branchWithTwoEdges = [
+    edge('pass-next', 'branch', 'pass', 'pass-target', 'input'),
+    edge('fail-next', 'branch', 'fail', 'fail-target', 'input'),
+  ];
+  assert.deepEqual(
+    reconcileConditionOutputEdges(branchWithTwoEdges, branch, { ...branch, config: { outputMode: 'PASS_ONLY' } }),
+    [branchWithTwoEdges[0]],
+    'leaving branch mode must remove only the inactive branch edge',
+  );
   const conditionGraph = graph([passOnly, action('dragged', { x: 900, y: 0 })]);
   assert.equal(appendCandidates(conditionGraph, drag('dragged', { x: 900, y: 0 }, { x: 246, y: 0 })).length, 1);
   for (const slotId of ['pass', 'fail']) {

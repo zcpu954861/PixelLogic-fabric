@@ -10,7 +10,8 @@ public record SimulationExecutionRequest(
         SimulationActor actor,
         SimulationWorld world,
         String sessionId,
-        long generation
+        long generation,
+        boolean initializeCurrentEntity
 ) {
     public SimulationExecutionRequest {
         if (actor == null) {
@@ -21,6 +22,18 @@ public record SimulationExecutionRequest(
         commandText = commandText == null ? "" : commandText;
         world = world == null ? SimulationWorld.overworld() : world;
         sessionId = sessionId == null || sessionId.isBlank() ? "manual-session" : sessionId;
+    }
+
+    public SimulationExecutionRequest(
+            String graphId,
+            String triggerType,
+            String commandText,
+            SimulationActor actor,
+            SimulationWorld world,
+            String sessionId,
+            long generation
+    ) {
+        this(graphId, triggerType, commandText, actor, world, sessionId, generation, true);
     }
 
     public static SimulationExecutionRequest manual(
@@ -39,7 +52,8 @@ public record SimulationExecutionRequest(
                 actor,
                 world,
                 sessionId,
-                generation
+                generation,
+                true
         );
     }
 }

@@ -30,7 +30,7 @@ Snapshot 在构造时验证引用、唯一性、可见归属、空分组、可�
 - `HIDDEN`：积木库任何模式都不显示。
 - `deprecated` 独立于 visibility；已弃用积木不能新建。
 
-当前 28 张 built-in 均为 `BROWSE`。当前没有 context-only 或 hidden built-in；相关语义由 synthetic self-check fixture 固定。
+当前 25 张 built-in 均为 `BROWSE`。当前没有 context-only 或 hidden built-in；相关语义由 synthetic self-check fixture 固定。
 
 ## 初始包与分类
 
@@ -54,7 +54,7 @@ Snapshot 在构造时验证引用、唯一性、可见归属、空分组、可�
 | `action.message.title` | 显示标题 | `MESSAGE_ACTION` | BROWSE | 表现与反馈 | 屏幕提示 | 依靠 blockId 区分共享 NodeType |
 | `action.message.subtitle` | 显示副标题 | `MESSAGE_ACTION` | BROWSE | 表现与反馈 | 屏幕提示 | 依靠 blockId 区分共享 NodeType |
 | `action.message.actionbar` | 显示快捷栏消息 | `MESSAGE_ACTION` | BROWSE | 表现与反馈 | 屏幕提示 | 依靠 blockId 区分共享 NodeType |
-| `condition.player.has_tag` | 玩家是否拥有标签 | `PLAYER_HAS_TAG_CONDITION` | BROWSE | 玩家与实体 | 标签 | `PREDICATE` |
+| `condition.entity.has_tag` | 实体是否拥有标签 | `ENTITY_HAS_TAG_CONDITION` | BROWSE | 玩家与实体 | 标签 | `PREDICATE`；`target: EntityTargetRef` |
 | `condition.player.is_admin` | 玩家是否为管理员 | `PLAYER_IS_ADMIN_CONDITION` | BROWSE | 玩家与实体 | 身份与权限 | `PREDICATE` |
 | `condition.player.dimension_is` | 玩家所在维度是否为 | `PLAYER_DIMENSION_CONDITION` | BROWSE | 位置与区域 | 维度与高度 | `PREDICATE` |
 | `condition.player.in_region` | 玩家是否在区域内 | `PLAYER_IN_REGION_CONDITION` | BROWSE | 位置与区域 | 区域 | `PREDICATE` |
@@ -63,15 +63,12 @@ Snapshot 在构造时验证引用、唯一性、可见归属、空分组、可�
 | `condition.target_block.y_compare` | 目标方块高度是否满足 | `TARGET_BLOCK_Y_COMPARE_CONDITION` | BROWSE | 位置与区域 | 维度与高度 | 当前不是 rack predicate |
 | `condition.player.near_target_block` | 玩家是否靠近目标方块 | `PLAYER_NEAR_TARGET_BLOCK_CONDITION` | BROWSE | 位置与区域 | 空间关系 | 当前不是 rack predicate |
 | `condition.target_block.in_region` | 目标方块是否在区域内 | `TARGET_BLOCK_IN_REGION_CONDITION` | BROWSE | 位置与区域 | 区域 | 当前不是 rack predicate |
-| `action.player.add_tag` | 添加玩家标签 | `PLAYER_ADD_TAG_ACTION` | BROWSE | 玩家与实体 | 标签 | 修改当前玩家标签 |
-| `action.player.remove_tag` | 移除玩家标签 | `PLAYER_REMOVE_TAG_ACTION` | BROWSE | 玩家与实体 | 标签 | 修改当前玩家标签 |
+| `action.entity.add_tag` | 添加实体标签 | `ENTITY_ADD_TAG_ACTION` | BROWSE | 玩家与实体 | 标签 | `target: EntityTargetRef`；typed outcome |
+| `action.entity.remove_tag` | 移除实体标签 | `ENTITY_REMOVE_TAG_ACTION` | BROWSE | 玩家与实体 | 标签 | `target: EntityTargetRef`；typed outcome |
 | `control.loop.count` | 循环次数 | `CONTROL_LOOP_COUNT` | BROWSE | 逻辑与流程 | 循环 | 固定次数容器 |
 | `control.loop.forever` | 无限循环 | `CONTROL_LOOP_FOREVER` | BROWSE | 逻辑与流程 | 循环 | 有模拟安全上限 |
 | `control.loop.until` | 循环直到 | `CONTROL_LOOP_UNTIL` | BROWSE | 逻辑与流程 | 循环 | `PREDICATE_RACK` 宿主 |
-| `context.entity.execute_as` | 以实体为上下文执行 | `CONTEXT_ENTITY_EXECUTE_AS` | BROWSE | 玩家与实体 | 实体上下文 | C 型执行上下文 |
-| `condition.context_entity.has_tag` | 上下文实体是否拥有标签 | `CONTEXT_ENTITY_HAS_TAG_CONDITION` | BROWSE | 玩家与实体 | 标签 | `PREDICATE` |
-| `action.context_entity.add_tag` | 为上下文实体添加标签 | `CONTEXT_ENTITY_ADD_TAG_ACTION` | BROWSE | 玩家与实体 | 标签 | 修改当前实体上下文 |
-| `action.context_entity.remove_tag` | 移除上下文实体标签 | `CONTEXT_ENTITY_REMOVE_TAG_ACTION` | BROWSE | 玩家与实体 | 标签 | 修改当前实体上下文 |
+| `context.entity.execute_as` | 以实体为上下文执行 | `CONTEXT_ENTITY_EXECUTE_AS` | BROWSE | 玩家与实体 | 实体上下文 | C 型执行上下文；共享 `target` 控件 |
 | `state.set` | 设置状态 | `STATE_SET_ACTION` | BROWSE | 状态与数据 | 状态写入 | typed state 写入 |
 | `state.add` | 累加状态 | `STATE_ADD_ACTION` | BROWSE | 状态与数据 | 状态写入 | checked INTEGER 累加 |
 | `timer.wait` | 等待一段时间 | `TIMER_START_ACTION` | BROWSE | 逻辑与流程 | 等待与时序 | continuation 等待 |

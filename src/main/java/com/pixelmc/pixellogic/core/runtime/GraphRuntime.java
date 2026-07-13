@@ -3,7 +3,8 @@ package com.pixelmc.pixellogic.core.runtime;
 import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.graph.CompiledGraph;
 import com.pixelmc.pixellogic.core.model.ConditionSlotDefinition;
-import com.pixelmc.pixellogic.core.model.EntitySource;
+import com.pixelmc.pixellogic.core.model.EntityTargetRequirement;
+import com.pixelmc.pixellogic.core.model.EntityTargetSource;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.runtime.ExecutionCursor.LoopFrame;
@@ -78,7 +79,7 @@ public final class GraphRuntime {
             return recordResult(new RuntimeResult(false, traceId, "找不到触发入口。"));
         }
 
-        RuntimeSubjectReference runEntity = services.runEntity(event.playerId(), event.sessionId()).orElse(null);
+        RuntimeSubjectReference initialCurrentEntity = services.initialCurrentEntity(event.playerId(), event.sessionId()).orElse(null);
         RuntimeSubjectReference targetEntity = services.targetEntity(event.playerId(), event.sessionId()).orElse(null);
         return recordResult(runExecution(new ExecutionCursor(
                 traceId,
@@ -88,9 +89,8 @@ public final class GraphRuntime {
                 0,
                 entry.get().id(),
                 List.of(),
-                runEntity,
                 targetEntity,
-                runEntity,
+                initialCurrentEntity,
                 null,
                 List.of()
         )));
@@ -155,17 +155,12 @@ public final class GraphRuntime {
         String nodeId = initial.nodeId();
         ArrayList<LoopFrame> frames = new ArrayList<>(initial.loopFrames());
         ArrayList<EntityContextFrame> entityFrames = new ArrayList<>(initial.entityContextFrames());
-        RuntimeSubjectReference runEntity = initial.runEntity() != null
-                ? initial.runEntity()
-                : services.runEntity(initial.playerId(), initial.sessionId()).orElse(null);
-        RuntimeSubjectReference currentEntity = initial.currentEntity() != null ? initial.currentEntity() : runEntity;
         ExecutionContext context = new ExecutionContext(
                 traceId,
                 initial.playerId(),
                 initial.sessionId(),
-                runEntity,
                 initial.targetEntity(),
-                currentEntity,
+                initial.currentEntity(),
                 initial.currentCondition()
         );
 
@@ -364,12 +359,13 @@ public final class GraphRuntime {
 
             if (node.type() == NodeType.CONTEXT_ENTITY_EXECUTE_AS) {
                 try {
-                    RuntimeSubjectReference selected = resolveContextEntity(node, context);
+                    ResolvedEntityTarget selection = resolveContextEntity(node, context);
+                    RuntimeSubjectReference selected = selection.reference();
                     Optional<NodeDefinition> bodyEntry = graph.bodyEntry(node.id(), "body");
                     String completion = scopes.targetId(node.id(), "done");
                     RuntimeSubjectReference previous = context.currentEntity();
                     context.currentEntity(selected);
-                    traces.add(traceId, node.id(), "使用" + entitySourceLabel(node) + " "
+                    traces.add(traceId, node.id(), "使用" + entitySourceLabel(selection.source()) + " "
                             + selected.displayName() + " 进入实体执行上下文。");
                     if (bodyEntry.isEmpty()) {
                         context.currentEntity(previous);
@@ -425,7 +421,11 @@ public final class GraphRuntime {
             try {
                 execution = nodeExecutor.execute(node, context);
             } catch (RuntimeException exception) {
+                recordFailedAction(node, exception);
                 return fail(traceId, node.id(), exception, "运行时错误。");
+            }
+            if (execution.actionOutcome() != null) {
+                services.recordActionOutcome(node.id(), execution.actionOutcome());
             }
             if (BuiltInBlockCatalog.isConditionBlock(node.blockId())) {
                 context.currentCondition(execution.conditionResult());
@@ -476,7 +476,6 @@ public final class GraphRuntime {
                 steps,
                 resumeNodeId,
                 frames,
-                context.runEntity(),
                 context.targetEntity(),
                 context.currentEntity(),
                 context.currentCondition(),
@@ -574,49 +573,31 @@ public final class GraphRuntime {
         return allMatched;
     }
 
-    private RuntimeSubjectReference resolveContextEntity(NodeDefinition node, ExecutionContext context) {
-        EntitySource source;
-        try {
-            source = EntitySource.valueOf(node.config().getOrDefault("entitySource", "CONDITION_SUBJECT"));
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalStateException("实体来源无效。");
-        }
-        RuntimeSubjectReference selected = switch (source) {
-            case RUN_ENTITY -> context.runEntity();
-            case TARGET_ENTITY -> context.targetEntity();
-            case CONDITION_SUBJECT -> {
-                RuntimeConditionResult result = context.currentCondition();
-                if (result == null || result.subject() == null) {
-                    throw new IllegalStateException("当前路径没有可用的条件对象，无法进入实体执行上下文。");
-                }
-                if (!result.subject().isEntity()) {
-                    throw new IllegalStateException("当前条件对象不是实体，无法作为实体上下文。");
-                }
-                yield result.subject();
-            }
-        };
-        if (selected == null) {
-            throw new IllegalStateException(switch (source) {
-                case RUN_ENTITY -> "运行实体缺失，无法进入实体执行上下文。";
-                case TARGET_ENTITY -> "目标实体缺失，无法进入实体执行上下文。";
-                case CONDITION_SUBJECT -> "当前路径没有可用的条件对象，无法进入实体执行上下文。";
-            });
-        }
-        if (!selected.isEntity()) {
-            throw new IllegalStateException("所选对象不是实体，无法进入实体执行上下文。");
-        }
-        if (!services.entityResolvable(selected, context.playerId(), context.sessionId())) {
-            throw new IllegalStateException("所选实体无法解析，无法进入实体执行上下文。");
-        }
-        return selected;
+    private ResolvedEntityTarget resolveContextEntity(NodeDefinition node, ExecutionContext context) {
+        String rawTarget = node.config().get("target");
+        return EntityTargetResolver.resolve(
+                node.id(),
+                "target",
+                rawTarget,
+                entityTargetRequirement(node),
+                context.snapshot(),
+                services.entityProvider()
+        );
     }
 
-    private String entitySourceLabel(NodeDefinition node) {
-        return switch (node.config().getOrDefault("entitySource", "CONDITION_SUBJECT")) {
-            case "RUN_ENTITY" -> "运行实体";
-            case "TARGET_ENTITY" -> "目标实体";
-            default -> "条件对象";
+    private String entitySourceLabel(EntityTargetSource source) {
+        return switch (source) {
+            case CURRENT_ENTITY -> "当前执行实体";
+            case CONDITION_SUBJECT -> "当前条件主体";
+            case TARGET_ENTITY -> "当前目标实体";
+            case ONLINE_PLAYER -> "指定在线玩家";
         };
+    }
+
+    private EntityTargetRequirement entityTargetRequirement(NodeDefinition node) {
+        return BuiltInBlockCatalog.block(node.blockId())
+                .map(block -> block.entityTargetRequirement())
+                .orElseThrow(() -> new IllegalStateException("积木缺少实体目标类型约束。"));
     }
 
     private String entityLabel(RuntimeSubjectReference entity) {
@@ -626,7 +607,18 @@ public final class GraphRuntime {
     private RuntimeResult fail(String traceId, String nodeId, RuntimeException exception, String fallback) {
         String message = exception.getMessage() == null ? fallback : exception.getMessage();
         traces.add(traceId, nodeId, "执行失败：" + message);
-        return new RuntimeResult(false, traceId, message);
+        EntityTargetError error = exception instanceof EntityTargetException targetException
+                ? targetException.error()
+                : null;
+        return new RuntimeResult(false, traceId, message, false, error);
+    }
+
+    private void recordFailedAction(NodeDefinition node, RuntimeException exception) {
+        if (exception instanceof EntityTargetException targetException
+                && (node.type() == NodeType.ENTITY_ADD_TAG_ACTION
+                || node.type() == NodeType.ENTITY_REMOVE_TAG_ACTION)) {
+            services.recordActionOutcome(node.id(), RuntimeActionOutcome.failure(targetException.error()));
+        }
     }
 
     private RuntimeResult recordResult(RuntimeResult result) {

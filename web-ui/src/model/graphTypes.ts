@@ -43,12 +43,23 @@ export type ConditionSlotDefinition = {
   negated: boolean;
 };
 
+export type EntityTargetSource = 'CURRENT_ENTITY' | 'CONDITION_SUBJECT' | 'TARGET_ENTITY' | 'ONLINE_PLAYER';
+
+export type EntityTargetRef = {
+  source: EntityTargetSource;
+  playerUuid?: string;
+  playerNameHint?: string;
+};
+
+export type GraphConfigValue = string | EntityTargetRef;
+export type GraphConfig = Record<string, GraphConfigValue>;
+
 export type GraphNode = {
   id: string;
   type: string;
   blockId?: string;
   displayName: string;
-  config: Record<string, string>;
+  config: GraphConfig;
   position?: GraphPosition;
   parentContainerId?: string;
   parentSlot?: string;
@@ -84,7 +95,7 @@ export type CatalogSubcategory = {
 
 export type CatalogFormField = {
   key: string;
-  type: 'string' | 'textarea' | 'number' | 'integer' | 'boolean' | 'select' | 'segmented' | 'readonly' | 'hidden' | 'scope' | 'rich_text_component';
+  type: 'string' | 'textarea' | 'number' | 'integer' | 'boolean' | 'select' | 'segmented' | 'readonly' | 'hidden' | 'scope' | 'rich_text_component' | 'entity_target';
   label: string;
   description: string;
   defaultValue: string;
@@ -109,7 +120,8 @@ export type CatalogBlock = {
   capabilities: string[];
   nodeKind: string;
   nodeType: string;
-  defaultConfig: Record<string, string>;
+  entityTargetRequirement?: 'ANY_ENTITY' | 'LIVING_ENTITY' | 'PLAYER_ONLY' | null;
+  defaultConfig: GraphConfig;
   formSchema: CatalogFormField[];
   summaryTemplate: string;
   summaryFormatter: string;
@@ -163,6 +175,7 @@ export type EditableField = {
   step?: string;
   ui?: string;
   suffix?: string;
+  entityTarget?: EntityTargetRef | null;
 };
 
 export type FieldOption = {
@@ -226,6 +239,22 @@ export type ApiResponse = {
     code: string;
     message: string;
   };
+  players?: OnlinePlayerSummary[];
+  selected?: OnlinePlayerSummary | null;
+};
+
+export type OnlinePlayerSummary = {
+  uuid: string;
+  name: string | null;
+  availability?: string;
+};
+
+export type OnlinePlayerDirectory = {
+  players: OnlinePlayerSummary[];
+  selected: OnlinePlayerSummary | null;
+  loaded: boolean;
+  loading: boolean;
+  error: string;
 };
 
 export type UiState = {
@@ -260,6 +289,7 @@ export type UiState = {
   editorDraftNode: GraphNode | null;
   editorOriginalNode: GraphNode | null;
   editorSaving: boolean;
+  onlinePlayerDirectory: OnlinePlayerDirectory;
   recentNodeId: string | null;
 };
 

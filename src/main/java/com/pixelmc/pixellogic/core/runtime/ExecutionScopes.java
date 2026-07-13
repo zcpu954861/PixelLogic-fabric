@@ -39,14 +39,12 @@ final class ExecutionScopes {
                 || !cursor.nodeId().equals(continuation.targetNodeId())) {
             return "continuation 恢复快照不一致。";
         }
-        if (!validEntity(cursor.runEntity()) || !validEntity(cursor.currentEntity())
+        if ((cursor.currentEntity() != null && !validEntity(cursor.currentEntity()))
                 || (cursor.targetEntity() != null && !validEntity(cursor.targetEntity()))) {
             return "continuation 实体上下文无效。";
         }
-        if (!services.entityResolvable(cursor.runEntity(), cursor.playerId(), cursor.sessionId())
-                || !services.entityResolvable(cursor.currentEntity(), cursor.playerId(), cursor.sessionId())
-                || (cursor.targetEntity() != null
-                && !services.entityResolvable(cursor.targetEntity(), cursor.playerId(), cursor.sessionId()))) {
+        if ((cursor.currentEntity() != null && !entityResolvable(cursor.currentEntity()))
+                || (cursor.targetEntity() != null && !entityResolvable(cursor.targetEntity()))) {
             return "continuation 实体无法解析。";
         }
         if (cursor.currentCondition() != null) {
@@ -58,8 +56,7 @@ final class ExecutionScopes {
                     || !conditionNode.get().blockId().equals(condition.blockId())) {
                 return "continuation 条件结果上下文无效。";
             }
-            if (condition.subject().isEntity()
-                    && !services.entityResolvable(condition.subject(), cursor.playerId(), cursor.sessionId())) {
+            if (condition.subject().isEntity() && !entityResolvable(condition.subject())) {
                 return "continuation 条件对象无法解析。";
             }
         }
@@ -127,12 +124,13 @@ final class ExecutionScopes {
             if (bodyEntry.isEmpty() || !graph.isInBody(bodyEntry.get(), frame.containerNodeId(), "body")) {
                 return "实体上下文 body membership 已失效。";
             }
-            if (!validEntity(frame.previousEntity()) || !validEntity(frame.selectedEntity())
+            if ((frame.previousEntity() != null && !validEntity(frame.previousEntity()))
+                    || !validEntity(frame.selectedEntity())
                     || frame.loopDepth() < 0 || frame.loopDepth() > frames.size()) {
                 return "实体上下文 frame 无效。";
             }
-            if (!services.entityResolvable(frame.previousEntity(), cursor.playerId(), cursor.sessionId())
-                    || !services.entityResolvable(frame.selectedEntity(), cursor.playerId(), cursor.sessionId())) {
+            if ((frame.previousEntity() != null && !entityResolvable(frame.previousEntity()))
+                    || !entityResolvable(frame.selectedEntity())) {
                 return "实体上下文 frame 中的实体无法解析。";
             }
             String completion;
@@ -157,11 +155,8 @@ final class ExecutionScopes {
                 }
             }
         }
-        if (!entityFrames.isEmpty() && !entityFrames.getLast().selectedEntity().equals(cursor.currentEntity())) {
+        if (!entityFrames.isEmpty() && !Objects.equals(entityFrames.getLast().selectedEntity(), cursor.currentEntity())) {
             return "continuation 当前实体与 frame 不一致。";
-        }
-        if (entityFrames.isEmpty() && !cursor.runEntity().equals(cursor.currentEntity())) {
-            return "continuation 外层实体上下文不一致。";
         }
         if (!cursor.nodeId().isBlank()) {
             Optional<NodeDefinition> target = graph.node(cursor.nodeId());
@@ -252,5 +247,17 @@ final class ExecutionScopes {
 
     private static boolean validEntity(RuntimeSubjectReference entity) {
         return entity != null && entity.isEntity() && !entity.id().isBlank();
+    }
+
+    private boolean entityResolvable(RuntimeSubjectReference entity) {
+        RuntimeEntityLookup lookup = services.entityProvider().resolve(entity);
+        if (lookup == null || lookup.status() != RuntimeEntityLookup.Status.RESOLVED
+                || lookup.entity() == null || lookup.entity().reference() == null) {
+            return false;
+        }
+        RuntimeSubjectReference resolved = lookup.entity().reference();
+        return entity.id().equals(resolved.id())
+                && entity.kind() == resolved.kind()
+                && (resolved.kind() != RuntimeSubjectReference.Kind.PLAYER || lookup.entity().online());
     }
 }

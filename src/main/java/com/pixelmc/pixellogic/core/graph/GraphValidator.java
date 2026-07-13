@@ -6,6 +6,7 @@ import com.pixelmc.pixellogic.core.catalog.BlockFormFieldDefinition;
 import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
+import com.pixelmc.pixellogic.core.model.EntityTargetRef;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
@@ -95,7 +96,7 @@ public final class GraphValidator {
             validateCatalogBlock(node, issues);
             switch (node.type()) {
                 case STATE_COMPARE_CONDITION -> validateCondition(node, issues);
-                case PLAYER_HAS_TAG_CONDITION -> validateTagConfig(node, issues);
+                case ENTITY_HAS_TAG_CONDITION -> validateTagConfig(node, issues);
                 case PLAYER_IS_ADMIN_CONDITION -> {
                 }
                 case PLAYER_DIMENSION_CONDITION -> validatePlayerDimensionCondition(node, issues);
@@ -109,12 +110,7 @@ public final class GraphValidator {
                 }
                 case CONTEXT_ENTITY_EXECUTE_AS -> {
                 }
-                case CONTEXT_ENTITY_HAS_TAG_CONDITION -> {
-                    validateTagConfig(node, issues);
-                }
-                case CONTEXT_ENTITY_ADD_TAG_ACTION, CONTEXT_ENTITY_REMOVE_TAG_ACTION ->
-                        validateTagConfig(node, issues);
-                case PLAYER_ADD_TAG_ACTION, PLAYER_REMOVE_TAG_ACTION -> validateTagConfig(node, issues);
+                case ENTITY_ADD_TAG_ACTION, ENTITY_REMOVE_TAG_ACTION -> validateTagConfig(node, issues);
                 case STATE_SET_ACTION -> validateStateSetValue(node, issues);
                 case STATE_ADD_ACTION -> validateStateAddType(node, issues);
                 case TIMER_START_ACTION -> {
@@ -244,6 +240,10 @@ public final class GraphValidator {
             if (key == null || key.isBlank() || "hidden".equals(field.type()) || "readonly".equals(field.type())) {
                 continue;
             }
+            if ("entity_target".equals(field.type())) {
+                validateEntityTargetConfig(node, key, issues);
+                continue;
+            }
             String value = node.config().get(key);
             if (value == null || value.isBlank()) {
                 if (field.required()) {
@@ -273,6 +273,36 @@ public final class GraphValidator {
                 }
             }
         }
+    }
+
+    private void validateEntityTargetConfig(NodeDefinition node, String key, List<ValidationIssue> issues) {
+        String value = node.config().get(key);
+        if (value == null || value.isBlank()) {
+            error(issues, "entity_target_invalid_config", "实体目标配置缺失：" + node.id() + "." + key);
+            return;
+        }
+        try {
+            EntityTargetRef.parse(value);
+        } catch (IllegalArgumentException exception) {
+            String detail = exception.getMessage() == null ? "实体目标配置无效" : exception.getMessage();
+            error(issues, entityTargetConfigCode(detail), "实体目标配置无效：" + node.id() + "." + key);
+        }
+    }
+
+    private String entityTargetConfigCode(String detail) {
+        if (detail.contains("target.source")) {
+            return "entity_target_source_invalid";
+        }
+        if (detail.contains("requires playerUuid")) {
+            return "entity_target_player_uuid_missing";
+        }
+        if (detail.contains("playerUuid")) {
+            return "entity_target_player_uuid_invalid";
+        }
+        if (detail.contains("playerNameHint")) {
+            return "entity_target_player_name_hint_invalid";
+        }
+        return "entity_target_invalid_config";
     }
 
     private void validateOptionValue(

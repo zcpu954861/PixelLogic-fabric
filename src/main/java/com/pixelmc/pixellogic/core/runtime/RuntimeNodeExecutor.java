@@ -46,7 +46,7 @@ final class RuntimeNodeExecutor {
             case TIMER_START_ACTION, CONTROL_LOOP_COUNT, CONTROL_LOOP_FOREVER, CONTROL_LOOP_UNTIL,
                  CONTEXT_ENTITY_EXECUTE_AS ->
                     throw new IllegalStateException("控制流节点必须由 GraphRuntime 游标执行：" + node.type());
-            case PLAYER_HAS_TAG_CONDITION,
+            case ENTITY_HAS_TAG_CONDITION,
                  PLAYER_IS_ADMIN_CONDITION,
                  PLAYER_DIMENSION_CONDITION,
                  PLAYER_IN_REGION_CONDITION,
@@ -55,11 +55,8 @@ final class RuntimeNodeExecutor {
                  TARGET_BLOCK_IN_REGION_CONDITION,
                  TARGET_BLOCK_Y_COMPARE_CONDITION,
                  PLAYER_NEAR_TARGET_BLOCK_CONDITION,
-                 PLAYER_ADD_TAG_ACTION,
-                 PLAYER_REMOVE_TAG_ACTION,
-                 CONTEXT_ENTITY_HAS_TAG_CONDITION,
-                 CONTEXT_ENTITY_ADD_TAG_ACTION,
-                 CONTEXT_ENTITY_REMOVE_TAG_ACTION ->
+                 ENTITY_ADD_TAG_ACTION,
+                 ENTITY_REMOVE_TAG_ACTION ->
                     throw new IllegalStateException("缺少模拟执行器：" + node.type());
         };
         return new RuntimeNodeExecutionResult(outputSlot, "");

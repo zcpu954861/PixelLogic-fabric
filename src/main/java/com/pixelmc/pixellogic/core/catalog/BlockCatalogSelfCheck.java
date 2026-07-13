@@ -33,7 +33,7 @@ public final class BlockCatalogSelfCheck {
                 BuiltInBlockCatalog.ACTION_MESSAGE_TITLE,
                 BuiltInBlockCatalog.ACTION_MESSAGE_SUBTITLE,
                 BuiltInBlockCatalog.ACTION_MESSAGE_ACTIONBAR,
-                BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG,
+                BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG,
                 BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN,
                 BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS,
                 BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION,
@@ -42,15 +42,12 @@ public final class BlockCatalogSelfCheck {
                 BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IN_REGION,
                 BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_Y_COMPARE,
                 BuiltInBlockCatalog.CONDITION_PLAYER_NEAR_TARGET_BLOCK,
-                BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG,
-                BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG,
+                BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG,
+                BuiltInBlockCatalog.ACTION_ENTITY_REMOVE_TAG,
                 BuiltInBlockCatalog.CONTROL_LOOP_COUNT,
                 BuiltInBlockCatalog.CONTROL_LOOP_FOREVER,
                 BuiltInBlockCatalog.CONTROL_LOOP_UNTIL,
                 BuiltInBlockCatalog.CONTEXT_ENTITY_EXECUTE_AS,
-                BuiltInBlockCatalog.CONDITION_CONTEXT_ENTITY_HAS_TAG,
-                BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_ADD_TAG,
-                BuiltInBlockCatalog.ACTION_CONTEXT_ENTITY_REMOVE_TAG,
                 BuiltInBlockCatalog.STATE_SET,
                 BuiltInBlockCatalog.STATE_ADD,
                 BuiltInBlockCatalog.TIMER_WAIT,
@@ -107,30 +104,32 @@ public final class BlockCatalogSelfCheck {
         require(hasIssue(withFirstNodeBlockId(demo, BuiltInBlockCatalog.STATE_SET), "block_type_mismatch"),
                 "blockId/node.type mismatch should fail validation");
 
-        BlockDefinition hasTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG).orElseThrow();
+        BlockDefinition hasTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG).orElseThrow();
         BlockDefinition isAdmin = BuiltInBlockCatalog.block(BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN).orElseThrow();
-        BlockDefinition addTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_PLAYER_ADD_TAG).orElseThrow();
-        BlockDefinition removeTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_PLAYER_REMOVE_TAG).orElseThrow();
+        BlockDefinition addTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG).orElseThrow();
+        BlockDefinition removeTag = BuiltInBlockCatalog.block(BuiltInBlockCatalog.ACTION_ENTITY_REMOVE_TAG).orElseThrow();
         require(hasTag.categoryId().equals("player-entity.tags"),
-                "player tag condition should be under player/entity tags");
+                "entity tag condition should be under player/entity tags");
         require(isAdmin.categoryId().equals("player-entity.identity-permissions"),
                 "player admin condition should be under identity/permissions");
         require(addTag.categoryId().equals("player-entity.tags"),
-                "player tag action should stay under player/entity tags");
+                "entity tag action should stay under player/entity tags");
         require(removeTag.categoryId().equals("player-entity.tags"),
-                "player remove tag action should stay under player/entity tags");
+                "entity remove tag action should stay under player/entity tags");
+        require(hasTag.formSchema().stream().anyMatch(field -> field.key().equals("target") && field.type().equals("entity_target")),
+                "entity tag condition should expose the shared target field");
         require(hasTag.formSchema().stream().anyMatch(field -> field.key().equals("tag") && field.type().equals("string")),
-                "player tag condition should expose tag field");
+                "entity tag condition should expose tag field");
         require(hasTag.formSchema().stream().anyMatch(field -> field.key().equals(ConditionOutputMode.CONFIG_KEY) && field.type().equals("segmented")),
-                "player tag condition should expose condition output mode field");
+                "entity tag condition should expose condition output mode field");
         require(addTag.formSchema().stream().anyMatch(field -> field.key().equals("tag") && field.type().equals("string")),
-                "player tag action should expose tag field");
+                "entity tag action should expose tag field");
         require(removeTag.formSchema().stream().anyMatch(field -> field.key().equals("tag") && field.type().equals("string")),
-                "player remove tag action should expose tag field");
+                "entity remove tag action should expose tag field");
         require(hasTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE
                         && addTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE
                         && removeTag.simulationCapability() == BlockCapabilityLevel.FULLY_SIMULATABLE,
-                "player tag blocks should be fully simulatable");
+                "entity tag blocks should be fully simulatable");
         require(messageBlock(BuiltInBlockCatalog.ACTION_MESSAGE_TITLE).categoryId().equals("presentation-feedback.screen-prompts"),
                 "title message block should live under presentation/feedback screen prompts");
         require(messageBlock(BuiltInBlockCatalog.ACTION_MESSAGE_SUBTITLE).formSchema().stream()
@@ -166,13 +165,12 @@ public final class BlockCatalogSelfCheck {
                     require(!item.predicateNegatedSummaryTemplate().isBlank(), "negated predicate capsule summary should exist: " + item.id());
                 });
         require(predicateBlocks.equals(Set.of(
-                        BuiltInBlockCatalog.CONDITION_PLAYER_HAS_TAG,
+                        BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG,
                         BuiltInBlockCatalog.CONDITION_PLAYER_IS_ADMIN,
                         BuiltInBlockCatalog.CONDITION_PLAYER_DIMENSION_IS,
                 BuiltInBlockCatalog.CONDITION_PLAYER_IN_REGION,
-                        BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE,
-                        BuiltInBlockCatalog.CONDITION_CONTEXT_ENTITY_HAS_TAG
-                )), "predicate capability should include the contextual entity tag condition");
+                        BuiltInBlockCatalog.CONDITION_TARGET_BLOCK_IS_TYPE
+                )), "predicate capability should include the generic entity tag condition");
         });
     }
 

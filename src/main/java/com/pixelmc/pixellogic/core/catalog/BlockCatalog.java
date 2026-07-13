@@ -1,5 +1,7 @@
 package com.pixelmc.pixellogic.core.catalog;
 
+import com.pixelmc.pixellogic.core.model.EntityTargetRef;
+
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -82,6 +84,7 @@ public record BlockCatalog(
             requireUniqueTerms(block.tags(), "tags", block.id());
             requireUniqueTerms(block.aliases(), "aliases", block.id());
             requireUniqueTerms(block.searchKeywords(), "searchKeywords", block.id());
+            validateEntityTargetContract(block);
             for (String alias : block.aliases()) {
                 require(aliases.add(normalize(alias)), "duplicate block alias: " + alias);
             }
@@ -157,6 +160,24 @@ public record BlockCatalog(
             require(normalized.add(normalize(term)),
                     "duplicate block " + field + ": " + blockId + " -> " + term);
         }
+    }
+
+    private static void validateEntityTargetContract(BlockDefinition block) {
+        List<BlockFormFieldDefinition> targetFields = block.formSchema().stream()
+                .filter(field -> "entity_target".equals(field.type()))
+                .toList();
+        require(targetFields.isEmpty() == (block.entityTargetRequirement() == null),
+                "entity_target field/requirement mismatch: " + block.id());
+        if (targetFields.isEmpty()) {
+            return;
+        }
+        require(targetFields.size() == 1, "block must declare exactly one entity_target field: " + block.id());
+        BlockFormFieldDefinition field = targetFields.getFirst();
+        require("target".equals(field.key()) && field.required(),
+                "entity_target field must be required config.target: " + block.id());
+        EntityTargetRef configDefault = EntityTargetRef.parse(block.defaultConfig().get("target"));
+        EntityTargetRef fieldDefault = EntityTargetRef.parse(field.defaultValue());
+        require(configDefault.equals(fieldDefault), "entity_target defaults must agree: " + block.id());
     }
 
     private static String normalize(String value) {

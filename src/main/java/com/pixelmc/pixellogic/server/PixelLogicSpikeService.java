@@ -9,6 +9,9 @@ import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.StateScope;
 import com.pixelmc.pixellogic.core.runtime.GraphRuntime;
 import com.pixelmc.pixellogic.core.runtime.RuntimeLimits;
+import com.pixelmc.pixellogic.core.runtime.RuntimeEntityLookup;
+import com.pixelmc.pixellogic.core.runtime.RuntimeEntityProvider;
+import com.pixelmc.pixellogic.core.runtime.RuntimeOnlinePlayerList;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimeServices;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationActor;
@@ -50,6 +53,7 @@ public final class PixelLogicSpikeService implements AutoCloseable {
     private final AtomicLong simulationRunSequence = new AtomicLong();
     private final GraphStorageService graphStorage;
     private final RuntimeServices services;
+    private final RuntimeEntityProvider entityProvider;
 
     private volatile GraphDocument committedGraph;
     private volatile List<ValidationIssue> validationIssues = List.of();
@@ -81,8 +85,32 @@ public final class PixelLogicSpikeService implements AutoCloseable {
             Duration timerDuration,
             Path storageRoot
     ) {
+        this(
+                playerMessenger,
+                serverThreadExecutor,
+                debugLogger,
+                timerDuration,
+                storageRoot,
+                RuntimeEntityProvider.UNAVAILABLE
+        );
+    }
+
+    public PixelLogicSpikeService(
+            BiConsumer<UUID, String> playerMessenger,
+            Consumer<Runnable> serverThreadExecutor,
+            Consumer<String> debugLogger,
+            Duration timerDuration,
+            Path storageRoot,
+            RuntimeEntityProvider entityProvider
+    ) {
         this.graphStorage = new GraphStorageService(storageRoot);
+        this.entityProvider = entityProvider == null ? RuntimeEntityProvider.UNAVAILABLE : entityProvider;
         this.services = new RuntimeServices() {
+            @Override
+            public RuntimeEntityProvider entityProvider() {
+                return PixelLogicSpikeService.this.entityProvider;
+            }
+
             @Override
             public void sendPlayerMessage(UUID playerId, String message) {
                 playerMessenger.accept(playerId, message);
@@ -163,7 +191,8 @@ public final class PixelLogicSpikeService implements AutoCloseable {
                 result.success(),
                 result.traceId(),
                 result.message(),
-                result.status() == SimulationExecutionResult.Status.WAITING
+                result.status() == SimulationExecutionResult.Status.WAITING,
+                result.targetError()
         );
     }
 
@@ -225,6 +254,16 @@ public final class PixelLogicSpikeService implements AutoCloseable {
 
     public boolean draftExists(String graphId) {
         return graphStorage.draftExists(graphId);
+    }
+
+    public RuntimeOnlinePlayerList onlinePlayers(String query, int limit) {
+        ensureOpen();
+        return entityProvider.listOnlinePlayers(query, limit);
+    }
+
+    public RuntimeEntityLookup onlinePlayer(UUID playerUuid) {
+        ensureOpen();
+        return entityProvider.resolveOnlinePlayer(playerUuid);
     }
 
     public Optional<ExecutionTrace> latestTrace() {

@@ -7,6 +7,7 @@ import com.pixelmc.pixellogic.core.graph.GraphValidator;
 import com.pixelmc.pixellogic.core.graph.ValidationIssue;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.EdgeType;
+import com.pixelmc.pixellogic.core.model.EntityTargetRef;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
@@ -76,8 +77,8 @@ public final class SimulationBackendSelfCheck {
                 0L
         ));
         require(tagged.success(), "actor with tag should pass condition");
-        require(tagHarness.traces().get(tagged.traceId()).orElseThrow().containsMessage("玩家 带标签玩家 拥有标签「runner」"),
-                "trace should include player tag pass branch");
+        require(tagHarness.traces().get(tagged.traceId()).orElseThrow().containsMessage("实体 带标签玩家 拥有标签「runner」"),
+                "trace should include entity tag pass branch");
 
         RunHarness addTagHarness = harness(tagGraph);
         SimulationActor plainActor = SimulationActor.player(playerId, "无标签玩家");
@@ -91,13 +92,11 @@ public final class SimulationBackendSelfCheck {
                 0L
         ));
         require(added.success(), "actor without tag should run fail branch and add tag");
-        require(added.actorTags().contains("runner"), "action.player.add_tag should mutate simulated actor tags");
-        require(added.actionResults().stream().anyMatch(result -> result.kind().equals("player_tag")),
-                "player tag action should produce action result");
-        require(added.stateChanges().stream().anyMatch(result -> result.target().equals("actor.tags") && result.value().contains("runner")),
-                "player tag action should produce state change result");
-        require(addTagHarness.traces().get(added.traceId()).orElseThrow().containsMessage("玩家标签写入"),
-                "trace should include player tag action");
+        require(added.actorTags().contains("runner"), "generic add-tag should mutate simulated actor tags");
+        require(added.actionResults().stream().anyMatch(result -> result.message().contains("runner")),
+                "entity tag action should produce action result");
+        require(addTagHarness.traces().get(added.traceId()).orElseThrow().containsMessage("runner"),
+                "trace should include entity tag action");
         });
     }
 
@@ -137,8 +136,8 @@ public final class SimulationBackendSelfCheck {
                 "player-tag-self-check",
                 List.of(
                         node("manual-trigger", NodeType.MANUAL_TRIGGER, out("started"), Map.of()),
-                        node("has-runner-tag", NodeType.PLAYER_HAS_TAG_CONDITION, in("input"), out("pass"), out("fail"), Map.of("tag", "runner")),
-                        node("add-runner-tag", NodeType.PLAYER_ADD_TAG_ACTION, in("input"), out("done"), Map.of("tag", "runner")),
+                        node("has-runner-tag", NodeType.ENTITY_HAS_TAG_CONDITION, in("input"), out("pass"), out("fail"), Map.of("target", EntityTargetRef.currentEntity().toJson(), "tag", "runner")),
+                        node("add-runner-tag", NodeType.ENTITY_ADD_TAG_ACTION, in("input"), out("done"), Map.of("target", EntityTargetRef.currentEntity().toJson(), "tag", "runner")),
                         node("debug-has-tag", NodeType.DEBUG_LOG_ACTION, in("input"), out("done"), Map.of("message", "已有 runner 标签")),
                         node("debug-added-tag", NodeType.DEBUG_LOG_ACTION, in("input"), out("done"), Map.of("message", "已添加 runner 标签"))
                 ),

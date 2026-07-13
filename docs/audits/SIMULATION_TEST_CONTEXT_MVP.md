@@ -4,7 +4,7 @@
 
 - WebUI test actor: a per-run simulated player context sent with `POST /api/pixellogic/test/start`.
 - Display name: editable in the WebUI and returned in `SimulationExecutionResult`.
-- Tags: editable as simple chips, trimmed/deduplicated, and used by `condition.player.has_tag`.
+- Tags: editable as simple chips, trimmed/deduplicated, and used by the current generic entity-tag condition when targeting the test actor.
 - Administrator flag: editable and returned with the run result; no OP-only block exists yet.
 - Run payload: optional `testContext.actor`; old no-body requests still use `WebUI 模拟玩家`.
 - Result summary: returns initial tags, final tags, display name, admin flag, trace id, and status.
@@ -15,7 +15,7 @@
 - It is not graph data and is not written into committed or draft graph JSON.
 - It is not named scenario persistence.
 - `SimulationRunner` still calls the real `GraphRuntime`.
-- `action.player.add_tag` mutates only the request actor for the current run result.
+- The current generic add-tag action mutates only the explicitly resolved test entity for the current run result.
 - `/pixellogic test start` keeps the default simulated player path.
 - No Minecraft adapter is added.
 

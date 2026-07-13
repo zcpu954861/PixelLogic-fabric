@@ -1,4 +1,5 @@
 import { catalogBlock, catalogCategory } from '../../model/blockCatalog';
+import { entityTargetLabel, entityTargetRef, graphConfigString } from '../../model/entityTargetReference';
 import { conditionRackParent, conditionSlots } from '../../model/conditionRack';
 import { conditionOutputMode, conditionOutputModeLabel } from '../../model/conditionOutputMode';
 import type { BlockCatalog, BlockKind, CatalogBlock, FieldOption, GraphDocument, GraphNode } from '../../model/graphTypes';
@@ -70,7 +71,7 @@ export function nodeTypeLabel(type: string): string {
       return '条件判断块(胶囊)';
     case 'MESSAGE_ACTION':
       return '发送消息';
-    case 'PLAYER_HAS_TAG_CONDITION':
+    case 'ENTITY_HAS_TAG_CONDITION':
     case 'PLAYER_IS_ADMIN_CONDITION':
     case 'PLAYER_DIMENSION_CONDITION':
     case 'PLAYER_IN_REGION_CONDITION':
@@ -79,21 +80,16 @@ export function nodeTypeLabel(type: string): string {
     case 'TARGET_BLOCK_IN_REGION_CONDITION':
     case 'TARGET_BLOCK_Y_COMPARE_CONDITION':
     case 'PLAYER_NEAR_TARGET_BLOCK_CONDITION':
-    case 'CONTEXT_ENTITY_HAS_TAG_CONDITION':
       return '条件判断块(胶囊)';
     case 'CONTROL_LOOP_COUNT':
     case 'CONTROL_LOOP_FOREVER':
       return '控制流';
     case 'CONTEXT_ENTITY_EXECUTE_AS':
       return '执行上下文';
-    case 'CONTEXT_ENTITY_ADD_TAG_ACTION':
-      return '为上下文实体添加标签';
-    case 'CONTEXT_ENTITY_REMOVE_TAG_ACTION':
-      return '移除上下文实体标签';
-    case 'PLAYER_ADD_TAG_ACTION':
-      return '添加玩家标签';
-    case 'PLAYER_REMOVE_TAG_ACTION':
-      return '移除玩家标签';
+    case 'ENTITY_ADD_TAG_ACTION':
+      return '添加实体标签';
+    case 'ENTITY_REMOVE_TAG_ACTION':
+      return '移除实体标签';
     case 'STATE_SET_ACTION':
       return '状态写入';
     case 'STATE_ADD_ACTION':
@@ -141,10 +137,11 @@ export function predicateNodeSummary(nodeItem: GraphNode, catalog: BlockCatalog,
     : positiveTemplate;
   if (template) {
     return template
-      .replaceAll('{tag}', nodeItem.config.tag || '标签')
-      .replaceAll('{dimensionId}', nodeItem.config.dimensionId || 'minecraft:overworld')
-      .replaceAll('{regionName}', nodeItem.config.regionName || '区域名称')
-      .replaceAll('{blockId}', nodeItem.config.blockId || 'minecraft:stone');
+      .replaceAll('{target}', entityTargetLabel(entityTargetRef(nodeItem.config)))
+      .replaceAll('{tag}', graphConfigString(nodeItem.config, 'tag', '标签'))
+      .replaceAll('{dimensionId}', graphConfigString(nodeItem.config, 'dimensionId', 'minecraft:overworld'))
+      .replaceAll('{regionName}', graphConfigString(nodeItem.config, 'regionName', '区域名称'))
+      .replaceAll('{blockId}', graphConfigString(nodeItem.config, 'blockId', 'minecraft:stone'));
   }
   return nodeSummary(nodeItem, catalog);
 }
@@ -161,8 +158,14 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   if (blockItem.id === 'condition.state.equals') {
     return conditionStateSummary(nodeItem);
   }
-  if (blockItem.id === 'condition.player.has_tag') {
-    return playerTagConditionSummary(nodeItem);
+  if (blockItem.id === 'condition.entity.has_tag') {
+    return entityTagConditionSummary(nodeItem);
+  }
+  if (blockItem.id === 'action.entity.add_tag') {
+    return `给「${entityTargetLabel(entityTargetRef(nodeItem.config))}」添加标签「${graphConfigString(nodeItem.config, 'tag', '标签')}」。`;
+  }
+  if (blockItem.id === 'action.entity.remove_tag') {
+    return `移除「${entityTargetLabel(entityTargetRef(nodeItem.config))}」的标签「${graphConfigString(nodeItem.config, 'tag', '标签')}」。`;
   }
   if (blockItem.id === 'condition.player.is_admin') {
     return playerAdminConditionSummary(nodeItem);
@@ -189,47 +192,47 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
     return playerNearTargetBlockConditionSummary(nodeItem);
   }
   if (blockItem.id === 'control.loop.count') {
-    return `把内部积木循环 ${nodeItem.config.count || '3'} 次后继续。`;
+    return `把内部积木循环 ${graphConfigString(nodeItem.config, 'count', '3')} 次后继续。`;
   }
   if (blockItem.id === 'control.loop.forever') {
-    return `持续循环内部积木，每轮间隔 ${nodeItem.config.intervalSeconds || '1'} 秒。`;
+    return `持续循环内部积木，每轮间隔 ${graphConfigString(nodeItem.config, 'intervalSeconds', '1')} 秒。`;
   }
   if (blockItem.id === 'control.loop.until') {
     return `配置了 ${nodeItem.conditionSlots?.length ?? 0} 个结束条件槽。`;
   }
   if (blockItem.id === 'context.entity.execute_as') {
-    return `以「${entitySourceLabel(nodeItem.config.entitySource)}」为上下文执行。`;
+    return `以「${entityTargetLabel(entityTargetRef(nodeItem.config))}」为上下文执行。`;
   }
   const template = blockItem.summaryTemplate;
   if (!template) {
     return legacyNodeTypeSummary(nodeItem);
   }
   return template
-    .replaceAll('{scope}', scopeLabel(nodeItem.config.scope))
-    .replaceAll('{key}', nodeItem.config.key || '状态名')
-    .replaceAll('{expected}', booleanLabel(nodeItem.config.expected ?? 'false'))
-    .replaceAll('{missing}', booleanLabel(nodeItem.config.missing ?? 'false'))
-    .replaceAll('{value}', stateValueLabel(nodeItem.config.value ?? '', nodeItem.config.valueType ?? 'BOOLEAN'))
-    .replaceAll('{amount}', nodeItem.config.amount ?? '1')
-    .replaceAll('{durationSeconds}', nodeItem.config.durationSeconds ?? '30')
-    .replaceAll('{target}', targetLabel(nodeItem.config.target ?? 'CURRENT_PLAYER'))
-    .replaceAll('{message.plainText}', shortRichText(nodeItem.config.message ?? ''))
-    .replaceAll('{message}', shortRichText(nodeItem.config.message ?? ''))
-    .replaceAll('{entitySource}', entitySourceLabel(nodeItem.config.entitySource))
-    .replaceAll('{tag}', nodeItem.config.tag ?? '标签');
+    .replaceAll('{scope}', scopeLabel(graphConfigString(nodeItem.config, 'scope')))
+    .replaceAll('{key}', graphConfigString(nodeItem.config, 'key', '状态名'))
+    .replaceAll('{expected}', booleanLabel(graphConfigString(nodeItem.config, 'expected', 'false')))
+    .replaceAll('{missing}', booleanLabel(graphConfigString(nodeItem.config, 'missing', 'false')))
+    .replaceAll('{value}', stateValueLabel(graphConfigString(nodeItem.config, 'value'), graphConfigString(nodeItem.config, 'valueType', 'BOOLEAN')))
+    .replaceAll('{amount}', graphConfigString(nodeItem.config, 'amount', '1'))
+    .replaceAll('{durationSeconds}', graphConfigString(nodeItem.config, 'durationSeconds', '30'))
+    .replaceAll('{target}', targetLabel(graphConfigString(nodeItem.config, 'target', 'CURRENT_PLAYER')))
+    .replaceAll('{message.plainText}', shortRichText(graphConfigString(nodeItem.config, 'message')))
+    .replaceAll('{message}', shortRichText(graphConfigString(nodeItem.config, 'message')))
+    .replaceAll('{tag}', graphConfigString(nodeItem.config, 'tag', '标签'));
 }
 
 function legacyNodeTypeSummary(nodeItem: GraphNode): string {
   const config = nodeItem.config;
+  const value = (key: string, fallback = '') => graphConfigString(config, key, fallback);
   switch (nodeItem.type) {
     case 'MANUAL_TRIGGER':
       return 'WebUI 点击后调用真实后端 API';
     case 'STATE_COMPARE_CONDITION':
       return conditionStateSummary(nodeItem);
     case 'MESSAGE_ACTION':
-      return `向当前玩家发送：${richTextPlainText(config.message ?? '')}`;
-    case 'PLAYER_HAS_TAG_CONDITION':
-      return playerTagConditionSummary(nodeItem);
+      return `向当前玩家发送：${richTextPlainText(value('message'))}`;
+    case 'ENTITY_HAS_TAG_CONDITION':
+      return entityTagConditionSummary(nodeItem);
     case 'PLAYER_IS_ADMIN_CONDITION':
       return playerAdminConditionSummary(nodeItem);
     case 'PLAYER_DIMENSION_CONDITION':
@@ -247,31 +250,25 @@ function legacyNodeTypeSummary(nodeItem: GraphNode): string {
     case 'PLAYER_NEAR_TARGET_BLOCK_CONDITION':
       return playerNearTargetBlockConditionSummary(nodeItem);
     case 'CONTROL_LOOP_COUNT':
-      return `把内部积木循环 ${config.count ?? '3'} 次后继续。`;
+      return `把内部积木循环 ${value('count', '3')} 次后继续。`;
     case 'CONTROL_LOOP_FOREVER':
-      return `持续循环内部积木，每轮间隔 ${config.intervalSeconds ?? '1'} 秒。`;
+      return `持续循环内部积木，每轮间隔 ${value('intervalSeconds', '1')} 秒。`;
     case 'CONTROL_LOOP_UNTIL':
       return `配置了 ${nodeItem.conditionSlots?.length ?? 0} 个结束条件槽。`;
     case 'CONTEXT_ENTITY_EXECUTE_AS':
-      return `以「${entitySourceLabel(config.entitySource)}」为上下文执行。`;
-    case 'CONTEXT_ENTITY_HAS_TAG_CONDITION':
-      return `按上下文实体是否拥有标签「${config.tag ?? '标签'}」继续。`;
-    case 'CONTEXT_ENTITY_ADD_TAG_ACTION':
-      return `为上下文实体添加标签「${config.tag ?? '标签'}」。`;
-    case 'CONTEXT_ENTITY_REMOVE_TAG_ACTION':
-      return `移除上下文实体标签「${config.tag ?? '标签'}」。`;
-    case 'PLAYER_ADD_TAG_ACTION':
-      return `给当前玩家添加标签“${config.tag ?? '标签'}”。`;
-    case 'PLAYER_REMOVE_TAG_ACTION':
-      return `移除当前玩家的标签“${config.tag ?? '标签'}”。`;
+      return `以「${entityTargetLabel(entityTargetRef(config))}」为上下文执行。`;
+    case 'ENTITY_ADD_TAG_ACTION':
+      return `给「${entityTargetLabel(entityTargetRef(config))}」添加标签「${value('tag', '标签')}」。`;
+    case 'ENTITY_REMOVE_TAG_ACTION':
+      return `移除「${entityTargetLabel(entityTargetRef(config))}」的标签「${value('tag', '标签')}」。`;
     case 'STATE_SET_ACTION':
-      return `把“${scopeLabel(config.scope)}”的 ${config.key ?? '状态名'} 设置为“${stateValueLabel(config.value ?? '', config.valueType ?? 'BOOLEAN')}”。`;
+      return `把“${scopeLabel(value('scope'))}”的 ${value('key', '状态名')} 设置为“${stateValueLabel(value('value'), value('valueType', 'BOOLEAN'))}”。`;
     case 'STATE_ADD_ACTION':
-      return `把“${scopeLabel(config.scope)}”的 ${config.key ?? '状态名'} 增加 ${config.amount ?? '1'}。`;
+      return `把“${scopeLabel(value('scope'))}”的 ${value('key', '状态名')} 增加 ${value('amount', '1')}。`;
     case 'TIMER_START_ACTION':
-      return `等待 ${config.durationSeconds ?? '30'} 秒后继续。`;
+      return `等待 ${value('durationSeconds', '30')} 秒后继续。`;
     case 'DEBUG_LOG_ACTION':
-      return `记录：${config.message ?? ''}`;
+      return `记录：${value('message')}`;
     default:
       return nodeItem.id;
   }
@@ -285,23 +282,12 @@ export function booleanLabel(value = 'false'): string {
   return booleanOptions().find((option) => option.value === value)?.label ?? value;
 }
 
-export function entitySourceLabel(value = 'CONDITION_SUBJECT'): string {
-  switch (value) {
-    case 'RUN_ENTITY':
-      return '运行实体';
-    case 'TARGET_ENTITY':
-      return '目标实体';
-    default:
-      return '当前条件对象';
-  }
-}
-
 export { conditionOutputModeLabel };
 
 function conditionStateSummary(nodeItem: GraphNode): string {
   const config = nodeItem.config;
-  const subject = `「${scopeLabel(config.scope)}」的 ${config.key || '状态名'}`;
-  const expected = `「${booleanLabel(config.expected ?? 'false')}」`;
+  const subject = `「${scopeLabel(graphConfigString(config, 'scope'))}」的 ${graphConfigString(config, 'key', '状态名')}`;
+  const expected = `「${booleanLabel(graphConfigString(config, 'expected', 'false'))}」`;
   switch (conditionOutputMode(nodeItem)) {
     case 'PASS_ONLY':
       return `当${subject}等于${expected}时继续。`;
@@ -312,15 +298,16 @@ function conditionStateSummary(nodeItem: GraphNode): string {
   }
 }
 
-function playerTagConditionSummary(nodeItem: GraphNode): string {
-  const tag = nodeItem.config.tag || '标签';
+function entityTagConditionSummary(nodeItem: GraphNode): string {
+  const target = entityTargetLabel(entityTargetRef(nodeItem.config));
+  const tag = graphConfigString(nodeItem.config, 'tag', '标签');
   switch (conditionOutputMode(nodeItem)) {
     case 'PASS_ONLY':
-      return `当拥有标签「${tag}」时继续。`;
+      return `当「${target}」拥有标签「${tag}」时继续。`;
     case 'FAIL_ONLY':
-      return `当当前玩家不拥有标签「${tag}」时继续。`;
+      return `当「${target}」没有标签「${tag}」时继续。`;
     case 'BRANCH':
-      return `按当前玩家是否拥有标签「${tag}」分开执行。`;
+      return `按「${target}」是否拥有标签「${tag}」分开执行。`;
   }
 }
 
@@ -336,7 +323,7 @@ function playerAdminConditionSummary(nodeItem: GraphNode): string {
 }
 
 function playerDimensionConditionSummary(nodeItem: GraphNode): string {
-  const dimensionId = nodeItem.config.dimensionId || 'minecraft:overworld';
+  const dimensionId = graphConfigString(nodeItem.config, 'dimensionId', 'minecraft:overworld');
   switch (conditionOutputMode(nodeItem)) {
     case 'PASS_ONLY':
       return `当当前玩家位于维度「${dimensionId}」时继续。`;
@@ -348,7 +335,7 @@ function playerDimensionConditionSummary(nodeItem: GraphNode): string {
 }
 
 function playerRegionConditionSummary(nodeItem: GraphNode): string {
-  const regionName = nodeItem.config.regionName || '区域名称';
+  const regionName = graphConfigString(nodeItem.config, 'regionName', '区域名称');
   switch (conditionOutputMode(nodeItem)) {
     case 'PASS_ONLY':
       return `当当前玩家在区域「${regionName}」内时继续。`;
@@ -372,7 +359,7 @@ function playerYCompareConditionSummary(nodeItem: GraphNode): string {
 }
 
 function targetBlockTypeConditionSummary(nodeItem: GraphNode): string {
-  const blockId = nodeItem.config.blockId || 'minecraft:stone';
+  const blockId = graphConfigString(nodeItem.config, 'blockId', 'minecraft:stone');
   switch (conditionOutputMode(nodeItem)) {
     case 'PASS_ONLY':
       return `当目标方块为「${blockId}」时继续。`;
@@ -396,8 +383,8 @@ function targetBlockYCompareConditionSummary(nodeItem: GraphNode): string {
 }
 
 function playerNearTargetBlockConditionSummary(nodeItem: GraphNode): string {
-  const maxDistance = nodeItem.config.maxDistance || '5';
-  const distanceMode = nodeItem.config.horizontalOnly === 'false' ? '三维距离' : '水平距离';
+  const maxDistance = graphConfigString(nodeItem.config, 'maxDistance', '5');
+  const distanceMode = graphConfigString(nodeItem.config, 'horizontalOnly') === 'false' ? '三维距离' : '水平距离';
   switch (conditionOutputMode(nodeItem)) {
     case 'PASS_ONLY':
       return `当玩家${distanceMode}距离目标方块不超过 ${maxDistance} 格时继续。`;
@@ -409,7 +396,7 @@ function playerNearTargetBlockConditionSummary(nodeItem: GraphNode): string {
 }
 
 function targetBlockRegionConditionSummary(nodeItem: GraphNode): string {
-  const regionName = nodeItem.config.regionName || '区域名称';
+  const regionName = graphConfigString(nodeItem.config, 'regionName', '区域名称');
   switch (conditionOutputMode(nodeItem)) {
     case 'PASS_ONLY':
       return `当目标方块在区域「${regionName}」内时继续。`;
@@ -421,15 +408,15 @@ function targetBlockRegionConditionSummary(nodeItem: GraphNode): string {
 }
 
 function yCompareLabel(nodeItem: GraphNode): string {
-  switch (nodeItem.config.compareMode || 'AT_OR_ABOVE') {
+  switch (graphConfigString(nodeItem.config, 'compareMode', 'AT_OR_ABOVE')) {
     case 'AT_OR_BELOW':
-      return `不高于 ${nodeItem.config.targetY || '64'}`;
+      return `不高于 ${graphConfigString(nodeItem.config, 'targetY', '64')}`;
     case 'EQUAL':
-      return `等于 ${nodeItem.config.targetY || '64'}`;
+      return `等于 ${graphConfigString(nodeItem.config, 'targetY', '64')}`;
     case 'BETWEEN':
-      return `在 ${nodeItem.config.minY || '60'} 到 ${nodeItem.config.maxY || '80'} 之间`;
+      return `在 ${graphConfigString(nodeItem.config, 'minY', '60')} 到 ${graphConfigString(nodeItem.config, 'maxY', '80')} 之间`;
     default:
-      return `不低于 ${nodeItem.config.targetY || '64'}`;
+      return `不低于 ${graphConfigString(nodeItem.config, 'targetY', '64')}`;
   }
 }
 

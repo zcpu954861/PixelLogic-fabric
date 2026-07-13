@@ -16,7 +16,7 @@ This stage does not add OR, grouped expressions, asynchronous predicates, break/
 
 Only these existing block ids are predicate-compatible in v1:
 
-- `condition.player.has_tag`
+- `condition.entity.has_tag`
 - `condition.player.is_admin`
 - `condition.player.dimension_is`
 - `condition.player.in_region`

@@ -1,10 +1,12 @@
 package com.pixelmc.pixellogic.server.storage;
 
+import com.google.gson.annotations.JsonAdapter;
 import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.EdgeType;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.ConditionSlotDefinition;
+import com.pixelmc.pixellogic.core.model.ConfigMapJsonAdapter;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
 import com.pixelmc.pixellogic.core.model.SlotDefinition;
@@ -109,7 +111,7 @@ public record GraphDocument(
             case COMMAND_TRIGGER -> "命令触发";
             case STATE_COMPARE_CONDITION -> "是否未开始";
             case MESSAGE_ACTION -> "发送欢迎语";
-            case PLAYER_HAS_TAG_CONDITION -> "判断玩家标签";
+            case ENTITY_HAS_TAG_CONDITION -> "判断实体标签";
             case PLAYER_IS_ADMIN_CONDITION -> "判断管理员";
             case PLAYER_DIMENSION_CONDITION -> "判断玩家维度";
             case PLAYER_IN_REGION_CONDITION -> "判断玩家区域";
@@ -122,11 +124,8 @@ public record GraphDocument(
             case CONTROL_LOOP_FOREVER -> "无限循环";
             case CONTROL_LOOP_UNTIL -> "循环直到";
             case CONTEXT_ENTITY_EXECUTE_AS -> "以实体为上下文执行";
-            case CONTEXT_ENTITY_HAS_TAG_CONDITION -> "上下文实体是否拥有标签";
-            case CONTEXT_ENTITY_ADD_TAG_ACTION -> "为上下文实体添加标签";
-            case CONTEXT_ENTITY_REMOVE_TAG_ACTION -> "移除上下文实体标签";
-            case PLAYER_ADD_TAG_ACTION -> "添加玩家标签";
-            case PLAYER_REMOVE_TAG_ACTION -> "移除玩家标签";
+            case ENTITY_ADD_TAG_ACTION -> "添加实体标签";
+            case ENTITY_REMOVE_TAG_ACTION -> "移除实体标签";
             case STATE_SET_ACTION -> "记录开始状态";
             case STATE_ADD_ACTION -> "累计开始次数";
             case TIMER_START_ACTION -> "等待倒计时";
@@ -176,6 +175,7 @@ public record GraphDocument(
             String parentSlot,
             List<ConditionSlotDefinition> conditionSlots,
             String displayName,
+            @JsonAdapter(ConfigMapJsonAdapter.class)
             Map<String, String> config,
             Position position,
             List<SlotDocument> slots

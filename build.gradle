@@ -60,6 +60,7 @@ def selfChecks = [
 	loopUntilConditionRackSelfCheck: 'com.pixelmc.pixellogic.core.runtime.LoopUntilConditionRackSelfCheck',
 	entityExecutionContextSelfCheck: 'com.pixelmc.pixellogic.core.runtime.EntityExecutionContextSelfCheck',
 	entityTargetReferenceSelfCheck: 'com.pixelmc.pixellogic.core.runtime.EntityTargetReferenceSelfCheck',
+	entityHealthTerminationSelfCheck: 'com.pixelmc.pixellogic.core.runtime.EntityHealthTerminationSelfCheck',
 	catalogValidationCleanupSelfCheck: 'com.pixelmc.pixellogic.core.catalog.CatalogValidationCleanupSelfCheck',
 ]
 

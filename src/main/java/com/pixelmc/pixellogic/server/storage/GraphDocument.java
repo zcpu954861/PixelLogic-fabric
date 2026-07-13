@@ -126,6 +126,11 @@ public record GraphDocument(
             case CONTEXT_ENTITY_EXECUTE_AS -> "以实体为上下文执行";
             case ENTITY_ADD_TAG_ACTION -> "添加实体标签";
             case ENTITY_REMOVE_TAG_ACTION -> "移除实体标签";
+            case ENTITY_DAMAGE_ACTION -> "伤害实体";
+            case ENTITY_HEAL_ACTION -> "恢复实体生命值";
+            case ENTITY_SET_HEALTH_ACTION -> "设置实体生命值";
+            case ENTITY_KILL_ACTION -> "杀死实体";
+            case ENTITY_REMOVE_ACTION -> "移除实体";
             case STATE_SET_ACTION -> "记录开始状态";
             case STATE_ADD_ACTION -> "累计开始次数";
             case TIMER_START_ACTION -> "等待倒计时";

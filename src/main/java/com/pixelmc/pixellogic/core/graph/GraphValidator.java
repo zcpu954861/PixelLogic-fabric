@@ -7,6 +7,7 @@ import com.pixelmc.pixellogic.core.catalog.BuiltInBlockCatalog;
 import com.pixelmc.pixellogic.core.catalog.RichTextComponentValue;
 import com.pixelmc.pixellogic.core.model.EdgeDefinition;
 import com.pixelmc.pixellogic.core.model.EntityTargetRef;
+import com.pixelmc.pixellogic.core.model.EntityTargetSource;
 import com.pixelmc.pixellogic.core.model.GraphDefinition;
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
 import com.pixelmc.pixellogic.core.model.NodeType;
@@ -111,6 +112,10 @@ public final class GraphValidator {
                 case CONTEXT_ENTITY_EXECUTE_AS -> {
                 }
                 case ENTITY_ADD_TAG_ACTION, ENTITY_REMOVE_TAG_ACTION -> validateTagConfig(node, issues);
+                case ENTITY_REMOVE_ACTION -> validateRemoveTarget(node, issues);
+                case ENTITY_DAMAGE_ACTION, ENTITY_HEAL_ACTION, ENTITY_SET_HEALTH_ACTION,
+                     ENTITY_KILL_ACTION -> {
+                }
                 case STATE_SET_ACTION -> validateStateSetValue(node, issues);
                 case STATE_ADD_ACTION -> validateStateAddType(node, issues);
                 case TIMER_START_ACTION -> {
@@ -289,6 +294,16 @@ public final class GraphValidator {
         }
     }
 
+    private void validateRemoveTarget(NodeDefinition node, List<ValidationIssue> issues) {
+        try {
+            if (EntityTargetRef.parse(node.config().get("target")).source() == EntityTargetSource.ONLINE_PLAYER) {
+                error(issues, "entity_remove_player_forbidden", "移除实体不能使用指定在线玩家目标：" + node.id() + ".target");
+            }
+        } catch (IllegalArgumentException ignored) {
+            // The shared entity-target validation reports malformed config.
+        }
+    }
+
     private String entityTargetConfigCode(String detail) {
         if (detail.contains("target.source")) {
             return "entity_target_source_invalid";
@@ -329,6 +344,9 @@ public final class GraphValidator {
     private void validateNumberValue(NodeDefinition node, String key, String value, BlockFormFieldDefinition field, List<ValidationIssue> issues) {
         try {
             double numeric = "integer".equals(field.type()) ? Integer.parseInt(value) : Double.parseDouble(value);
+            if (!Double.isFinite(numeric)) {
+                throw new NumberFormatException("number must be finite");
+            }
             if (!field.min().isBlank() && numeric < Double.parseDouble(field.min())) {
                 error(issues, "config_number_range", "数值低于允许范围：" + node.id() + "." + key);
             }

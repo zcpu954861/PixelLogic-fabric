@@ -192,7 +192,8 @@ public final class PixelLogicSpikeService implements AutoCloseable {
                 result.traceId(),
                 result.message(),
                 result.status() == SimulationExecutionResult.Status.WAITING,
-                result.targetError()
+                result.targetError(),
+                result.actionError()
         );
     }
 

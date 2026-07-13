@@ -2,7 +2,7 @@
 
 正式名称：**Player & Entity Foundation v1-A / 玩家与实体基础包：目标、生命与状态**。
 
-This is the design contract for the full v1-A pack and the implementation record for Slice 1. The later health, effect, game-mode and condition blocks remain planned only.
+This is the design contract for the full v1-A pack and the implementation record for Slice 1 plus Slice 2. Status-effect, game-mode and condition blocks remain planned only.
 
 ## Product slice
 
@@ -27,11 +27,11 @@ action.entity.remove_tag
 
 All three use the shared composite `target: EntityTargetRef`, requirement `ANY_ENTITY`, and an explicit new-node default of `CURRENT_ENTITY`. The condition remains compatible with `PASS_ONLY`, `FAIL_ONLY`, `BRANCH` and Predicate Rack, records the resolved entity as condition subject for normal true/false results, and leaves condition object empty. The retired block IDs are unknown, and their former tag NodeTypes are absent.
 
-Slice 1 also removes the former permanent run-start source, adds the shared resolver/errors/action outcome, provides on-demand online-player UUID selection, and moves `context.entity.execute_as` onto the same target control. The eight later actions and six later conditions specified below are not implemented by Slice 1.
+Slice 1 also removes the former permanent run-start source, adds the shared resolver/errors/action outcome, provides on-demand online-player UUID selection, and moves `context.entity.execute_as` onto the same target control. Slice 2 now implements the five health/termination actions below; the remaining three actions and six conditions stay planned.
 
 ## Taxonomy plan
 
-These are planned paths only. The Catalog must not register them until real blocks are implemented.
+The Catalog registers only paths with real blocks. `生命与属性` and `实体管理` are implemented by Slice 2; `状态效果` and `玩家设置` remain planned and are not registered yet.
 
 ```text
 玩家与实体
@@ -54,24 +54,20 @@ All Slice 1 tag blocks and the fourteen later blocks use `ENTITY_TARGET_REFERENC
 Actions extend the existing node-result path with one bounded `RuntimeActionOutcome`:
 
 ```text
-nodeId
-blockId
 status              SUCCESS / FAILURE
+kind                canonical blockId/action kind
 code
-targetId            resolved stable identity, optional on failure
-targetDisplay       bounded readable display, optional on failure
+message
+target              resolved stable reference when available
 changed
 affectedCount
-message
-beforeSummary       optional
-afterSummary        optional
 ```
 
-`targetId` and `targetDisplay` describe the resolved entity; an unresolved target does not fabricate either value. `message` is required readable text capped at 512 characters.
+The surrounding `SimulationActionResult` supplies `nodeId`. `target` contains the stable identity and bounded display name; unresolved target errors do not fabricate a target.
 
-`RuntimeNodeExecutionResult` gains nullable `actionOutcome` beside its existing output, Trace, condition result and structured error. `RuntimeServices` gains `recordActionResult(RuntimeActionOutcome)`. Runtime and Simulation implementations of that typed recorder retain every field above. The existing string recorder remains only for unaffected existing callers; neither overload delegates to the other, and it is not an old-block compatibility path.
+`RuntimeNodeExecutionResult` carries nullable `actionOutcome` beside its output, Trace and condition result. `RuntimeServices.recordActionOutcome` preserves the typed outcome; unaffected legacy actions continue to use the string recorder.
 
-The executor returns `actionOutcome` and does not record it directly. `GraphRuntime` records a non-null outcome exactly once. `SUCCESS` may continue through the ordinary done edge. `FAILURE` carries the same stable code/message as the structured terminal error and does not select an output. `SimulationActionResult` and the existing action-results API gain additive `blockId`, `targetId`, `targetDisplay`, `status`, `code`, `changed`, `affectedCount`, `beforeSummary` and `afterSummary` fields while retaining their existing fields.
+The executor returns `actionOutcome` and does not record it directly. `GraphRuntime` records a non-null outcome exactly once. `SUCCESS` may continue through the ordinary done edge. `FAILURE` carries the same stable code/message as `RuntimeResult.targetError` or `RuntimeResult.actionError` and does not select an output. Before/after health is kept in the bounded readable message rather than a free-form payload map.
 
 The two Slice 1 tag actions are the first consumers:
 
@@ -80,7 +76,7 @@ The two Slice 1 tag actions are the first consumers:
 - a real add or remove returns `SUCCESS`, `changed=true`, `affectedCount=1`;
 - target resolution failure returns `FAILURE`, `changed=false`, `affectedCount=0` and the structured terminal target error.
 
-This is not a generic object/result framework. It is the minimum extension first reused by the two Slice 1 tag actions and later by the eight v1-A actions. There is no free-form payload map. Block-specific facts use bounded before/after strings capped at 256 characters.
+This is not a generic object/result framework. It is the minimum extension reused by the Slice 1 tag actions and Slice 2 health/termination actions. There is no free-form payload map.
 
 All common target errors come from EntityTargetRef. Domain errors use stable codes. Trace includes the readable target, requested operation, changed/no-change outcome, selected condition output, and error code when present; it must not dump Minecraft objects.
 
@@ -109,17 +105,18 @@ Literal numbers remain ordinary Form Schema number fields. v1-A does not introdu
 
 v1-A uses fixed implementation bounds rather than adapter-dependent defaults:
 
-- damage, heal and set-health values are decimal health points in `0.001..1_000_000`;
+- damage and heal values are decimal health points in `0.001..1_000_000`;
+- set-health values are decimal health points in `0..1_000_000` and must not exceed the resolved target's current maximum health;
 - health-condition values are decimal health points in `0..1_000_000`;
 - status-effect duration is an integer `1..1_000_000` seconds;
 - minimum remaining effect duration is an integer `0..1_000_000` seconds;
 - effect level is user-facing `1..256` and maps exactly to amplifier `0..255` by subtracting one;
 - seconds convert to ticks with checked integer multiplication `seconds × 20`; overflow or a non-integral/invalid config fails validation before execution;
 - health/damage values must parse as finite decimal numbers; `NaN`, infinity, underflow below the declared minimum and values above the maximum are rejected;
-- runtime conversion to the target-version numeric type occurs only after validation and must reject a non-finite conversion;
+- Runtime and Simulation convert health values to the target-version numeric type only after validation, so both report the same `changed` semantics at float precision;
 - health `EQUAL` uses the same fixed `0.0001` tolerance in Simulation and Runtime.
 
-No action saturates numeric overflow silently. The only clamp is the explicit `CLAMP_TO_MAX` set-health policy and ordinary heal-to-maximum behavior.
+No action saturates numeric overflow silently. Only ordinary healing stops at maximum health; set-health above the resolved maximum fails without clamping.
 
 ## Final action set
 
@@ -139,14 +136,14 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Responsibility:** ask the Minecraft damage pipeline to apply typed damage; it is not direct health subtraction.
 - **Target/default:** `LIVING_ENTITY`, default `CURRENT_ENTITY`; target must be alive.
 - **Common parameters:** target and damage amount in health points (`0.001..1_000_000`).
-- **Advanced parameters:** closed `damageKind` enum. Recommended v1 values are `GENERIC`, `MAGIC`, `FIRE`, `FREEZE`, `DROWN`; the Minecraft 1.21.11 adapter audit must verify exact registry/API mapping before implementation.
+- **Advanced parameters:** closed `damageKind` enum: `GENERIC`, `MAGIC`, `FIRE`, `FALL`, `VOID`.
 - **Explicitly unsupported:** arbitrary damage-type resource ids, attacker/projectile ownership, bypass flags, custom death messages and direct set-health behavior.
 - **Form Schema:** `entity_target`, number `amount`, select `damageKind`.
 - **Summary:** `对当前执行实体造成 4 点普通伤害`.
 - **GraphValidator:** target config, finite positive range and known damage kind.
-- **Simulation:** use one explicit deterministic approximation: if fixture `invulnerable=true`, reject with no change; otherwise `effectiveDamage=min(requestedAmount,currentHealth)` and reduce fixture health by that value. Armor, resistance, damage cooldown and enchantments are not modelled. The Catalog declares `APPROXIMATE_SIMULATION`, and Trace/result message calls this an unmitigated approximation, so it validates flow/death intent rather than predicting the server's accepted amount.
-- **Runtime contract:** loader adapter constructs the audited 1.21.11 damage source and invokes the normal damage path so armor, resistance, invulnerability, events and death semantics remain Minecraft-authoritative.
-- **Errors/result:** `ENTITY_TARGET_NOT_ALIVE`, `ENTITY_DAMAGE_REJECTED`, `ENTITY_DAMAGE_KIND_UNAVAILABLE`; result distinguishes requested amount, accepted/no-change and before/after health when observable.
+- **Simulation:** use one explicit deterministic approximation at target-runtime float precision: if fixture `invulnerable=true`, reject with no change; otherwise apply unmitigated damage to fixture health. Armor, resistance, damage cooldown and enchantments are not modelled. The Catalog declares `APPROXIMATE_SIMULATION`, and Trace/result message calls this an unmitigated approximation, so it validates flow/death intent rather than predicting the server's accepted amount.
+- **Runtime contract:** the audited 1.21.11 adapter maps to `generic()`, `magic()`, `inFire()`, `fall()` or `outOfWorld()` and invokes `damage(ServerWorld, DamageSource, float)` so Minecraft remains authoritative.
+- **Errors/result:** `ENTITY_TARGET_NOT_ALIVE`, `ENTITY_DAMAGE_REJECTED`, `ENTITY_DAMAGE_KIND_UNSUPPORTED`; result distinguishes requested amount, accepted/no-change and before/after health when observable.
 - **Trace/help:** explains that the real server may reduce or reject damage; example: damage the latest condition subject after a type check.
 - **Self-check:** deterministic approximation, invulnerable rejection, death, wrong type, dead target, each source and continuation cancellation; a Runtime adapter spy proves the real executor issues a damage request and never substitutes a set-health request.
 - **Creation/defaults:** new Catalog nodes explicitly store `target.source=CURRENT_ENTITY` and `damageKind=GENERIC`; missing target or amount is invalid.
@@ -170,20 +167,20 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 
 ### `action.entity.set_health` — 设置实体生命值
 
-- **Responsibility:** set one living entity to an explicit positive health value.
+- **Responsibility:** set one living entity to an explicit health value, including zero.
 - **Target/default:** alive `LIVING_ENTITY`, default `CURRENT_ENTITY`.
-- **Common parameters:** target and finite `health` in `0.001..1_000_000`.
-- **Advanced parameters:** `aboveMaximum`: `CLAMP_TO_MAX` (default) or `FAIL`.
-- **Explicitly unsupported:** value zero as an indirect kill, maximum-health/attribute mutation, absorption and resurrection.
-- **Form Schema:** `entity_target`, number `health`, segmented/select `aboveMaximum`.
+- **Common parameters:** target and finite `health` in `0..1_000_000`, additionally bounded by the resolved target's maximum health.
+- **Advanced parameters:** none in v1.
+- **Explicitly unsupported:** maximum-health/attribute mutation, absorption and resurrection.
+- **Form Schema:** `entity_target`, number `health`.
 - **Summary:** `把当前执行实体的生命值设为 10`.
-- **GraphValidator:** positive finite bound and known policy.
-- **Simulation:** use fixture maximum and the selected clamp/fail policy.
-- **Runtime contract:** read current maximum then set through the audited living-entity API; setting death through zero is prohibited so kill remains distinct.
+- **GraphValidator:** finite static bound; Runtime/Simulation also enforce the resolved target's current maximum.
+- **Simulation:** use the fixture maximum and fail above it without clamping.
+- **Runtime contract:** read current maximum then call the audited living-entity `setHealth(float)` API. Zero follows the current version's health-zero/death state, while `kill` remains the explicit normal kill operation.
 - **Errors/result:** `ENTITY_TARGET_NOT_ALIVE`, `ENTITY_HEALTH_ABOVE_MAXIMUM`; result includes requested, applied and before/after health.
 - **Trace/help:** warns that maximum health can vary by attributes and effects.
-- **Self-check:** below/equal/above max, both policies, dead/wrong target and no zero-kill alias.
-- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY` and `CLAMP_TO_MAX`; health is required and missing target is invalid.
+- **Self-check:** below/equal/zero/negative/above max, dead/wrong target and no remove alias.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY`; health is required and missing target is invalid.
 
 ### `action.entity.kill` — 杀死实体
 
@@ -217,7 +214,7 @@ No action saturates numeric overflow silently. The only clamp is the explicit `C
 - **Errors/result:** `ENTITY_REMOVE_PLAYER_FORBIDDEN`, `ENTITY_TARGET_UNRESOLVABLE`; changed true only on actual removal.
 - **Trace/help:** prominently contrasts remove with kill.
 - **Self-check:** mob removal, player rejection, later reference failure, double removal and no death-result emission.
-- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY`; missing target is invalid. Player prohibition is an open product decision and implementation gate.
+- **Creation/defaults:** new nodes explicitly store `CURRENT_ENTITY`; missing target is invalid. Statically player-only targets fail GraphValidator, with runtime and adapter guards retained for dynamic targets.
 
 ### `action.entity.add_status_effect` — 给予状态效果
 
@@ -375,7 +372,7 @@ The first implementation supplies at least one runnable/help-center example per 
 |---|---|
 | `action.entity.damage` | after “实体类型是否为 zombie”, damage the latest condition subject by 4 |
 | `action.entity.heal` | heal the current execution entity by 6 after a checkpoint |
-| `action.entity.set_health` | set a round participant to 20 health with clamp-to-maximum |
+| `action.entity.set_health` | set a round participant to 20 health, failing if its current maximum is lower |
 | `action.entity.kill` | kill the current execution entity when it enters an elimination path |
 | `action.entity.remove` | remove a spawned non-player cleanup entity without loot/death flow |
 | `action.entity.add_status_effect` | give Speed II for 30 seconds with particles and icon |
@@ -394,7 +391,7 @@ The first implementation supplies at least one runnable/help-center example per 
 |---|---|---|
 | entity damage | include | high-frequency and meaningfully different from set health |
 | heal | include | common minigame reward/recovery behavior |
-| set health | include | deterministic setup behavior; zero is prohibited to keep kill distinct |
+| set health | include | deterministic setup behavior; zero is allowed, while explicit kill retains normal kill semantics |
 | add/remove effect | include both | common and share one small status-effect component |
 | kill | include | preserves death semantics |
 | remove entity | include behind explicit no-player safety decision | necessary cleanup behavior and deliberately distinct from kill |
@@ -410,7 +407,7 @@ Forms follow user behavior, not Minecraft internals:
 
 - **Common:** target and the one main behavior value.
 - **Display:** effect particles/icon/ambient settings.
-- **Advanced:** explicit replacement/clamp policy or audited damage kind.
+- **Advanced:** explicit replacement policy or audited damage kind.
 
 The current Form Schema has no disclosure-group model. v1-A adds only three `ui` tokens to the existing string metadata: `section:common`, `section:display` and `section:advanced`. The editor groups fields in schema order; common is always visible, while display and advanced render as accessible native disclosures, collapsed by default. Unknown section tokens fail the Catalog self-check. This needs no new `BlockFormFieldDefinition` field and does not create a layout schema.
 
@@ -442,24 +439,19 @@ After all automatic checks and the explicit user hand-test gate, the implementat
 
 This slice establishes the shared target/error/result boundary reused by every later slice. Its final release gate is the explicit Stage B user hand-test matrix.
 
-### Slice 2 — Health and Termination (next)
+### Slice 2 — Health and Termination (implemented, awaiting user hand-test gate)
 
 Scope: damage, heal, set health, kill and remove. The Simulation fixture extends Slice 1 metadata with bounded `health`, `maximumHealth` and `invulnerable` facts, and makes the existing per-run `alive` fact mutable for damage/kill transitions; it does not introduce a second alive field.
 
-Recommended branch: `feature/player-entity-health-v1a`, based on merged Slice 1 after its hand-test and merge gates.
+Implementation branch: `feature/player-entity-health-termination-v1`, based on merged Slice 1.
 
-Suggested commits:
-
-1. `feat: add entity health actions`;
-2. `feat: add entity kill and remove actions`.
-
-Implementation gate: target-version damage/kill/discard APIs and the “remove players” product decision must be settled first.
+The audited adapter uses normal 1.21.11 damage/kill APIs and `discard()` for removal. Player removal is permanently rejected. After automatic validation, this slice remains uncommitted until the explicit user hand-test gate; its intended single commit is `feat: add entity health and termination actions`.
 
 ### Slice 3 — Status effects and player setting
 
 Scope: add/remove status effect and set game mode. The Simulation fixture gains a per-run effect map and player game-mode fact before these executors are registered. The implementation gate is an audited, explicit `VANILLA_UPDATE`/`REPLACE` transition table—including infinite existing effects—for the target Minecraft version.
 
-Recommended branch: `feature/player-entity-status-v1a`, based on merged Slice 1 (it need not wait for Slice 2 if shared result/error contracts are already merged).
+Recommended branch: `feature/player-entity-status-v1a`, based on merged Slice 2 so it reuses the finalized life-state fixture and result contract.
 
 Suggested commits:
 
@@ -474,7 +466,7 @@ Recommended branch: `feature/player-entity-conditions-v1a`, based on merged Slic
 
 Suggested commit: `feat: add player entity predicate capsules`.
 
-Each slice is independently reviewable and mergeable. Slices 2 and 3 depend on Slice 1 and may proceed in parallel; Slice 4 depends on merged Slices 2 and 3. No slice should add future empty Catalog categories; only categories with its real blocks are registered.
+Each slice is independently reviewable and mergeable. Slice 3 follows merged Slice 2; Slice 4 depends on merged Slices 2 and 3. No slice should add future empty Catalog categories; only categories with its real blocks are registered.
 
 ## User hand-test gates
 
@@ -491,7 +483,7 @@ Slice 1:
 Slice 2:
 
 - damage differs from direct set health;
-- heal clamps, set-health policy is visible, kill triggers death semantics;
+- heal stops at maximum; set-health accepts zero and fails above the resolved maximum without clamping; kill triggers normal death semantics;
 - remove never accepts a player and does not produce death/loot semantics.
 
 Slice 3:

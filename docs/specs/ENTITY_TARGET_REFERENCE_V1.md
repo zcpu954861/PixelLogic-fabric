@@ -16,7 +16,7 @@ The approved reform is intentionally breaking:
 - remove old block IDs, NodeTypes, aliases and implicit defaults;
 - do not add a migrator, deprecated Catalog entry or compatibility wrapper.
 
-The Stage B implementation has a 25-block Catalog (`28 - 6 + 3`), the shared target model/resolver, the generic tag blocks and the online-player boundary described below. User hand-testing remains the final release gate.
+Slice 1 produced a 25-block Catalog (`28 - 6 + 3`) and the shared target model/resolver. Health and Termination Slice 2 now reuses it for five additional actions, bringing the current feature Catalog to 30 blocks. User hand-testing remains the final release gate.
 
 ## Non-goals
 
@@ -233,8 +233,9 @@ Runtime and Simulation must not collapse these states. A saved name hint is disp
 The loader adapter provides:
 
 - exact online-player resolution by UUID;
+- exact UUID lookup of currently loaded non-player entities across server worlds, without enumerating entity collections or loading chunks;
 - bounded listing/search of current online players;
-- minimal type/living/alive/online metadata;
+- type/living/alive/online plus health/action access required by current consumers;
 - no world-entity enumeration, chunk loading or live-object storage in core/cursors.
 
 The WebUI loads the directory only when the player picker opens or the user presses refresh. It performs no periodic polling and exposes no manual UUID input.
@@ -293,7 +294,7 @@ Simulation follows the same four-source resolver and error codes.
 - a scenario may deliberately initialize no current entity;
 - the existing optional target fixture supplies `TARGET_ENTITY`;
 - an `ONLINE_PLAYER` UUID matching the test actor resolves to the existing per-run actor copy;
-- the first different UUID is resolved lazily through the delegate provider and binds the run's only additional online-player fixture; a successful lookup copies that exact player's identity, display name and current tags into Simulation;
+- the first different UUID is resolved lazily through the delegate provider and binds the run's only additional online-player fixture; a successful lookup copies that exact player's identity, display name, tags, health, maximum health and invulnerability into Simulation;
 - later resolutions of that same UUID, including after an in-run Continuation, reuse the bound lookup and mutable simulation copy without querying or mutating the provider entity;
 - after that fixture slot is bound, a second different UUID is unresolvable and fails closed; no online-player collection or world scan is introduced.
 
@@ -372,9 +373,9 @@ Outside formal historical “removed ID” documentation, repository searches fo
 - WebUI uses one compact accessible target editor for tag blocks and execute-as;
 - no selector, collection, position context, offline player or success/failure graph port is added.
 
-## Next slice
+## Current consumer slice
 
-After Stage B automatic validation and the explicit user hand-test gate, the next implementation slice is **Health and Termination**: damage, heal, set health, kill and non-player removal. This specification does not implement or pre-register those blocks.
+**Health and Termination** now consumes this contract for damage, heal, set health, kill and non-player removal. It adds no target source or selector behavior. Status effects, player game mode and later entity conditions remain future slices and must continue reusing this reference instead of creating parallel target models.
 
 ## Implementation evidence
 

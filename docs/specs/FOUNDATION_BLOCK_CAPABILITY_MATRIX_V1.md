@@ -2,7 +2,7 @@
 
 ## Purpose and scoring
 
-This document inventories the Stage B Entity Target Reference implementation. The formal taxonomy is the existing `packs → categories → blocks` Catalog Snapshot; this document does not create a second catalog or register future empty packs.
+This document inventories the current Entity Target Reference plus Health and Termination implementation. The formal taxonomy is the existing `packs → categories → blocks` Catalog Snapshot; this document does not create a second catalog or register future empty packs.
 
 Status means:
 
@@ -18,15 +18,15 @@ Status means:
 | Metric | Current value |
 |---|---:|
 | Registered packs | 7 |
-| Registered categories | 15 |
-| Built-in blocks | 25 |
-| `BROWSE / CONTEXT_ONLY / HIDDEN` | 25 / 0 / 0 |
-| `FULLY_SIMULATABLE / APPROXIMATE_SIMULATION` | 20 / 5 |
+| Registered categories | 17 |
+| Built-in blocks | 30 |
+| `BROWSE / CONTEXT_ONLY / HIDDEN` | 30 / 0 / 0 |
+| `FULLY_SIMULATABLE / APPROXIMATE_SIMULATION` | 20 / 10 |
 | `PREDICATE / PREDICATE_RACK` | 5 / 1 |
 | Legacy aliases | 1 (`manual.test.start`) |
-| Current block status | 1 COMPLETE / 24 PARTIAL |
+| Current block status | 6 COMPLETE / 24 PARTIAL |
 
-All 25 definitions have a description, Form Schema and summary metadata. They all declare `REQUIRES_MINECRAFT_RUNTIME`; that flag is a required-environment marker, not proof that every block has a Minecraft executor. There is no independent help/example metadata. Entity-target failures now use stable structured codes; unaffected older paths may still expose readable-string runtime errors.
+All 30 definitions have a description, Form Schema and summary metadata. They all declare `REQUIRES_MINECRAFT_RUNTIME`; that flag is a required-environment marker, not proof that every block has a Minecraft executor. Entity-target and health-action failures use stable structured codes; unaffected older paths may still expose readable-string runtime errors.
 
 ### Slice 1 result
 
@@ -41,7 +41,7 @@ Slice 1 is a breaking reform with no alias or migration:
 | retired player/context tag IDs | 6 | 0 |
 | generic entity tag IDs | 0 | 3 |
 
-The arithmetic is `28 - 6 + 3 = 25`. Packs and non-empty categories remain 7 and 15. The three new tag blocks remain `PARTIAL` because general non-player runtime lookup is not implemented, so the current score is 1 COMPLETE / 24 PARTIAL.
+The Slice 1 arithmetic is `28 - 6 + 3 = 25`. Slice 2 adds five real blocks and two non-empty categories, producing 30 blocks across 17 categories. It also adds exact loaded-world entity lookup in the Fabric adapter; offline/unloaded entity search remains out of scope. The five health/termination actions are complete within their declared single-entity boundary, producing the current score of 6 COMPLETE / 24 PARTIAL.
 
 ## Eight-domain overview
 
@@ -49,7 +49,7 @@ The arithmetic is `28 - 6 + 3 = 25`. Packs and non-empty categories remain 7 and
 |---|---|---:|---:|---:|---|---|
 | 事件与触发 | `events-triggers` | 1 | 1 | 0 | official gameplay event triggers | polling detectors and a general event bus |
 | 逻辑与流程 | `logic-flow` | 4 | 0 | 4 | durable scheduling and selected small control primitives | universal execute pipeline and collection loops |
-| 玩家与实体 | `player-entity` | 5 | 0 | 5 | health, damage, effects, game mode | selectors, scans, AI and multi-entity fan-out |
+| 玩家与实体 | `player-entity` | 10 | 5 | 5 | effects, game mode and entity conditions | selectors, scans, AI and multi-entity fan-out |
 | 物品与容器 | not registered | 0 | 0 | 0 | give/take/match simple item stacks | full components/NBT and arbitrary container automation |
 | 位置与区域 | `location-region` | 6 | 0 | 6 | Position Reference and teleport | nested coordinate expressions and world scans |
 | 方块与世界 | `block-world` | 1 | 0 | 1 | typed block state and safe setblock/fill | physics, lighting and structure simulation |
@@ -71,7 +71,8 @@ The arithmetic is `28 - 6 + 3 = 25`. Packs and non-empty categories remain 7 and
 | 玩家与实体 | single-entity tags | three generic entity-tag blocks | PARTIAL | `tag` | shared EntityTargetRef, typed outcomes and condition subject | Entity Target Reference | implemented foundation |
 | 玩家与实体 | execute with one current entity | `context.entity.execute_as` | PARTIAL | `execute as` | explicit four-source target and stack-safe continuation without selector syntax | existing execution context | implemented foundation |
 | 玩家与实体 | administrator check | `condition.player.is_admin` | PARTIAL | OP/permission check | typed predicate and explicit permission provider | Player-only target constraint | later |
-| 玩家与实体 | health, damage, effects and game mode | none | MISSING | `damage`, `effect`, `kill`, `gamemode` | typed targets, structured results, Simulation and errors | EntityTargetRef, EffectSpec, EntityTypeRef | v1-A |
+| 玩家与实体 | health and termination | five `action.entity.*` health/termination blocks | COMPLETE | `damage`, `kill` | typed targets, structured results, Simulation and audited adapters | EntityTargetRef | implemented v1-A Slice 2 |
+| 玩家与实体 | effects and game mode | none | MISSING | `effect`, `gamemode` | typed effects/player settings, Simulation and errors | EffectSpec | later v1-A |
 | 玩家与实体 | entity collections and scans | none | DEFERRED | `@e[...]` | bounded query and fan-out rather than selector text | query subsystem | deferred |
 | 物品与容器 | give/take/match simple items | none | MISSING | `give`, `clear`, `item` | typed id/count, atomic result and Simulation facts | ItemStackSpec, ItemMatchSpec | later foundation pack |
 | 物品与容器 | arbitrary slots/components/NBT | none | DEFERRED | `item replace/modify` | explicit slot ownership and safe component matching | SlotRef, component model | deferred |
@@ -111,9 +112,14 @@ Rows that say `test actor` or `request player` describe block-specific fixtures 
 | `control.loop.forever` | `logic-flow` / `logic-flow.loops` | control | interval 1..86400 s | body + continuation | `intervalSeconds:integer` | FULLY_SIMULATABLE | `GraphRuntime` forever frame | 20-round Simulation cap, wait/resume Trace | “持续循环，间隔 N 秒” | durable server loop | medium |
 | `control.loop.until` | `logic-flow` / `logic-flow.loops` | control + PREDICATE_RACK | ordered condition slots | rack + body + cursor | `conditionRack:readonly` | FULLY_SIMULATABLE | `GraphRuntime` pre-check loop | empty/illegal rack fail closed; slot/round Trace | rack summaries + until summary | only five predicates | medium |
 | `timer.wait` | `logic-flow` / `logic-flow.timing` | timer | duration 1..86400 s | active cursor | `durationSeconds:integer` | FULLY_SIMULATABLE | `GraphRuntime` + scheduler continuation | pending/cancel/stale bounds and Trace | “等待 N 秒后继续” | no restart durability | medium |
-| `condition.entity.has_tag` | `player-entity` / `player-entity.tags` | condition + PREDICATE | output mode, target, tag | EntityTargetRef / ANY_ENTITY | `outputMode:segmented`; `target:entity_target`; `tag:string` | FULLY_SIMULATABLE | shared Runtime/Simulation resolver and tag evaluator; Fabric provider resolves online players | structured target errors; true/false subject Trace | target-aware positive/negated summary | Fabric non-player lookup remains unavailable | high |
-| `action.entity.add_tag` | `player-entity` / `player-entity.tags` | action | target, tag | EntityTargetRef / ANY_ENTITY | `target:entity_target`; `tag:string` | FULLY_SIMULATABLE | shared entity-target action path | typed SUCCESS/FAILURE, changed, affectedCount | target-aware add summary | Fabric non-player lookup remains unavailable | high |
-| `action.entity.remove_tag` | `player-entity` / `player-entity.tags` | action | target, tag | EntityTargetRef / ANY_ENTITY | `target:entity_target`; `tag:string` | FULLY_SIMULATABLE | shared entity-target action path | absent tag is SUCCESS/no-change; structured target failure | target-aware remove summary | Fabric non-player lookup remains unavailable | high |
+| `condition.entity.has_tag` | `player-entity` / `player-entity.tags` | condition + PREDICATE | output mode, target, tag | EntityTargetRef / ANY_ENTITY | `outputMode:segmented`; `target:entity_target`; `tag:string` | FULLY_SIMULATABLE | shared Runtime/Simulation resolver and tag evaluator; Fabric resolves online players and exact loaded entities | structured target errors; true/false subject Trace | target-aware positive/negated summary | no offline/unloaded lookup | high |
+| `action.entity.add_tag` | `player-entity` / `player-entity.tags` | action | target, tag | EntityTargetRef / ANY_ENTITY | `target:entity_target`; `tag:string` | FULLY_SIMULATABLE | shared entity-target action path + exact loaded-entity Fabric lookup | typed SUCCESS/FAILURE, changed, affectedCount | target-aware add summary | no offline/unloaded lookup | high |
+| `action.entity.remove_tag` | `player-entity` / `player-entity.tags` | action | target, tag | EntityTargetRef / ANY_ENTITY | `target:entity_target`; `tag:string` | FULLY_SIMULATABLE | shared entity-target action path + exact loaded-entity Fabric lookup | absent tag is SUCCESS/no-change; structured target failure | target-aware remove summary | no offline/unloaded lookup | high |
+| `action.entity.damage` | `player-entity` / `player-entity.health-attributes` | action | target, amount, five-value damage kind | EntityTargetRef / LIVING_ENTITY | `target:entity_target`; `amount:number`; `damageKind:select` | APPROXIMATE_SIMULATION | shared executor; Fabric calls normal audited damage pipeline | rejected/invalid/kind errors; before/after Trace | target-aware damage summary | Simulation omits armor/resistance/cooldown | complete |
+| `action.entity.heal` | `player-entity` / `player-entity.health-attributes` | action | target, amount | EntityTargetRef / LIVING_ENTITY | `target:entity_target`; `amount:number` | APPROXIMATE_SIMULATION | shared executor; Fabric calls `heal(float)` | full-health success/no-change; structured errors | target-aware heal summary | Simulation omits non-health side effects | complete |
+| `action.entity.set_health` | `player-entity` / `player-entity.health-attributes` | action | target, health 0..maximum | EntityTargetRef / LIVING_ENTITY | `target:entity_target`; `health:number` | APPROXIMATE_SIMULATION | shared executor; Fabric calls `setHealth(float)` after max check | above max/invalid structured errors | target-aware set summary | max-health mutation excluded | complete |
+| `action.entity.kill` | `player-entity` / `player-entity.entity-management` | action | target | EntityTargetRef / LIVING_ENTITY | `target:entity_target` | APPROXIMATE_SIMULATION | shared executor; Fabric calls `LivingEntity.kill(ServerWorld)` | rejected/dead structured errors | target-aware kill summary | Simulation records death intent, not loot/events | complete |
+| `action.entity.remove` | `player-entity` / `player-entity.entity-management` | action | target | EntityTargetRef / ANY_ENTITY + no player | `target:entity_target` | APPROXIMATE_SIMULATION | shared executor; Fabric guards player then calls `discard()` | player forbidden/execution structured errors | target-aware direct-remove summary | offline/unloaded removal excluded | complete |
 | `condition.player.is_admin` | `player-entity` / `player-entity.identity-permissions` | condition + PREDICATE | output mode | Simulation actor fixture | `outputMode:segmented` | APPROXIMATE_SIMULATION | Simulation operator flag; no permission adapter | boolean/subject Trace, string runtime errors | admin positive/negated summary | permission semantics | medium |
 | `context.entity.execute_as` | `player-entity` / `player-entity.execution-context` | control | four-source target, default condition subject | EntityTargetRef / ANY_ENTITY | `target:entity_target` | FULLY_SIMULATABLE | shared resolver + `GraphRuntime` context frame | structured target failures; switch/restore Trace | target-aware summary and warnings | no position context | high |
 | `condition.player.dimension_is` | `location-region` / `location-region.dimensions-heights` | condition + PREDICATE | output mode, dimension id | Simulation actor position | `outputMode:segmented`; `dimensionId:string` | FULLY_SIMULATABLE | Simulation world fact; no MC position adapter | false/Trace; no contextual subject | dimension summary | adapter + subject contract | medium |
@@ -153,13 +159,13 @@ condition.target_block.is_type
 | `tp` / `teleport` | none | MISSING | separate EntityTargetRef from PositionRef; typed collision/dimension policy |
 | `give` / `clear` / `item` | none | MISSING | typed stack/match/slot with atomic affected-count result |
 | `effect` | none | MISSING | typed effect, duration, level and visibility settings in v1-A |
-| `damage` | none | MISSING | use the damage pipeline; never model it as direct health subtraction |
+| `damage` | `action.entity.damage` | COMPLETE | normal audited damage pipeline; Simulation is an explicit unmitigated approximation |
 | `summon` | none | DEFERRED | requires PositionRef, entity type, ownership and world lifecycle |
 | `setblock` / `fill` | one read-only block-type condition | MISSING | preview intent, permissions, chunks and structured affected count |
 | `title` / `tellraw` | four message blocks | PARTIAL | preserve rich Text and report delivery outcome in a real adapter |
 | `playsound` / `particle` | none | MISSING | typed spec plus target/position; Simulation records intent |
 | `gamemode` | none | MISSING | PLAYER_ONLY action and predicate in v1-A |
-| `kill` | none | MISSING | preserve death semantics and distinguish removal |
+| `kill` | `action.entity.kill`, `action.entity.remove` | COMPLETE | normal death and direct removal are explicit separate behaviors |
 | `spawnpoint` | none | MISSING | depends on PositionRef and player target |
 | `time` / `weather` | none | MISSING, lower priority | world-scoped typed actions, not command text |
 | `tag` | three generic EntityTargetRef blocks | PARTIAL | shared target, condition subject and typed outcomes are implemented; real non-player lookup remains adapter work |
@@ -185,7 +191,7 @@ These features are the product advantage. New blocks should compose with them ra
 
 | Component | Controlled status | Current evidence | Decision |
 |---|---|---|---|
-| Entity Target Reference | 已实现 | four sources, composite Graph target, shared resolver/editor and tag consumers | reuse before adding health/termination blocks |
+| Entity Target Reference | 已实现并复用 | four sources, composite Graph target, shared resolver/editor, tag and health/termination consumers | reuse for later effects, game mode and conditions |
 | Player Target Reference | 暂缓 | message/admin blocks still have older request/test-player contracts | use `EntityTargetRef` with `PLAYER_ONLY`; request actor metadata is not a target fallback |
 | Position Reference | 后续 | only Simulation position facts exist | required before teleport/spawnpoint |
 | Direction / Rotation | 后续 | absent | design with PositionRef when movement is in scope |
@@ -204,7 +210,7 @@ These features are the product advantage. New blocks should compose with them ra
 
 ## Foundation decisions
 
-1. `EntityTargetRef` is the next shared foundation because at least health, effect and game-mode blocks immediately reuse it.
+1. `EntityTargetRef` is the shared foundation already reused by tag, execute-as and health/termination blocks; effects and game mode should continue using it.
 2. A player target is a type constraint on `EntityTargetRef`, not another reference universe.
 3. The existing optional Simulation target is a test fixture that populates the formal `TARGET_ENTITY` run input; it is not a separate `TEST_TARGET_ENTITY` source, and current production providers do not populate that input yet.
 4. The current runtime has a condition subject but no condition object. New specifications must not pretend otherwise.

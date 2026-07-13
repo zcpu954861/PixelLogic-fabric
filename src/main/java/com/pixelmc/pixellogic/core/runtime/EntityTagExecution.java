@@ -41,7 +41,7 @@ final class EntityTagExecution {
                 "done",
                 message,
                 null,
-                RuntimeActionOutcome.success(message, target.reference(), changed)
+                RuntimeActionOutcome.success(node.blockId(), message, target.reference(), changed)
         ));
     }
 

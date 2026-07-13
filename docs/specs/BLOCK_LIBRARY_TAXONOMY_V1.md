@@ -30,7 +30,7 @@ Snapshot 在构造时验证引用、唯一性、可见归属、空分组、可�
 - `HIDDEN`：积木库任何模式都不显示。
 - `deprecated` 独立于 visibility；已弃用积木不能新建。
 
-当前 25 张 built-in 均为 `BROWSE`。当前没有 context-only 或 hidden built-in；相关语义由 synthetic self-check fixture 固定。
+当前 30 张 built-in 均为 `BROWSE`。当前没有 context-only 或 hidden built-in；相关语义由 synthetic self-check fixture 固定。
 
 ## 初始包与分类
 
@@ -65,6 +65,11 @@ Snapshot 在构造时验证引用、唯一性、可见归属、空分组、可�
 | `condition.target_block.in_region` | 目标方块是否在区域内 | `TARGET_BLOCK_IN_REGION_CONDITION` | BROWSE | 位置与区域 | 区域 | 当前不是 rack predicate |
 | `action.entity.add_tag` | 添加实体标签 | `ENTITY_ADD_TAG_ACTION` | BROWSE | 玩家与实体 | 标签 | `target: EntityTargetRef`；typed outcome |
 | `action.entity.remove_tag` | 移除实体标签 | `ENTITY_REMOVE_TAG_ACTION` | BROWSE | 玩家与实体 | 标签 | `target: EntityTargetRef`；typed outcome |
+| `action.entity.damage` | 伤害实体 | `ENTITY_DAMAGE_ACTION` | BROWSE | 玩家与实体 | 生命与属性 | 正常 damage 流程；五种封闭伤害类型 |
+| `action.entity.heal` | 恢复实体生命值 | `ENTITY_HEAL_ACTION` | BROWSE | 玩家与实体 | 生命与属性 | 恢复到最大生命值 |
+| `action.entity.set_health` | 设置实体生命值 | `ENTITY_SET_HEALTH_ACTION` | BROWSE | 玩家与实体 | 生命与属性 | 允许 0；超过最大值失败 |
+| `action.entity.kill` | 杀死实体 | `ENTITY_KILL_ACTION` | BROWSE | 玩家与实体 | 实体管理 | 正常死亡流程；允许玩家 |
+| `action.entity.remove` | 移除实体 | `ENTITY_REMOVE_ACTION` | BROWSE | 玩家与实体 | 实体管理 | 直接移除；永久禁止玩家 |
 | `control.loop.count` | 循环次数 | `CONTROL_LOOP_COUNT` | BROWSE | 逻辑与流程 | 循环 | 固定次数容器 |
 | `control.loop.forever` | 无限循环 | `CONTROL_LOOP_FOREVER` | BROWSE | 逻辑与流程 | 循环 | 有模拟安全上限 |
 | `control.loop.until` | 循环直到 | `CONTROL_LOOP_UNTIL` | BROWSE | 逻辑与流程 | 循环 | `PREDICATE_RACK` 宿主 |

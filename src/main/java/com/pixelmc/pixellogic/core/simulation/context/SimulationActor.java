@@ -23,7 +23,30 @@ public final class SimulationActor extends SimulationEntity {
             Collection<String> tags,
             SimulationPosition position
     ) {
-        super(id, "minecraft:player", displayName == null || displayName.isBlank() ? "模拟玩家" : displayName, tags);
+        this(id, displayName, online, operator, tags, position, 20, 20, false);
+    }
+
+    public SimulationActor(
+            UUID id,
+            String displayName,
+            boolean online,
+            boolean operator,
+            Collection<String> tags,
+            SimulationPosition position,
+            double health,
+            double maxHealth,
+            boolean invulnerable
+    ) {
+        super(
+                id,
+                "minecraft:player",
+                displayName == null || displayName.isBlank() ? "模拟玩家" : displayName,
+                tags,
+                true,
+                health,
+                maxHealth,
+                invulnerable
+        );
         this.online = online;
         this.operator = operator;
         this.position = position == null ? SimulationPosition.overworldSpawn() : position;

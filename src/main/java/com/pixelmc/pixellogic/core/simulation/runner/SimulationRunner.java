@@ -55,9 +55,11 @@ public final class SimulationRunner {
         SimulationActor actor = copyActor(request.actor());
         SimulationWorld world = copyWorld(request.world());
         Set<String> initialActorTags = actor.tags();
+        double initialActorHealth = actor.health();
         Set<String> initialTargetEntityTags = world.targetEntity() == null
                 ? Set.of()
                 : world.targetEntity().tags();
+        double initialTargetEntityHealth = world.targetEntity() == null ? 0 : world.targetEntity().health();
         SimulationContext context = new SimulationContext(
                 UUID.randomUUID().toString(),
                 request.generation(),
@@ -70,7 +72,9 @@ public final class SimulationRunner {
                 registry,
                 context,
                 initialActorTags,
+                initialActorHealth,
                 initialTargetEntityTags,
+                initialTargetEntityHealth,
                 request.initializeCurrentEntity(),
                 resultObserver
         ));
@@ -80,7 +84,14 @@ public final class SimulationRunner {
                 request.actor().id(),
                 request.sessionId()
         ));
-        return SimulationExecutionResult.from(result, context, initialActorTags, initialTargetEntityTags);
+        return SimulationExecutionResult.from(
+                result,
+                context,
+                initialActorTags,
+                initialActorHealth,
+                initialTargetEntityTags,
+                initialTargetEntityHealth
+        );
     }
 
     private static SimulationActor copyActor(SimulationActor actor) {
@@ -90,7 +101,10 @@ public final class SimulationRunner {
                 actor.online(),
                 actor.operator(),
                 actor.tags(),
-                actor.position()
+                actor.position(),
+                actor.health(),
+                actor.maxHealth(),
+                actor.invulnerable()
         );
     }
 
@@ -98,7 +112,16 @@ public final class SimulationRunner {
         SimulationEntity target = world.targetEntity();
         SimulationEntity targetCopy = target == null
                 ? null
-                : new SimulationEntity(target.id(), target.entityTypeId(), target.displayName(), target.tags());
+                : new SimulationEntity(
+                        target.id(),
+                        target.entityTypeId(),
+                        target.displayName(),
+                        target.tags(),
+                        target.living(),
+                        target.health(),
+                        target.maxHealth(),
+                        target.invulnerable()
+                );
         return new SimulationWorld(world.defaultDimensionId(), world.targetBlock(), world.regions(), targetCopy);
     }
 
@@ -111,7 +134,9 @@ public final class SimulationRunner {
         private final SimulationExecutionRegistry registry;
         private final SimulationContext context;
         private final Set<String> initialActorTags;
+        private final double initialActorHealth;
         private final Set<String> initialTargetEntityTags;
+        private final double initialTargetEntityHealth;
         private final boolean initializeCurrentEntity;
         private final Consumer<SimulationExecutionResult> resultObserver;
 
@@ -120,7 +145,9 @@ public final class SimulationRunner {
                 SimulationExecutionRegistry registry,
                 SimulationContext context,
                 Set<String> initialActorTags,
+                double initialActorHealth,
                 Set<String> initialTargetEntityTags,
+                double initialTargetEntityHealth,
                 boolean initializeCurrentEntity,
                 Consumer<SimulationExecutionResult> resultObserver
         ) {
@@ -128,7 +155,9 @@ public final class SimulationRunner {
             this.registry = registry;
             this.context = context;
             this.initialActorTags = initialActorTags;
+            this.initialActorHealth = initialActorHealth;
             this.initialTargetEntityTags = initialTargetEntityTags;
+            this.initialTargetEntityHealth = initialTargetEntityHealth;
             this.initializeCurrentEntity = initializeCurrentEntity;
             this.resultObserver = resultObserver;
         }
@@ -188,7 +217,7 @@ public final class SimulationRunner {
 
         @Override
         public void recordActionOutcome(String nodeId, RuntimeActionOutcome outcome) {
-            context.addActionResult(new SimulationActionResult(nodeId, "entity_tag", outcome.message(), outcome));
+            context.addActionResult(new SimulationActionResult(nodeId, outcome.kind(), outcome.message(), outcome));
         }
 
         @Override
@@ -224,7 +253,9 @@ public final class SimulationRunner {
                     result,
                     context,
                     initialActorTags,
-                    initialTargetEntityTags
+                    initialActorHealth,
+                    initialTargetEntityTags,
+                    initialTargetEntityHealth
             ));
         }
     }

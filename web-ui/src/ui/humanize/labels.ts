@@ -90,6 +90,16 @@ export function nodeTypeLabel(type: string): string {
       return '添加实体标签';
     case 'ENTITY_REMOVE_TAG_ACTION':
       return '移除实体标签';
+    case 'ENTITY_DAMAGE_ACTION':
+      return '伤害实体';
+    case 'ENTITY_HEAL_ACTION':
+      return '恢复实体生命值';
+    case 'ENTITY_SET_HEALTH_ACTION':
+      return '设置实体生命值';
+    case 'ENTITY_KILL_ACTION':
+      return '杀死实体';
+    case 'ENTITY_REMOVE_ACTION':
+      return '移除实体';
     case 'STATE_SET_ACTION':
       return '状态写入';
     case 'STATE_ADD_ACTION':
@@ -166,6 +176,21 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   }
   if (blockItem.id === 'action.entity.remove_tag') {
     return `移除「${entityTargetLabel(entityTargetRef(nodeItem.config))}」的标签「${graphConfigString(nodeItem.config, 'tag', '标签')}」。`;
+  }
+  if (blockItem.id === 'action.entity.damage') {
+    return `对「${entityTargetLabel(entityTargetRef(nodeItem.config))}」造成 ${graphConfigString(nodeItem.config, 'amount', '4')} 点${damageKindLabel(graphConfigString(nodeItem.config, 'damageKind', 'GENERIC'))}伤害。`;
+  }
+  if (blockItem.id === 'action.entity.heal') {
+    return `恢复「${entityTargetLabel(entityTargetRef(nodeItem.config))}」 ${graphConfigString(nodeItem.config, 'amount', '6')} 点生命值。`;
+  }
+  if (blockItem.id === 'action.entity.set_health') {
+    return `将「${entityTargetLabel(entityTargetRef(nodeItem.config))}」的生命值设为 ${graphConfigString(nodeItem.config, 'health', '20')}。`;
+  }
+  if (blockItem.id === 'action.entity.kill') {
+    return `杀死「${entityTargetLabel(entityTargetRef(nodeItem.config))}」。`;
+  }
+  if (blockItem.id === 'action.entity.remove') {
+    return `直接移除「${entityTargetLabel(entityTargetRef(nodeItem.config))}」。`;
   }
   if (blockItem.id === 'condition.player.is_admin') {
     return playerAdminConditionSummary(nodeItem);
@@ -261,6 +286,16 @@ function legacyNodeTypeSummary(nodeItem: GraphNode): string {
       return `给「${entityTargetLabel(entityTargetRef(config))}」添加标签「${value('tag', '标签')}」。`;
     case 'ENTITY_REMOVE_TAG_ACTION':
       return `移除「${entityTargetLabel(entityTargetRef(config))}」的标签「${value('tag', '标签')}」。`;
+    case 'ENTITY_DAMAGE_ACTION':
+      return `对「${entityTargetLabel(entityTargetRef(config))}」造成 ${value('amount', '4')} 点${damageKindLabel(value('damageKind', 'GENERIC'))}伤害。`;
+    case 'ENTITY_HEAL_ACTION':
+      return `恢复「${entityTargetLabel(entityTargetRef(config))}」 ${value('amount', '6')} 点生命值。`;
+    case 'ENTITY_SET_HEALTH_ACTION':
+      return `将「${entityTargetLabel(entityTargetRef(config))}」的生命值设为 ${value('health', '20')}。`;
+    case 'ENTITY_KILL_ACTION':
+      return `杀死「${entityTargetLabel(entityTargetRef(config))}」。`;
+    case 'ENTITY_REMOVE_ACTION':
+      return `直接移除「${entityTargetLabel(entityTargetRef(config))}」。`;
     case 'STATE_SET_ACTION':
       return `把“${scopeLabel(value('scope'))}”的 ${value('key', '状态名')} 设置为“${stateValueLabel(value('value'), value('valueType', 'BOOLEAN'))}”。`;
     case 'STATE_ADD_ACTION':
@@ -280,6 +315,10 @@ export function scopeLabel(value = 'PLAYER'): string {
 
 export function booleanLabel(value = 'false'): string {
   return booleanOptions().find((option) => option.value === value)?.label ?? value;
+}
+
+function damageKindLabel(value: string): string {
+  return ({ GENERIC: '普通', MAGIC: '魔法', FIRE: '火焰', FALL: '摔落', VOID: '虚空' } as Record<string, string>)[value] ?? value;
 }
 
 export { conditionOutputModeLabel };

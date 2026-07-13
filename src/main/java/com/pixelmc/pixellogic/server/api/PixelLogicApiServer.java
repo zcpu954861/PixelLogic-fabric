@@ -163,10 +163,14 @@ public final class PixelLogicApiServer implements AutoCloseable {
             }
             return onServerThread(() -> {
                 RuntimeResult result = service.startManualTest(testContext.actor(), testContext.world());
-                Map<String, Object> fields = service.simulationRun(result.traceId())
+                Optional<SimulationExecutionResult> run = service.simulationRun(result.traceId());
+                Map<String, Object> fields = run
                         .map(this::testRunFields)
                         .orElseGet(() -> fields("message", result.message(), "traceId", result.traceId()));
                 fields.put("demoActor", demoActor());
+                if (run.isPresent()) {
+                    return ok(fields);
+                }
                 if (!result.success()) {
                     fields.put("error", errorMap("RUNTIME_FAILED", result.message()));
                     return json(500, false, fields);
@@ -542,6 +546,13 @@ public final class PixelLogicApiServer implements AutoCloseable {
     }
 
     private Map<String, Object> testRunFields(SimulationExecutionResult run) {
+        JsonObject simulation = GSON.toJsonTree(run).getAsJsonObject();
+        if (run.targetError() != null) {
+            simulation.getAsJsonObject("targetError").addProperty("code", run.targetError().code().id());
+        }
+        if (run.actionError() != null) {
+            simulation.getAsJsonObject("actionError").addProperty("code", run.actionError().code().id());
+        }
         return fields(
                 "message", run.message(),
                 "traceId", run.traceId(),
@@ -549,7 +560,7 @@ public final class PixelLogicApiServer implements AutoCloseable {
                 "runStatus", run.status().name(),
                 "terminal", run.status().terminal(),
                 "trace", service.trace(run.traceId()).map(PixelLogicApiServer::traceView).orElse(null),
-                "simulation", run
+                "simulation", simulation
         );
     }
 

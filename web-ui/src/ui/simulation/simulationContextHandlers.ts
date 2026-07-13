@@ -9,6 +9,8 @@ import {
   removeSimulationTargetEntityTag,
   simulationTestPayload,
   type SimulationTestContext,
+  updateSimulationActorHealth,
+  updateSimulationActorInvulnerable,
   updateSimulationDisplayName,
   updateSimulationOperator,
   updateSimulationPlayerPosition,
@@ -17,6 +19,8 @@ import {
   updateSimulationTargetEnabled,
   updateSimulationTargetEntity,
   updateSimulationTargetEntityEnabled,
+  updateSimulationTargetEntityFlag,
+  updateSimulationTargetEntityHealth,
   validateSimulationTestContext,
 } from '../../model/simulationTestContext';
 import { state } from '../../state/appState';
@@ -109,6 +113,30 @@ export function bindSimulationDraftFields(renderApp: RenderApp): void {
     });
   });
 
+  document.querySelectorAll<HTMLInputElement>('[data-sim-draft-health-field]').forEach((inputEl) => {
+    inputEl.addEventListener('input', () => {
+      updateSimulationDraft(
+        updateSimulationActorHealth(
+          simulationDraft(),
+          inputEl.dataset.simDraftHealthField as 'health' | 'maxHealth',
+          inputEl.value,
+        ),
+        false,
+        renderApp,
+      );
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-sim-draft-invulnerable]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      updateSimulationDraft(
+        updateSimulationActorInvulnerable(simulationDraft(), buttonEl.dataset.simDraftInvulnerable === 'true'),
+        true,
+        renderApp,
+      );
+    });
+  });
+
   document.querySelectorAll<HTMLInputElement>('[data-sim-player-position-field]').forEach((inputEl) => {
     inputEl.addEventListener('input', () => {
       updateSimulationDraft(
@@ -158,6 +186,34 @@ export function bindSimulationDraftFields(renderApp: RenderApp): void {
           inputEl.value,
         ),
         false,
+        renderApp,
+      );
+    });
+  });
+
+  document.querySelectorAll<HTMLInputElement>('[data-sim-target-entity-health-field]').forEach((inputEl) => {
+    inputEl.addEventListener('input', () => {
+      updateSimulationDraft(
+        updateSimulationTargetEntityHealth(
+          simulationDraft(),
+          inputEl.dataset.simTargetEntityHealthField as 'health' | 'maxHealth',
+          inputEl.value,
+        ),
+        false,
+        renderApp,
+      );
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-sim-target-entity-flag]').forEach((buttonEl) => {
+    buttonEl.addEventListener('click', () => {
+      updateSimulationDraft(
+        updateSimulationTargetEntityFlag(
+          simulationDraft(),
+          buttonEl.dataset.simTargetEntityFlag as 'living' | 'invulnerable',
+          buttonEl.dataset.simTargetEntityFlagValue === 'true',
+        ),
+        true,
         renderApp,
       );
     });

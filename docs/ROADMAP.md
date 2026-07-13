@@ -16,18 +16,19 @@
 - Polling、Runtime/API、Catalog/Validation、拖拽性能与文档治理收口；
 - Block Library Taxonomy v1 的积木包 → 一级分类 → 具体积木导航、搜索与 visibility；
 - Entity Target Reference v1：四来源复合目标、共享 resolver/错误、在线玩家 UUID 选择、通用实体标签与 execute-as 接入；
+- Health and Termination v1 工作分支：伤害、恢复、设置生命、正常 kill 与禁止玩家的直接 remove；
 - 独立 Vanilla TypeScript WebUI 和有界 trace/runtime 安全机制。
 
 这些能力仍以 simulation-first 为主；目前只有 plain chat 等少量真实 Minecraft adapter，大部分积木尚未接入真实服务器行为。
 
 ## 当前基础状态
 
-Block Library Taxonomy v1 已独立合并主线，Entity Target Reference v1 的 Stage B 实现已形成待手测工作区。当前基础积木能力盘点确认：
+Block Library Taxonomy v1 与 Entity Target Reference v1 已合并主线；Health and Termination v1 已在 feature 工作区实现并等待用户手测门禁。当前 feature 工作区确认：
 
-- 正式 Catalog 当前为 7 个 pack、15 个 category、25 张 built-in block；
+- 正式 Catalog 当前为 7 个 pack、17 个 category、30 张 built-in block；
 - Simulation 能力不等于真实 Minecraft adapter 已完成；
 - Entity Target Reference 已成为生命、状态效果和玩家设置动作的共同前置；
-- Player & Entity Foundation v1-A 设计已经确定，下一实现切片是 Health and Termination。
+- Player & Entity Foundation v1-A 的 Health and Termination 已完成自动实现验证，下一切片仍须等待本轮手测、提交与后续明确任务。
 
 Entity Target Reference Slice 1 的实现边界：
 
@@ -38,17 +39,24 @@ Entity Target Reference Slice 1 的实现边界：
 - `context.entity.execute_as` 使用同一目标控件与 resolver；
 - 指定在线玩家只保存 UUID，名字仅作提示，离线时结构化失败且不按名字回退。
 
+Health and Termination Slice 2 的实现边界：
+
+- 五张动作均复用同一 Entity Target resolver、typed outcome 和 `done` 控制口；
+- 伤害类型固定为普通、魔法、火焰、摔落、虚空，真实 Fabric adapter 走 Minecraft 正常 damage API；
+- heal 只恢复到最大生命；set-health 允许 0，超过目标最大生命值直接失败且不 clamp；
+- kill 走正常死亡流程；remove 只调用直接 discard，并永久拒绝玩家；
+- Simulation fixture 增加 living、health、maxHealth、invulnerable、killed/removed 状态，且每次运行隔离复制。
+
 设计依据见[基础积木能力矩阵](specs/FOUNDATION_BLOCK_CAPABILITY_MATRIX_V1.md)、[Entity Target Reference v1](specs/ENTITY_TARGET_REFERENCE_V1.md) 与 [Player & Entity Foundation v1-A](specs/PLAYER_ENTITY_FOUNDATION_V1A.md)。
 
 ## 近期候选方向
 
 以下是候选方向，不是已承诺功能：
 
-- Health and Termination：伤害、恢复生命、设置生命值、杀死与移除非玩家实体；
 - 后续玩家与实体基础包的状态效果、玩家设置和条件胶囊；
 - 在现有 condition rack 中增加经过明确产品确认的 predicate capsule；
 - 为真实 Minecraft adapter 建立权限、执行上下文和行为对照前置；
-- Slice 1 自动验证与用户手测通过后，才创建 Health and Termination 实现切片；
+- Health and Termination 用户手测通过后再收口 feature；
 - Position Reference、传送和执行位置上下文留给 v1-B 或更晚阶段。
 
 新增方向继续复用 Catalog、GraphValidator、SimulationExecutionRegistry、Direct Edge runtime 和现有 WebUI editor，不另建平行模型。

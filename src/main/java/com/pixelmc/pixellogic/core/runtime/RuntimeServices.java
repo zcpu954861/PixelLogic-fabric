@@ -14,7 +14,8 @@ public interface RuntimeServices {
             NodeDefinition node,
             RuntimeExecutionContext context
     ) {
-        return EntityTagExecution.execute(node, context, this);
+        return EntityTagExecution.execute(node, context, this)
+                .or(() -> EntityHealthExecution.execute(node, context, this));
     }
 
     default Optional<RuntimePredicateResult> evaluatePredicate(
@@ -46,7 +47,7 @@ public interface RuntimeServices {
     }
 
     default void recordActionOutcome(String nodeId, RuntimeActionOutcome outcome) {
-        recordActionResult(nodeId, "entity_tag", outcome.message());
+        recordActionResult(nodeId, outcome.kind(), outcome.message());
     }
 
     default void recordEntityTagState(

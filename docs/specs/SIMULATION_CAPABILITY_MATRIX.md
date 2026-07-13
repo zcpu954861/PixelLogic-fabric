@@ -11,9 +11,10 @@ This matrix classifies current Simulation capabilities and the boundary of later
 | message/chat component | `action.message.chat`, rich text plain output | `APPROXIMATE_SIMULATION` | yes | yes, for real delivery | Simulation records target and plain text; real adapter later converts to Minecraft Text/tellraw-equivalent. |
 | title/actionbar | title, subtitle, actionbar | `APPROXIMATE_SIMULATION` | yes | yes, for real display | Model visible output and channel summary; do not implement client rendering, timing, fade, or combo blocks yet. |
 | entity tag | target-aware has/add/remove tag | `FULLY_SIMULATABLE` | yes | yes, for real server tags | Uses the shared four-source EntityTargetRef and one generic execution path. |
+| entity health and termination | damage, heal, set health, kill, direct remove | `APPROXIMATE_SIMULATION` | yes | yes | Uses the same target resolver/outcome path. Simulation models unmitigated health math, death/removal and invulnerability; Fabric uses audited normal damage/heal/set/kill/discard APIs. |
 | contextual condition result | checked subject + raw result + readable fact | `FULLY_SIMULATABLE` | yes | yes, for real-world subjects | True and false evaluations retain the checked object on the current run/path; the result is temporary cursor state, not graph or global state. |
 | entity execution context | execute as current/condition/target/online-player source | `FULLY_SIMULATABLE` | yes | yes, for real entities | Simulation switches one current entity and restores it across nesting/delay/loop; v1 is not execute-at and does not scan or fan out entities. |
-| simulated target entity | optional type id, display name, tags | `FULLY_SIMULATABLE` | yes | yes, for real entity lookup | Per-run Test Context fact only; initial/final target tags are reported separately from the optional initial current entity. |
+| simulated target entity | optional type id, display name, tags, living/health/max/invulnerable facts | `FULLY_SIMULATABLE` | yes | yes, for real entity lookup | Per-run Test Context fact only; mutable health, alive, killed and removed state remain isolated to the copied run fixture. |
 | player gamemode | check/set gamemode | `APPROXIMATE_SIMULATION` | maybe | yes | Check can be simulated; mutation must be clearly approximate until MC adapter. |
 | player position | check position, teleport result | `APPROXIMATE_SIMULATION` | maybe | yes | Simulate dimension/coordinates and teleport result, not collision safety. |
 | inventory simple items | has/give/take item id + count | `APPROXIMATE_SIMULATION` | yes | yes | Use item id/count/display summary; defer NBT/data-component exactness. |
@@ -46,7 +47,7 @@ The original skeleton implemented the first player-tag slice. Entity Target Refe
 - `condition.entity.has_tag`: fully simulatable against the explicitly resolved target tags.
 - `action.entity.add_tag`: fully simulatable with typed changed/no-change outcomes.
 - `action.entity.remove_tag`: fully simulatable with typed changed/no-change outcomes.
-- The Fabric provider supports exact online-player tag access; general non-player world lookup remains future adapter work.
+- The Fabric provider supports exact online-player access and UUID lookup of currently loaded entities without scanning entity collections or loading chunks.
 
 ## Simulation Test Context MVP Status
 
@@ -55,6 +56,7 @@ The original skeleton implemented the first player-tag slice. Entity Target Refe
 - display name: returned in the simulation result and used by player-tag trace messages.
 - tags: used as the initial current-entity tag set when the generic tag condition targets `CURRENT_ENTITY`.
 - administrator flag: accepted and returned for future permission blocks; no OP-sensitive behavior exists yet.
+- health, maximum health and invulnerability: bounded per-run actor facts used by health actions and returned as initial/final state.
 - the generic add-tag action mutates only the resolved entity for the current run and returns final tags/outcome.
 - no scenario persistence, multiplayer, inventory, world, container, or game mode context is implemented.
 
@@ -118,7 +120,15 @@ The original skeleton implemented the first player-tag slice. Entity Target Refe
 - `context.entity.execute_as` resolves exactly one of `CURRENT_ENTITY`, `CONDITION_SUBJECT`, `TARGET_ENTITY`, or `ONLINE_PLAYER`, switches the current entity for its body, and restores the outer entity on empty or natural body completion.
 - `ExecutionCursor` carries optional target/current stable identities, the current condition result, entity-context frames, and loop frames through `timer.wait`. Invalid, cancelled, duplicate, or stale resumes fail closed before entity mutation.
 - The three generic tag blocks operate on the resolved EntityTargetRef; there is no split player/context tag executor or permanent start-of-run target fallback.
-- Simulation Test Context optionally supplies one target entity (`minecraft:zombie`, `测试僵尸`, no tags by default). Each run copies actor and target tag state, and results expose actor and target initial/final tags separately.
+- Simulation Test Context optionally supplies one target entity (`minecraft:zombie`, `测试僵尸`, 20/20 health, living and vulnerable by default). Each run copies actor/target tags and life facts; results expose initial/final tags, health, alive and removed state separately.
 - Graph/storage persists one nested target object plus block/config, edges, and flat `body` membership. Runtime subjects, condition facts, entity state, and scope frames are not persisted.
 - Save-time validation rejects unknown sources and invalid/deep/cyclic membership while allowing an empty body as a warning. Runtime fails closed on missing/non-entity/unresolvable subjects or targets and never falls back to another source.
-- Not implemented: execute-at, general non-player world lookup, world-entity scanning, offline-player actions, detector/event blocks, multi-entity arrays or fan-out, and cross-restart continuation. A future detector must produce one isolated path/run and condition result per matched entity.
+- Not implemented: execute-at, unloaded/offline entity lookup, world-entity scanning, offline-player actions, detector/event blocks, multi-entity arrays or fan-out, and cross-restart continuation. A future detector must produce one isolated path/run and condition result per matched entity.
+
+## Health and Termination v1 Status
+
+- `action.entity.damage` supports the closed `GENERIC/MAGIC/FIRE/FALL/VOID` list. Simulation applies deterministic unmitigated damage unless the fixture is invulnerable; Runtime calls the audited Minecraft damage pipeline and never substitutes set-health.
+- `action.entity.heal` restores up to fixture/live maximum health and reports full-health success with `changed=false`.
+- `action.entity.set_health` accepts zero, rejects negative/non-finite/static-overflow values, and fails above the resolved maximum without clamping.
+- `action.entity.kill` marks the Simulation fixture killed/dead and calls the normal living-entity kill path in Fabric. `action.entity.remove` marks it removed/unresolvable and calls `discard()` only for non-players.
+- All five reuse the four-source target resolver, stable Continuation identities, typed outcomes and structured domain/target errors. They add no success/failure graph ports.

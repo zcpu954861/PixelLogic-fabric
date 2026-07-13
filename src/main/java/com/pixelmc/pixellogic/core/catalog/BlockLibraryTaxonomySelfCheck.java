@@ -45,6 +45,11 @@ public final class BlockLibraryTaxonomySelfCheck {
                 Map.entry(BuiltInBlockCatalog.CONDITION_PLAYER_NEAR_TARGET_BLOCK, "location-region.spatial-relations"),
                 Map.entry(BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG, "player-entity.tags"),
                 Map.entry(BuiltInBlockCatalog.ACTION_ENTITY_REMOVE_TAG, "player-entity.tags"),
+                Map.entry(BuiltInBlockCatalog.ACTION_ENTITY_DAMAGE, "player-entity.health-attributes"),
+                Map.entry(BuiltInBlockCatalog.ACTION_ENTITY_HEAL, "player-entity.health-attributes"),
+                Map.entry(BuiltInBlockCatalog.ACTION_ENTITY_SET_HEALTH, "player-entity.health-attributes"),
+                Map.entry(BuiltInBlockCatalog.ACTION_ENTITY_KILL, "player-entity.entity-management"),
+                Map.entry(BuiltInBlockCatalog.ACTION_ENTITY_REMOVE, "player-entity.entity-management"),
                 Map.entry(BuiltInBlockCatalog.CONTROL_LOOP_COUNT, "logic-flow.loops"),
                 Map.entry(BuiltInBlockCatalog.CONTROL_LOOP_FOREVER, "logic-flow.loops"),
                 Map.entry(BuiltInBlockCatalog.CONTROL_LOOP_UNTIL, "logic-flow.loops"),
@@ -61,6 +66,8 @@ public final class BlockLibraryTaxonomySelfCheck {
                 Map.entry("player-entity.tags", "标签"),
                 Map.entry("player-entity.identity-permissions", "身份与权限"),
                 Map.entry("player-entity.execution-context", "实体上下文"),
+                Map.entry("player-entity.health-attributes", "生命与属性"),
+                Map.entry("player-entity.entity-management", "实体管理"),
                 Map.entry("location-region.dimensions-heights", "维度与高度"),
                 Map.entry("location-region.regions", "区域"),
                 Map.entry("location-region.spatial-relations", "空间关系"),
@@ -73,7 +80,7 @@ public final class BlockLibraryTaxonomySelfCheck {
         );
 
         require(catalog.packs().size() == 7, "built-in taxonomy should expose seven non-empty packs");
-        require(catalog.categories().size() == 15, "built-in taxonomy should expose fifteen non-empty categories");
+        require(catalog.categories().size() == 17, "built-in taxonomy should expose seventeen non-empty categories");
         require(catalog.subcategories().size() == catalog.categories().size(),
                 "legacy subcategories should be a one-to-one compatibility projection");
         require(catalog.subcategories().stream().allMatch(subcategory -> catalog.categories().stream()
@@ -82,7 +89,7 @@ public final class BlockLibraryTaxonomySelfCheck {
                                 && subcategory.displayName().equals(category.displayName())
                                 && subcategory.order() == category.order())),
                 "legacy subcategory metadata should be derived from formal categories");
-        require(catalog.blocks().size() == 25, "built-in taxonomy should explicitly classify all 25 blocks");
+        require(catalog.blocks().size() == 30, "built-in taxonomy should explicitly classify all 30 blocks");
         require(catalog.categories().stream().allMatch(category ->
                         category.displayName().equals(expectedCategoryNames.get(category.id()))),
                 "formal category display names should match the taxonomy specification");

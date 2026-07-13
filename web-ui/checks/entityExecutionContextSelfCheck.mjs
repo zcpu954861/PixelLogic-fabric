@@ -33,6 +33,10 @@ try {
     entityTypeId: 'minecraft:zombie',
     displayName: '测试僵尸',
     tags: [],
+    living: true,
+    health: 20,
+    maxHealth: 20,
+    invulnerable: false,
   });
   context = updateSimulationTargetEntityEnabled(context, true);
   context = updateSimulationTargetEntity(context, 'entityTypeId', 'minecraft:skeleton');
@@ -45,6 +49,10 @@ try {
     entityTypeId: 'minecraft:skeleton',
     displayName: '测试骷髅',
     tags: ['boss'],
+    living: true,
+    health: 20,
+    maxHealth: 20,
+    invulnerable: false,
   }, 'editing actor fields must not discard the target entity draft');
   assert.equal(validateSimulationTestContext(context), '');
   assert.match(

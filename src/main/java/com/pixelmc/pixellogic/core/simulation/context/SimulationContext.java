@@ -83,12 +83,12 @@ public final class SimulationContext implements RuntimeEntityProvider {
             return Optional.empty();
         }
         if (actor.id().toString().equals(referenceId)) {
-            return Optional.of(actor);
+            return actor.removed() ? Optional.empty() : Optional.of(actor);
         }
         if (onlinePlayerFixture != null && onlinePlayerFixture.id().toString().equals(referenceId)) {
-            return Optional.of(onlinePlayerFixture);
+            return onlinePlayerFixture.removed() ? Optional.empty() : Optional.of(onlinePlayerFixture);
         }
-        return targetEntity().filter(entity -> entity.id().toString().equals(referenceId));
+        return targetEntity().filter(entity -> !entity.removed() && entity.id().toString().equals(referenceId));
     }
 
     @Override
@@ -149,7 +149,11 @@ public final class SimulationContext implements RuntimeEntityProvider {
                 lookup.displayName(),
                 true,
                 false,
-                entity.tags()
+                entity.tags(),
+                SimulationPosition.overworldSpawn(),
+                entity.health(),
+                entity.maxHealth(),
+                entity.invulnerable()
         );
         return RuntimeEntityLookup.resolved(onlinePlayerFixture);
     }

@@ -606,18 +606,28 @@ public final class GraphRuntime {
 
     private RuntimeResult fail(String traceId, String nodeId, RuntimeException exception, String fallback) {
         String message = exception.getMessage() == null ? fallback : exception.getMessage();
-        traces.add(traceId, nodeId, "执行失败：" + message);
-        EntityTargetError error = exception instanceof EntityTargetException targetException
+        EntityTargetError targetError = exception instanceof EntityTargetException targetException
                 ? targetException.error()
                 : null;
-        return new RuntimeResult(false, traceId, message, false, error);
+        EntityActionError actionError = exception instanceof EntityActionException actionException
+                ? actionException.error()
+                : null;
+        String errorCode = targetError != null
+                ? targetError.code().id()
+                : actionError == null ? "" : actionError.code().id();
+        traces.add(traceId, nodeId, "执行失败" + (errorCode.isBlank() ? "" : " [" + errorCode + "]") + "：" + message);
+        return new RuntimeResult(false, traceId, message, false, targetError, actionError);
     }
 
     private void recordFailedAction(NodeDefinition node, RuntimeException exception) {
         if (exception instanceof EntityTargetException targetException
                 && (node.type() == NodeType.ENTITY_ADD_TAG_ACTION
-                || node.type() == NodeType.ENTITY_REMOVE_TAG_ACTION)) {
-            services.recordActionOutcome(node.id(), RuntimeActionOutcome.failure(targetException.error()));
+                || node.type() == NodeType.ENTITY_REMOVE_TAG_ACTION
+                || EntityHealthExecution.supports(node.type()))) {
+            services.recordActionOutcome(node.id(), RuntimeActionOutcome.failure(node.blockId(), targetException.error()));
+        } else if (exception instanceof EntityActionException actionException
+                && EntityHealthExecution.supports(node.type())) {
+            services.recordActionOutcome(node.id(), RuntimeActionOutcome.failure(node.blockId(), actionException.error()));
         }
     }
 

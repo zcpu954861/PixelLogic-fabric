@@ -6,6 +6,7 @@ export const simulationRegionNameLengthLimit = 64;
 export const simulationCoordinateLimit = 30_000_000;
 export const simulationMinY = -2048;
 export const simulationMaxY = 4096;
+export const simulationMaxHealth = 1_000_000;
 
 const defaultDimensionId = 'minecraft:overworld';
 const defaultBlockId = 'minecraft:stone';
@@ -39,6 +40,10 @@ export type SimulationTargetEntity = {
   entityTypeId: string;
   displayName: string;
   tags: string[];
+  living: boolean;
+  health: number;
+  maxHealth: number;
+  invulnerable: boolean;
 };
 
 export type SimulationTestWorld = {
@@ -53,6 +58,9 @@ export type SimulationTestActor = {
   displayName: string;
   tags: string[];
   operator: boolean;
+  health: number;
+  maxHealth: number;
+  invulnerable: boolean;
 };
 
 export type SimulationTestContext = {
@@ -70,12 +78,22 @@ export type SimulationTestResult = {
   targetBlock?: SimulationTargetBlock;
   regions?: SimulationRegionFact[];
   initialActorTags: string[];
+  initialActorHealth: number;
   actorTags: string[];
+  actorHealth: number;
+  actorMaxHealth: number;
+  actorAlive: boolean;
+  actorRemoved: boolean;
   targetEntityEnabled: boolean;
   targetEntityTypeId: string;
   targetEntityDisplayName: string;
   initialTargetEntityTags: string[];
+  initialTargetEntityHealth: number;
   targetEntityTags: string[];
+  targetEntityHealth: number;
+  targetEntityMaxHealth: number;
+  targetEntityAlive: boolean;
+  targetEntityRemoved: boolean;
   timerScheduled: boolean;
   status: 'WAITING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 };
@@ -87,6 +105,9 @@ export function defaultSimulationTestContext(): SimulationTestContext {
       displayName: 'WebUI 模拟玩家',
       tags: [],
       operator: false,
+      health: 20,
+      maxHealth: 20,
+      invulnerable: false,
     },
     world: defaultSimulationWorld(),
   };
@@ -114,6 +135,23 @@ export function updateSimulationOperator(context: SimulationTestContext, operato
       operator,
     },
   };
+}
+
+export function updateSimulationActorHealth(
+  context: SimulationTestContext,
+  field: 'health' | 'maxHealth',
+  value: string,
+): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  return { ...normalized, actor: { ...normalized.actor, [field]: toNumberInput(value) } };
+}
+
+export function updateSimulationActorInvulnerable(
+  context: SimulationTestContext,
+  invulnerable: boolean,
+): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  return { ...normalized, actor: { ...normalized.actor, invulnerable } };
 }
 
 export function updateSimulationPlayerPosition(
@@ -182,6 +220,36 @@ export function updateSimulationTargetEntity(
   context: SimulationTestContext,
   field: 'entityTypeId' | 'displayName',
   value: string,
+): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  return {
+    ...normalized,
+    world: {
+      ...normalized.world,
+      targetEntity: { ...normalized.world.targetEntity, [field]: value },
+    },
+  };
+}
+
+export function updateSimulationTargetEntityHealth(
+  context: SimulationTestContext,
+  field: 'health' | 'maxHealth',
+  value: string,
+): SimulationTestContext {
+  const normalized = withWorldDefaults(context);
+  return {
+    ...normalized,
+    world: {
+      ...normalized.world,
+      targetEntity: { ...normalized.world.targetEntity, [field]: toNumberInput(value) },
+    },
+  };
+}
+
+export function updateSimulationTargetEntityFlag(
+  context: SimulationTestContext,
+  field: 'living' | 'invulnerable',
+  value: boolean,
 ): SimulationTestContext {
   const normalized = withWorldDefaults(context);
   return {
@@ -376,6 +444,11 @@ export function validateSimulationTestContext(context: SimulationTestContext): s
     }
   }
 
+  const actorHealthError = validateHealth(normalized.actor.health, normalized.actor.maxHealth, '测试玩家');
+  if (actorHealthError) {
+    return actorHealthError;
+  }
+
   return validateWorld(normalized.world);
 }
 
@@ -435,12 +508,14 @@ function normalizeSimulationTestContext(context: SimulationTestContext): Simulat
 }
 
 function withWorldDefaults(context: SimulationTestContext): SimulationTestContext {
+  const defaultActor = defaultSimulationTestContext().actor;
+  const defaultTargetEntity = defaultSimulationTargetEntity();
   return {
-    actor: context.actor,
+    actor: { ...defaultActor, ...context.actor },
     world: {
       playerPosition: context.world?.playerPosition ?? defaultSimulationPosition(),
       targetBlock: context.world?.targetBlock ?? defaultSimulationTargetBlock(),
-      targetEntity: context.world?.targetEntity ?? defaultSimulationTargetEntity(),
+      targetEntity: { ...defaultTargetEntity, ...context.world?.targetEntity },
       regions: context.world?.regions ?? [],
     },
   };
@@ -488,6 +563,10 @@ function defaultSimulationTargetEntity(): SimulationTargetEntity {
     entityTypeId: 'minecraft:zombie',
     displayName: '测试僵尸',
     tags: [],
+    living: true,
+    health: 20,
+    maxHealth: 20,
+    invulnerable: false,
   };
 }
 
@@ -544,6 +623,10 @@ function validateWorld(world: SimulationTestWorld): string {
   }
   if (hasControlCharacter(world.targetEntity.displayName)) {
     return '测试目标实体名称不能包含换行或控制字符。';
+  }
+  const targetHealthError = validateHealth(world.targetEntity.health, world.targetEntity.maxHealth, '测试目标实体');
+  if (targetHealthError) {
+    return targetHealthError;
   }
   const targetTags = normalizeSimulationTags(world.targetEntity.tags);
   if (targetTags.length > simulationTagLimit) {
@@ -618,6 +701,16 @@ function validateCoordinate(value: number, label: string, min: number, max: numb
   }
   if (value < min || value > max) {
     return `${label} 超出允许范围。`;
+  }
+  return '';
+}
+
+function validateHealth(health: number, maximum: number, label: string): string {
+  if (!Number.isFinite(maximum) || maximum <= 0 || maximum > simulationMaxHealth) {
+    return `${label}最大生命值超出允许范围。`;
+  }
+  if (!Number.isFinite(health) || health < 0 || health > maximum) {
+    return `${label}生命值必须在 0 到最大生命值之间。`;
   }
   return '';
 }

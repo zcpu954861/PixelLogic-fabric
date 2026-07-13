@@ -79,6 +79,8 @@ public final class EntityTargetReferenceSelfCheck {
     }
 
     private static void checkModelAndCatalog() {
+        require(new Gson().toJson(EntityTargetErrorCode.ENTITY_TARGET_MISSING).equals("\"entity_target_missing\""),
+                "entity target error codes should use stable wire IDs");
         require(EnumSet.allOf(EntityTargetSource.class).equals(EnumSet.of(
                         EntityTargetSource.CURRENT_ENTITY,
                         EntityTargetSource.CONDITION_SUBJECT,
@@ -114,8 +116,8 @@ public final class EntityTargetReferenceSelfCheck {
         expectInvalidTarget("{\"source\":\"ONLINE_PLAYER\",\"playerUuid\":\"" + ONLINE_ID
                 + "\",\"playerNameHint\":\"bad\\nname\"}", "playerNameHint");
 
-        require(BuiltInBlockCatalog.catalog().blocks().size() == 25,
-                "catalog should contain 25 blocks after six-to-three tag reform");
+        require(BuiltInBlockCatalog.catalog().blocks().size() == 30,
+                "catalog should contain 30 blocks after health and termination actions");
         List<String> newIds = List.of(
                 BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG,
                 BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG,
@@ -218,6 +220,17 @@ public final class EntityTargetReferenceSelfCheck {
                         .reference().equals(target.reference()), "TARGET_ENTITY should remain independent");
         require(resolve(EntityTargetRef.onlinePlayer(ONLINE_ID, "stale name"), EntityTargetRequirement.PLAYER_ONLY, context, provider)
                         .reference().equals(online.reference()), "ONLINE_PLAYER should resolve exact UUID, not name hint");
+        String unsafeName = "A".repeat(70) + "\nInjected";
+        TestEntity unsafe = TestEntity.entity(UUID.randomUUID(), unsafeName, true, true, Set.of());
+        ResolvedEntityTarget bounded = resolve(
+                source(EntityTargetSource.CURRENT_ENTITY),
+                EntityTargetRequirement.ANY_ENTITY,
+                new RuntimeExecutionContext(ACTOR_ID, "session", null, unsafe.reference(), null),
+                new TestProvider(List.of(unsafe), Map.of())
+        );
+        require(bounded.reference().displayName().length() == 64
+                        && bounded.reference().displayName().chars().noneMatch(Character::isISOControl),
+                "resolved target names should use the bounded lookup display name");
         expectResolutionError(source(EntityTargetSource.CURRENT_ENTITY), EntityTargetRequirement.ANY_ENTITY,
                 context, providerReturning(target), EntityTargetErrorCode.ENTITY_TARGET_UNRESOLVABLE);
         expectResolutionError(EntityTargetRef.onlinePlayer(ONLINE_ID, "Steve"), EntityTargetRequirement.ANY_ENTITY,

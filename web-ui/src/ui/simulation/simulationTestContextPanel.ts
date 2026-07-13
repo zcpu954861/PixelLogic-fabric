@@ -114,7 +114,7 @@ export function renderSimulationTestContextModal(
 function renderTargetEntitySection(target: SimulationTargetEntity): string {
   const tags = normalizeSimulationTags(target.tags);
   return renderDisclosure('entity', '测试目标实体', target.enabled
-    ? `${target.displayName || '未命名实体'} · ${target.entityTypeId} · ${tags.length} 个标签`
+    ? `${target.displayName || '未命名实体'} · ${target.entityTypeId} · ${target.health}/${target.maxHealth} 生命`
     : '未启用', `
       <div class="field-grid">
         <div class="field-row">
@@ -131,6 +131,28 @@ function renderTargetEntitySection(target: SimulationTargetEntity): string {
         <label class="field-row is-full">
           显示名称
           <input type="text" data-sim-target-entity-field="displayName" maxlength="64" value="${escapeAttr(target.displayName)}" autocomplete="off">
+        </label>
+        <div class="field-row">
+          <span>活体实体</span>
+          <div class="segmented-control" role="group" aria-label="测试目标是否为活体实体">
+            <button type="button" data-sim-target-entity-flag="living" data-sim-target-entity-flag-value="true" aria-pressed="${target.living}">是</button>
+            <button type="button" data-sim-target-entity-flag="living" data-sim-target-entity-flag-value="false" aria-pressed="${!target.living}">否</button>
+          </div>
+        </div>
+        <div class="field-row">
+          <span>免疫伤害</span>
+          <div class="segmented-control" role="group" aria-label="测试目标是否免疫伤害">
+            <button type="button" data-sim-target-entity-flag="invulnerable" data-sim-target-entity-flag-value="true" aria-pressed="${target.invulnerable}">是</button>
+            <button type="button" data-sim-target-entity-flag="invulnerable" data-sim-target-entity-flag-value="false" aria-pressed="${!target.invulnerable}">否</button>
+          </div>
+        </div>
+        <label class="field-row">
+          当前生命值
+          <input type="number" data-sim-target-entity-health-field="health" value="${coordinateValue(target.health)}" min="0" max="1000000" step="0.5">
+        </label>
+        <label class="field-row">
+          最大生命值
+          <input type="number" data-sim-target-entity-health-field="maxHealth" value="${coordinateValue(target.maxHealth)}" min="0.001" max="1000000" step="0.5">
         </label>
         <div class="field-row is-full">
           <span>标签</span>
@@ -188,6 +210,21 @@ function renderPlayerSection(context: SimulationTestContext, tags: string[]): st
           <div class="segmented-control sim-admin-control" role="group" aria-label="管理员">
             <button type="button" data-sim-draft-admin-value="true" aria-pressed="${context.actor.operator}">是</button>
             <button type="button" data-sim-draft-admin-value="false" aria-pressed="${!context.actor.operator}">否</button>
+          </div>
+        </div>
+        <label class="field-row">
+          当前生命值
+          <input type="number" data-sim-draft-health-field="health" value="${coordinateValue(context.actor.health)}" min="0" max="1000000" step="0.5">
+        </label>
+        <label class="field-row">
+          最大生命值
+          <input type="number" data-sim-draft-health-field="maxHealth" value="${coordinateValue(context.actor.maxHealth)}" min="0.001" max="1000000" step="0.5">
+        </label>
+        <div class="field-row">
+          <span>免疫伤害</span>
+          <div class="segmented-control" role="group" aria-label="测试玩家是否免疫伤害">
+            <button type="button" data-sim-draft-invulnerable="true" aria-pressed="${context.actor.invulnerable}">是</button>
+            <button type="button" data-sim-draft-invulnerable="false" aria-pressed="${!context.actor.invulnerable}">否</button>
           </div>
         </div>
         <div class="field-row is-full">
@@ -340,9 +377,13 @@ function renderSimulationResult(result: SimulationTestResult | null): string {
       <div><span>初始标签</span><b>${escapeHtml(formatTags(initialTags))}</b></div>
       <div><span>结束标签</span><b>${escapeHtml(formatTags(finalTags))}</b></div>
       <div><span>标签变化</span><b>${escapeHtml(tagChanges(initialTags, finalTags))}</b></div>
+      <div><span>玩家生命值</span><b>${escapeHtml(`${result.initialActorHealth} → ${result.actorHealth}/${result.actorMaxHealth}`)}</b></div>
+      <div><span>玩家状态</span><b>${result.actorRemoved ? '已移除' : result.actorAlive ? '存活' : '死亡'}</b></div>
       <div><span>测试目标实体</span><b>${result.targetEntityEnabled ? escapeHtml(`${result.targetEntityDisplayName}（${result.targetEntityTypeId}）`) : '未启用'}</b></div>
       <div><span>目标实体初始标签</span><b>${result.targetEntityEnabled ? escapeHtml(formatTags(normalizeSimulationTags(result.initialTargetEntityTags ?? []))) : '未启用'}</b></div>
       <div><span>目标实体最终标签</span><b>${result.targetEntityEnabled ? escapeHtml(formatTags(normalizeSimulationTags(result.targetEntityTags ?? []))) : '未启用'}</b></div>
+      <div><span>目标实体生命值</span><b>${result.targetEntityEnabled ? escapeHtml(`${result.initialTargetEntityHealth} → ${result.targetEntityHealth}/${result.targetEntityMaxHealth}`) : '未启用'}</b></div>
+      <div><span>目标实体状态</span><b>${result.targetEntityEnabled ? result.targetEntityRemoved ? '已移除' : result.targetEntityAlive ? '存活' : '死亡' : '未启用'}</b></div>
       <small>${simulationRunStatusLabel(result)} · ${escapeHtml(shortTraceId(result.traceId))}</small>
     </div>
   `;

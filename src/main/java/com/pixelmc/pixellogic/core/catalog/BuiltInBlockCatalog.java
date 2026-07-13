@@ -32,6 +32,11 @@ public final class BuiltInBlockCatalog {
     public static final String CONDITION_PLAYER_NEAR_TARGET_BLOCK = "condition.player.near_target_block";
     public static final String ACTION_ENTITY_ADD_TAG = "action.entity.add_tag";
     public static final String ACTION_ENTITY_REMOVE_TAG = "action.entity.remove_tag";
+    public static final String ACTION_ENTITY_DAMAGE = "action.entity.damage";
+    public static final String ACTION_ENTITY_HEAL = "action.entity.heal";
+    public static final String ACTION_ENTITY_SET_HEALTH = "action.entity.set_health";
+    public static final String ACTION_ENTITY_KILL = "action.entity.kill";
+    public static final String ACTION_ENTITY_REMOVE = "action.entity.remove";
     public static final String CONTROL_LOOP_COUNT = "control.loop.count";
     public static final String CONTROL_LOOP_FOREVER = "control.loop.forever";
     public static final String CONTROL_LOOP_UNTIL = "control.loop.until";
@@ -62,6 +67,11 @@ public final class BuiltInBlockCatalog {
             Map.entry(NodeType.PLAYER_NEAR_TARGET_BLOCK_CONDITION, CONDITION_PLAYER_NEAR_TARGET_BLOCK),
             Map.entry(NodeType.ENTITY_ADD_TAG_ACTION, ACTION_ENTITY_ADD_TAG),
             Map.entry(NodeType.ENTITY_REMOVE_TAG_ACTION, ACTION_ENTITY_REMOVE_TAG),
+            Map.entry(NodeType.ENTITY_DAMAGE_ACTION, ACTION_ENTITY_DAMAGE),
+            Map.entry(NodeType.ENTITY_HEAL_ACTION, ACTION_ENTITY_HEAL),
+            Map.entry(NodeType.ENTITY_SET_HEALTH_ACTION, ACTION_ENTITY_SET_HEALTH),
+            Map.entry(NodeType.ENTITY_KILL_ACTION, ACTION_ENTITY_KILL),
+            Map.entry(NodeType.ENTITY_REMOVE_ACTION, ACTION_ENTITY_REMOVE),
             Map.entry(NodeType.CONTROL_LOOP_COUNT, CONTROL_LOOP_COUNT),
             Map.entry(NodeType.CONTROL_LOOP_FOREVER, CONTROL_LOOP_FOREVER),
             Map.entry(NodeType.CONTROL_LOOP_UNTIL, CONTROL_LOOP_UNTIL),
@@ -123,6 +133,8 @@ public final class BuiltInBlockCatalog {
                 category("player-entity.tags", "player-entity", "标签", "判断或修改玩家与上下文实体标签。", "#", 10),
                 category("player-entity.identity-permissions", "player-entity", "身份与权限", "判断玩家身份和权限。", "★", 20),
                 category("player-entity.execution-context", "player-entity", "实体上下文", "切换内部积木操作的实体上下文。", "◎", 30),
+                category("player-entity.health-attributes", "player-entity", "生命与属性", "伤害、恢复或设置实体生命值。", "♥", 40),
+                category("player-entity.entity-management", "player-entity", "实体管理", "杀死实体或直接移除非玩家实体。", "×", 50),
                 category("location-region.dimensions-heights", "location-region", "维度与高度", "判断维度或垂直高度。", "↕", 10),
                 category("location-region.regions", "location-region", "区域", "判断玩家或目标方块是否位于区域内。", "▣", 20),
                 category("location-region.spatial-relations", "location-region", "空间关系", "判断玩家与目标对象的空间关系。", "⇄", 30),
@@ -490,6 +502,126 @@ public final class BuiltInBlockCatalog {
                         List.of(in("input")),
                         List.of(out("done")),
                         BlockCapabilityLevel.FULLY_SIMULATABLE,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
+                        List.of(),
+                        EntityTargetRequirement.ANY_ENTITY
+                ),
+                targetBlock(
+                        ACTION_ENTITY_DAMAGE,
+                        "伤害实体",
+                        "通过 Minecraft 正常伤害流程对所选活体实体造成伤害；模拟测试使用未减伤近似，真实服务器可能减伤或拒绝。",
+                        "player-entity.health-attributes",
+                        "action",
+                        NodeType.ENTITY_DAMAGE_ACTION,
+                        Map.of(
+                                "target", EntityTargetRef.currentEntity().toJson(),
+                                "amount", "4",
+                                "damageKind", "GENERIC"
+                        ),
+                        List.of(
+                                entityTarget("目标", EntityTargetRef.currentEntity()),
+                                number("amount", "伤害值", "点", "0.001", "1000000", "0.5"),
+                                select("damageKind", "伤害类型", List.of(
+                                        option("GENERIC", "普通"),
+                                        option("MAGIC", "魔法"),
+                                        option("FIRE", "火焰"),
+                                        option("FALL", "摔落"),
+                                        option("VOID", "虚空")
+                                ))
+                        ),
+                        "对「{target}」造成 {amount} 点{damageKind}伤害。",
+                        "action.entity.damage",
+                        List.of(),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.APPROXIMATE_SIMULATION,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
+                        List.of(),
+                        EntityTargetRequirement.LIVING_ENTITY
+                ),
+                targetBlock(
+                        ACTION_ENTITY_HEAL,
+                        "恢复实体生命值",
+                        "恢复所选活体实体的生命值，最多恢复到当前最大生命值。",
+                        "player-entity.health-attributes",
+                        "action",
+                        NodeType.ENTITY_HEAL_ACTION,
+                        Map.of("target", EntityTargetRef.currentEntity().toJson(), "amount", "6"),
+                        List.of(
+                                entityTarget("目标", EntityTargetRef.currentEntity()),
+                                number("amount", "恢复值", "点", "0.001", "1000000", "0.5")
+                        ),
+                        "恢复「{target}」 {amount} 点生命值。",
+                        "action.entity.heal",
+                        List.of(),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.APPROXIMATE_SIMULATION,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
+                        List.of(),
+                        EntityTargetRequirement.LIVING_ENTITY
+                ),
+                targetBlock(
+                        ACTION_ENTITY_SET_HEALTH,
+                        "设置实体生命值",
+                        "将所选活体实体设为明确生命值；0 会使实体进入死亡状态。",
+                        "player-entity.health-attributes",
+                        "action",
+                        NodeType.ENTITY_SET_HEALTH_ACTION,
+                        Map.of("target", EntityTargetRef.currentEntity().toJson(), "health", "20"),
+                        List.of(
+                                entityTarget("目标", EntityTargetRef.currentEntity()),
+                                number("health", "生命值", "点", "0", "1000000", "0.5")
+                        ),
+                        "将「{target}」的生命值设为 {health}。",
+                        "action.entity.set_health",
+                        List.of(),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.APPROXIMATE_SIMULATION,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
+                        List.of(),
+                        EntityTargetRequirement.LIVING_ENTITY
+                ),
+                targetBlock(
+                        ACTION_ENTITY_KILL,
+                        "杀死实体",
+                        "通过正常死亡流程杀死所选活体实体，可用于玩家。",
+                        "player-entity.entity-management",
+                        "action",
+                        NodeType.ENTITY_KILL_ACTION,
+                        Map.of("target", EntityTargetRef.currentEntity().toJson()),
+                        List.of(entityTarget("目标", EntityTargetRef.currentEntity())),
+                        "杀死「{target}」。",
+                        "action.entity.kill",
+                        List.of(),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.APPROXIMATE_SIMULATION,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
+                        List.of(),
+                        EntityTargetRequirement.LIVING_ENTITY
+                ),
+                targetBlock(
+                        ACTION_ENTITY_REMOVE,
+                        "移除实体",
+                        "直接移除所选非玩家实体，不触发正常死亡流程。",
+                        "player-entity.entity-management",
+                        "action",
+                        NodeType.ENTITY_REMOVE_ACTION,
+                        Map.of("target", EntityTargetRef.currentEntity().toJson()),
+                        List.of(entityTarget("目标", EntityTargetRef.currentEntity())),
+                        "直接移除「{target}」。",
+                        "action.entity.remove",
+                        List.of(),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.APPROXIMATE_SIMULATION,
                         BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
                         List.of(BlockSafetyFlag.ENTITY_MUTATING),
                         List.of(),
@@ -962,6 +1094,11 @@ public final class BuiltInBlockCatalog {
             case ACTION_MESSAGE_ACTIONBAR -> List.of("消息", "屏幕提示", "actionbar");
             case CONDITION_ENTITY_HAS_TAG, ACTION_ENTITY_ADD_TAG, ACTION_ENTITY_REMOVE_TAG ->
                     List.of("实体标签", "玩家标签", "标签", "entity tag");
+            case ACTION_ENTITY_DAMAGE -> List.of("伤害", "扣血", "damage", "hurt");
+            case ACTION_ENTITY_HEAL -> List.of("恢复生命", "回血", "heal", "health");
+            case ACTION_ENTITY_SET_HEALTH -> List.of("设置生命", "血量", "set health");
+            case ACTION_ENTITY_KILL -> List.of("杀死", "死亡", "kill");
+            case ACTION_ENTITY_REMOVE -> List.of("移除实体", "清理", "remove", "discard");
             case CONDITION_PLAYER_IS_ADMIN -> List.of("管理员", "权限");
             case CONDITION_PLAYER_DIMENSION_IS -> List.of("世界", "维度");
             case CONDITION_PLAYER_IN_REGION, CONDITION_TARGET_BLOCK_IN_REGION -> List.of("区域", "范围");

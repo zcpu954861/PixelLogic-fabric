@@ -96,8 +96,8 @@ public final class EntityTargetResolver {
                 requirement,
                 referenceId
         );
-        RuntimeSubjectReference resolved = entity.reference();
-        if (resolved == null || !resolved.isEntity() || resolved.id().isBlank()) {
+        RuntimeSubjectReference rawReference = entity.reference();
+        if (rawReference == null || !rawReference.isEntity() || rawReference.id().isBlank()) {
             throw failure(
                     EntityTargetErrorCode.ENTITY_TARGET_UNRESOLVABLE,
                     nodeId,
@@ -108,6 +108,11 @@ public final class EntityTargetResolver {
                     "所选实体无法解析。"
             );
         }
+        RuntimeSubjectReference resolved = new RuntimeSubjectReference(
+                rawReference.id(),
+                rawReference.kind(),
+                lookup.displayName()
+        );
         enforceSource(nodeId, fieldPath, target, requirement, requested, resolved, entity);
         enforceRequirement(nodeId, fieldPath, target.source(), requirement, resolved, entity);
         return new ResolvedEntityTarget(target.source(), resolved, entity);

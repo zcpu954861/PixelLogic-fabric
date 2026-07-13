@@ -25,6 +25,7 @@ final class SimulationTestContextParser {
     private static final int MAX_TEST_TAG_LENGTH = 64;
     private static final int MAX_TEST_REGIONS = 8;
     private static final int MAX_TEST_REGION_NAME_LENGTH = 64;
+    private static final double MAX_TEST_HEALTH = 1_000_000;
     private static final int MAX_COORDINATE = 30_000_000;
     private static final int MIN_TEST_Y = -2048;
     private static final int MAX_TEST_Y = 4096;
@@ -76,14 +77,21 @@ final class SimulationTestContextParser {
             if (!actorElement.isJsonObject()) {
                 throw new IllegalArgumentException("测试玩家格式无效。");
             }
-            TestActorRequest actor = gson.fromJson(actorElement, TestActorRequest.class);
+            JsonObject actorObject = actorElement.getAsJsonObject();
+            TestActorRequest actor = gson.fromJson(actorObject, TestActorRequest.class);
+            double maxHealth = healthNumber(actorObject.get("maxHealth"), "测试玩家最大生命值", 20, true);
+            double health = healthNumber(actorObject.get("health"), "测试玩家生命值", maxHealth, false);
+            requireHealthAtMostMaximum(health, maxHealth, "测试玩家生命值不能超过最大生命值。");
             return new SimulationActor(
                     actorId,
-                    displayName(actor.displayName()),
+                    displayName(stringValue(actorObject.get("displayName"), "测试玩家名称必须是字符串。", defaultActorName)),
                     true,
-                    Boolean.TRUE.equals(actor.operator()),
+                    booleanValue(actorObject.get("operator"), "测试玩家管理员状态", false),
                     tags(actor.tags()),
-                    position
+                    position,
+                    health,
+                    maxHealth,
+                    booleanValue(actorObject.get("invulnerable"), "测试玩家免伤状态", false)
             );
         } catch (JsonParseException exception) {
             throw new IllegalArgumentException("测试玩家请求无法解析。", exception);
@@ -143,22 +151,38 @@ final class SimulationTestContextParser {
             throw new IllegalArgumentException("测试目标实体格式无效。");
         }
         JsonObject target = targetElement.getAsJsonObject();
-        boolean enabled = target.has("enabled")
-                && !target.get("enabled").isJsonNull()
-                && target.get("enabled").getAsBoolean();
+        boolean enabled = booleanValue(target.get("enabled"), "测试目标实体启用状态", false);
         String entityTypeId = namespacedId(
                 target.get("entityTypeId"),
                 "测试目标实体类型 ID 必须类似 minecraft:zombie。",
                 "minecraft:zombie"
         );
-        String displayName = target.has("displayName") && !target.get("displayName").isJsonNull()
-                ? displayName(target.get("displayName").getAsString(), "测试僵尸", "测试目标实体")
-                : "测试僵尸";
+        String displayName = displayName(
+                stringValue(target.get("displayName"), "测试目标实体名称必须是字符串。", "测试僵尸"),
+                "测试僵尸",
+                "测试目标实体"
+        );
         String[] rawTags = target.has("tags") && !target.get("tags").isJsonNull()
                 ? gson.fromJson(target.get("tags"), String[].class)
                 : null;
         List<String> entityTags = tags(rawTags == null ? List.of() : Arrays.asList(rawTags));
-        return enabled ? new SimulationEntity(UUID.randomUUID(), entityTypeId, displayName, entityTags) : null;
+        boolean living = booleanValue(target.get("living"), "测试目标实体活体状态", true);
+        double maxHealth = healthNumber(target.get("maxHealth"), "测试目标实体最大生命值", 20, true);
+        double health = healthNumber(target.get("health"), "测试目标实体生命值", maxHealth, false);
+        requireHealthAtMostMaximum(health, maxHealth, "测试目标实体生命值不能超过最大生命值。");
+        boolean invulnerable = booleanValue(target.get("invulnerable"), "测试目标实体免伤状态", false);
+        return enabled
+                ? new SimulationEntity(
+                        UUID.randomUUID(),
+                        entityTypeId,
+                        displayName,
+                        entityTags,
+                        living,
+                        health,
+                        maxHealth,
+                        invulnerable
+                )
+                : null;
     }
 
     private SimulationBlockFact parseTargetBlock(JsonElement targetElement) {
@@ -169,7 +193,7 @@ final class SimulationTestContextParser {
             throw new IllegalArgumentException("目标方块格式无效。");
         }
         JsonObject target = targetElement.getAsJsonObject();
-        boolean enabled = target.has("enabled") && !target.get("enabled").isJsonNull() && target.get("enabled").getAsBoolean();
+        boolean enabled = booleanValue(target.get("enabled"), "目标方块启用状态", false);
         return new SimulationBlockFact(
                 enabled,
                 namespacedId(target.get("dimensionId"), "目标方块的维度 ID 不合法。", "minecraft:overworld"),
@@ -262,10 +286,7 @@ final class SimulationTestContextParser {
     }
 
     private static String regionName(JsonElement element) {
-        if (element == null || element.isJsonNull()) {
-            throw new IllegalArgumentException("测试区域名称不能为空。");
-        }
-        String value = element.getAsString().trim();
+        String value = stringValue(element, "测试区域名称必须是字符串。", "").trim();
         if (value.isEmpty()) {
             throw new IllegalArgumentException("测试区域名称不能为空。");
         }
@@ -279,14 +300,21 @@ final class SimulationTestContextParser {
     }
 
     private static String namespacedId(JsonElement element, String message, String defaultValue) {
-        if (element == null || element.isJsonNull()) {
-            return defaultValue;
-        }
-        String value = element.getAsString().trim();
+        String value = stringValue(element, message, defaultValue).trim();
         if (!NAMESPACED_ID.matcher(value).matches()) {
             throw new IllegalArgumentException(message);
         }
         return value;
+    }
+
+    private static String stringValue(JsonElement element, String message, String defaultValue) {
+        if (element == null || element.isJsonNull()) {
+            return defaultValue;
+        }
+        if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isString()) {
+            throw new IllegalArgumentException(message);
+        }
+        return element.getAsString();
     }
 
     private static int coordinate(JsonElement element, String label, int min, int max, int defaultValue) {
@@ -306,6 +334,43 @@ final class SimulationTestContextParser {
         return element.getAsInt();
     }
 
+    private static double healthNumber(
+            JsonElement element,
+            String label,
+            double defaultValue,
+            boolean positive
+    ) {
+        if (element == null || element.isJsonNull()) {
+            return defaultValue;
+        }
+        if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isNumber()) {
+            throw new IllegalArgumentException(label + "必须是数字。");
+        }
+        double value = element.getAsDouble();
+        if (!Double.isFinite(value)
+                || (positive ? value <= 0 : value < 0)
+                || value > MAX_TEST_HEALTH) {
+            throw new IllegalArgumentException(label + "超出允许范围。");
+        }
+        return value;
+    }
+
+    private static boolean booleanValue(JsonElement element, String label, boolean defaultValue) {
+        if (element == null || element.isJsonNull()) {
+            return defaultValue;
+        }
+        if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isBoolean()) {
+            throw new IllegalArgumentException(label + "必须是布尔值。");
+        }
+        return element.getAsBoolean();
+    }
+
+    private static void requireHealthAtMostMaximum(double health, double maximum, String message) {
+        if (health > maximum) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
     private static boolean hasControlCharacter(String value) {
         return value.chars().anyMatch(Character::isISOControl);
     }
@@ -313,7 +378,9 @@ final class SimulationTestContextParser {
     record Parsed(SimulationActor actor, SimulationWorld world) {
     }
 
-    private record TestActorRequest(String displayName, List<String> tags, Boolean operator) {
+    private record TestActorRequest(
+            List<String> tags
+    ) {
     }
 
 }

@@ -56,7 +56,12 @@ final class RuntimeNodeExecutor {
                  TARGET_BLOCK_Y_COMPARE_CONDITION,
                  PLAYER_NEAR_TARGET_BLOCK_CONDITION,
                  ENTITY_ADD_TAG_ACTION,
-                 ENTITY_REMOVE_TAG_ACTION ->
+                 ENTITY_REMOVE_TAG_ACTION,
+                 ENTITY_DAMAGE_ACTION,
+                 ENTITY_HEAL_ACTION,
+                 ENTITY_SET_HEALTH_ACTION,
+                 ENTITY_KILL_ACTION,
+                 ENTITY_REMOVE_ACTION ->
                     throw new IllegalStateException("缺少模拟执行器：" + node.type());
         };
         return new RuntimeNodeExecutionResult(outputSlot, "");

@@ -2,6 +2,7 @@ package com.pixelmc.pixellogic.core.simulation.runner;
 
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
 import com.pixelmc.pixellogic.core.runtime.EntityTargetError;
+import com.pixelmc.pixellogic.core.runtime.EntityActionError;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationBlockFact;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationContext;
 import com.pixelmc.pixellogic.core.simulation.context.SimulationPosition;
@@ -23,25 +24,38 @@ public record SimulationExecutionResult(
         SimulationBlockFact targetBlock,
         List<SimulationRegionFact> regions,
         Set<String> initialActorTags,
+        double initialActorHealth,
         List<SimulationActionResult> actionResults,
         List<SimulationMessageResult> messageResults,
         List<SimulationStateChangeResult> stateChanges,
         Set<String> actorTags,
+        double actorHealth,
+        double actorMaxHealth,
+        boolean actorAlive,
+        boolean actorRemoved,
         boolean targetEntityEnabled,
         String targetEntityTypeId,
         String targetEntityDisplayName,
         Set<String> initialTargetEntityTags,
+        double initialTargetEntityHealth,
         Set<String> targetEntityTags,
+        double targetEntityHealth,
+        double targetEntityMaxHealth,
+        boolean targetEntityAlive,
+        boolean targetEntityRemoved,
         boolean timerScheduled,
         Status status,
         List<String> errors,
-        EntityTargetError targetError
+        EntityTargetError targetError,
+        EntityActionError actionError
 ) {
     public static SimulationExecutionResult from(
             RuntimeResult result,
             SimulationContext context,
             Set<String> initialActorTags,
-            Set<String> initialTargetEntityTags
+            double initialActorHealth,
+            Set<String> initialTargetEntityTags,
+            double initialTargetEntityHealth
     ) {
         var targetEntity = context.targetEntity().orElse(null);
         return new SimulationExecutionResult(
@@ -54,19 +68,30 @@ public record SimulationExecutionResult(
                 context.world().targetBlock(),
                 context.world().regions(),
                 Set.copyOf(initialActorTags),
+                initialActorHealth,
                 context.actionResults(),
                 context.messageResults(),
                 context.stateChanges(),
                 context.actor().tags(),
+                context.actor().health(),
+                context.actor().maxHealth(),
+                context.actor().alive(),
+                context.actor().removed(),
                 targetEntity != null,
                 targetEntity == null ? "" : targetEntity.entityTypeId(),
                 targetEntity == null ? "" : targetEntity.displayName(),
                 Set.copyOf(initialTargetEntityTags),
+                initialTargetEntityHealth,
                 targetEntity == null ? Set.of() : targetEntity.tags(),
+                targetEntity == null ? 0 : targetEntity.health(),
+                targetEntity == null ? 0 : targetEntity.maxHealth(),
+                targetEntity != null && targetEntity.alive(),
+                targetEntity != null && targetEntity.removed(),
                 context.timerScheduled(),
                 result.suspended() ? Status.WAITING : result.success() ? Status.COMPLETED : Status.FAILED,
                 result.success() ? List.of() : List.of(result.message()),
-                result.targetError()
+                result.targetError(),
+                result.actionError()
         );
     }
 
@@ -81,19 +106,30 @@ public record SimulationExecutionResult(
                 targetBlock,
                 regions,
                 initialActorTags,
+                initialActorHealth,
                 actionResults,
                 messageResults,
                 stateChanges,
                 actorTags,
+                actorHealth,
+                actorMaxHealth,
+                actorAlive,
+                actorRemoved,
                 targetEntityEnabled,
                 targetEntityTypeId,
                 targetEntityDisplayName,
                 initialTargetEntityTags,
+                initialTargetEntityHealth,
                 targetEntityTags,
+                targetEntityHealth,
+                targetEntityMaxHealth,
+                targetEntityAlive,
+                targetEntityRemoved,
                 timerScheduled,
                 Status.CANCELLED,
                 List.of(message),
-                targetError
+                targetError,
+                actionError
         );
     }
 

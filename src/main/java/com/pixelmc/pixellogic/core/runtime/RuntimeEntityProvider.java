@@ -25,4 +25,8 @@ public interface RuntimeEntityProvider {
     RuntimeEntityLookup resolveOnlinePlayer(UUID playerUuid);
 
     RuntimeOnlinePlayerList listOnlinePlayers(String query, int limit);
+
+    default boolean statusEffectExists(String effectId) {
+        return false;
+    }
 }

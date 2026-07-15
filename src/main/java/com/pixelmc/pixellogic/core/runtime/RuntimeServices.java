@@ -15,7 +15,8 @@ public interface RuntimeServices {
             RuntimeExecutionContext context
     ) {
         return EntityTagExecution.execute(node, context, this)
-                .or(() -> EntityHealthExecution.execute(node, context, this));
+                .or(() -> EntityHealthExecution.execute(node, context, this))
+                .or(() -> EntityStatusExecution.execute(node, context, this));
     }
 
     default Optional<RuntimePredicateResult> evaluatePredicate(

@@ -2,7 +2,7 @@
 
 正式名称：**Player & Entity Foundation v1-A / 玩家与实体基础包：目标、生命与状态**。
 
-This is the design contract for the full v1-A pack and the implementation record for Slice 1 plus Slice 2. Status-effect, game-mode and condition blocks remain planned only.
+This is the design contract for the full v1-A pack and the implementation record for Slices 1–3. Status-effect and game-mode actions are implemented in the current feature; the six condition blocks remain planned only.
 
 ## Product slice
 
@@ -27,11 +27,11 @@ action.entity.remove_tag
 
 All three use the shared composite `target: EntityTargetRef`, requirement `ANY_ENTITY`, and an explicit new-node default of `CURRENT_ENTITY`. The condition remains compatible with `PASS_ONLY`, `FAIL_ONLY`, `BRANCH` and Predicate Rack, records the resolved entity as condition subject for normal true/false results, and leaves condition object empty. The retired block IDs are unknown, and their former tag NodeTypes are absent.
 
-Slice 1 also removes the former permanent run-start source, adds the shared resolver/errors/action outcome, provides on-demand online-player UUID selection, and moves `context.entity.execute_as` onto the same target control. Slice 2 now implements the five health/termination actions below; the remaining three actions and six conditions stay planned.
+Slice 1 also removes the former permanent run-start source, adds the shared resolver/errors/action outcome, provides on-demand online-player UUID selection, and moves `context.entity.execute_as` onto the same target control. Slice 2 implements the five health/termination actions below and is merged. Slice 3 implements the remaining three actions; the six conditions stay planned.
 
 ## Taxonomy plan
 
-The Catalog registers only paths with real blocks. `生命与属性` and `实体管理` are implemented by Slice 2; `状态效果` and `玩家设置` remain planned and are not registered yet.
+The Catalog registers only paths with real blocks. `生命与属性` and `实体管理` come from Slice 2; `状态效果` and `玩家设置` are now registered by Slice 3 because each contains real blocks.
 
 ```text
 玩家与实体
@@ -76,7 +76,7 @@ The two Slice 1 tag actions are the first consumers:
 - a real add or remove returns `SUCCESS`, `changed=true`, `affectedCount=1`;
 - target resolution failure returns `FAILURE`, `changed=false`, `affectedCount=0` and the structured terminal target error.
 
-This is not a generic object/result framework. It is the minimum extension reused by the Slice 1 tag actions and Slice 2 health/termination actions. There is no free-form payload map.
+This is not a generic object/result framework. It is the minimum extension reused by the Slice 1 tag actions, Slice 2 health/termination actions and Slice 3 status/game-mode actions. There is no free-form payload map.
 
 All common target errors come from EntityTargetRef. Domain errors use stable codes. Trace includes the readable target, requested operation, changed/no-change outcome, selected condition output, and error code when present; it must not dump Minecraft objects.
 
@@ -95,7 +95,7 @@ All six conditions:
 v1-A justifies two small reusable components:
 
 1. `entity_target`: one composite EntityTargetRef value and compact picker;
-2. `status_effect`: one namespaced effect-id editor/validator reused by add, remove and has-effect blocks. Duration, level, visibility and minimum thresholds remain ordinary block-specific fields.
+2. `status_effect`: one namespaced effect-id editor/validator now reused by add/remove actions and reserved for the later has-effect condition. Duration, level, visibility and minimum thresholds remain ordinary block-specific fields.
 
 `condition.entity.type_is` uses the existing namespaced Resource ID field/validator with an “实体类型” label. It is the only v1-A consumer, so v1-A does not create an `entity_type` component; extraction waits for a second real consumer.
 
@@ -226,13 +226,37 @@ No action saturates numeric overflow silently. Only ordinary healing stops at ma
 - **Explicitly unsupported:** infinite duration in v1, effect collections, arbitrary NBT/components and hidden amplifier arithmetic.
 - **Form Schema:** `entity_target`, `status_effect`, integer duration/level, three booleans, policy select; display and advanced groups are collapsed by default.
 - **Summary:** `给予当前执行实体 速度 II，持续 30 秒`.
-- **GraphValidator:** namespaced effect id, duration/level bounds and known policy.
-- **Simulation:** maintain a per-run effect map and mirror the policy table frozen by the target-version adapter audit; record before/after effect state. No executor is registered until `VANILLA_UPDATE` versus `REPLACE` behavior for weaker, stronger, shorter, longer and infinite existing effects is documented and covered by the same Simulation/Runtime self-check cases.
-- **Runtime contract:** resolve the effect registry entry and use target-version status-effect APIs; `REPLACE` may remove then add only if the audited API requires it.
-- **Errors/result:** `STATUS_EFFECT_UNKNOWN`, `STATUS_EFFECT_REJECTED`, target errors; result includes changed and effective duration/level.
+- **GraphValidator:** validates the namespaced id shape, duration/level bounds and known policy; effect existence remains execution-time provider authority. Fabric resolves `Registries.STATUS_EFFECT`, while Simulation delegates to its supplied provider and fails closed when no registry authority is available.
+- **Simulation:** maintain one per-run current-visible-effect record per effect id and apply the frozen policy table below. Simulation has no effect clock, expiry processing or hidden fallback chain.
+- **Runtime contract:** resolve the effect registry entry. `VANILLA_UPDATE` uses the target-version ordinary add/update path. `REPLACE` first checks `canHaveStatusEffect`; a missing effect uses ordinary add, while an existing effect uses `setStatusEffect(requested, null)` and a postcondition check. It never implements replacement as remove-then-add.
+- **Errors/result:** `STATUS_EFFECT_UNKNOWN`, `STATUS_EFFECT_REJECTED`, target errors; the structured result includes `changed`, while the readable message and Trace include the current-visible duration/level before → after.
 - **Trace/help:** explains the user level/amplifier mapping and the two update policies.
 - **Self-check:** new effect, stronger/weaker/longer/infinite existing effect under both policies, visibility flags, unknown id and dead target.
 - **Creation/defaults:** new nodes explicitly store target, booleans and policy; effect/duration/level are required and missing target is invalid.
+
+#### Frozen status-effect transition table
+
+For the same effect id, `changed` describes the current visible record only. Graph v1 always requests a finite positive duration; infinite incoming rows below document the audited underlying transition model and its self-check boundary, not a user-facing infinite-duration option.
+
+| Existing visible effect | Request | `VANILLA_UPDATE` visible result | `REPLACE` visible result |
+|---|---|---|---|
+| none | any valid request | request is added | request is added |
+| finite or infinite | higher level, finite or infinite duration | request level and duration become visible; the old longer/infinite value may become Minecraft fallback | request fully replaces existing |
+| finite | same level, longer finite duration or infinite duration | request duration becomes visible | request fully replaces existing |
+| finite | same level, equal or shorter finite duration | existing level/duration remain | request fully replaces existing unless identical |
+| infinite | same level, finite duration | infinite visible effect remains | finite request fully replaces infinite |
+| infinite | same level, infinite duration | infinite visible effect remains | request fully replaces existing unless identical |
+| finite or infinite | lower level, any duration | existing visible level/duration remain; if the request outlasts it, real Minecraft may retain the request as fallback | request fully replaces existing |
+
+Visibility flags follow the target-version update contract:
+
+- when visible level or duration changes, `ambient` takes the requested value;
+- without a level/duration change, `ambient=true → false` updates, while `false → true` keeps false;
+- `showParticles` and `showIcon` update whenever the requested visible flag differs;
+- `REPLACE` always covers level, duration, ambient, particles and icon; an identical request returns `changed=false`, otherwise the visible record changes;
+- `REPLACE` does not retain a hidden fallback chain.
+
+Simulation deliberately keeps only the current visible record. A weaker but longer `VANILLA_UPDATE` may create a hidden fallback in real Minecraft while Simulation reports the visible effect unchanged. Simulation never advances effect time and cannot restore a fallback after expiry. Unknown effect ids, rejected entities, dead targets and invalid targets are structured failures; removing a known absent effect succeeds with `changed=false`.
 
 ### `action.entity.remove_status_effect` — 移除状态效果
 
@@ -243,7 +267,7 @@ No action saturates numeric overflow silently. Only ordinary healing stops at ma
 - **Explicitly unsupported:** remove-all, effect groups and clearing hidden non-status attributes.
 - **Form Schema:** `entity_target`, `status_effect` id.
 - **Summary:** `移除当前执行实体的速度效果`.
-- **GraphValidator:** target and namespaced effect id.
+- **GraphValidator:** target and namespaced effect-id shape; the execution provider authoritatively resolves registry existence.
 - **Simulation:** remove from the per-run effect map; absence is a successful no-change result.
 - **Runtime contract:** resolve registry id and call the one-effect removal API.
 - **Errors/result:** `STATUS_EFFECT_UNKNOWN`; result distinguishes removed from not present.
@@ -258,7 +282,7 @@ No action saturates numeric overflow silently. Only ordinary healing stops at ma
 - **Parameters:** target and one of `SURVIVAL`, `CREATIVE`, `ADVENTURE`, `SPECTATOR`.
 - **Advanced parameters:** none.
 - **Explicitly unsupported:** default game mode, offline players, permission-group changes and temporary scheduled restoration.
-- **Form Schema:** `entity_target` restricted to player-capable sources and a segmented/select game-mode control.
+- **Form Schema:** `entity_target` plus one four-value segmented game-mode control.
 - **Summary:** `把玩家 Steve 的游戏模式设为冒险`.
 - **GraphValidator:** target config and known enum.
 - **Simulation:** update the player fixture mode and record before/after; approximate because client/world side effects are not simulated.
@@ -439,24 +463,21 @@ After all automatic checks and the explicit user hand-test gate, the implementat
 
 This slice establishes the shared target/error/result boundary reused by every later slice. Its final release gate is the explicit Stage B user hand-test matrix.
 
-### Slice 2 — Health and Termination (implemented, awaiting user hand-test gate)
+### Slice 2 — Health and Termination (implemented and merged)
 
 Scope: damage, heal, set health, kill and remove. The Simulation fixture extends Slice 1 metadata with bounded `health`, `maximumHealth` and `invulnerable` facts, and makes the existing per-run `alive` fact mutable for damage/kill transitions; it does not introduce a second alive field.
 
-Implementation branch: `feature/player-entity-health-termination-v1`, based on merged Slice 1.
+Merged implementation branch: `feature/player-entity-health-termination-v1`, based on merged Slice 1.
 
-The audited adapter uses normal 1.21.11 damage/kill APIs and `discard()` for removal. Player removal is permanently rejected. After automatic validation, this slice remains uncommitted until the explicit user hand-test gate; its intended single commit is `feat: add entity health and termination actions`.
+The audited adapter uses normal 1.21.11 damage/kill APIs and `discard()` for removal. Player removal is permanently rejected. The automatic and user hand-test gates were completed before merge.
 
-### Slice 3 — Status effects and player setting
+### Slice 3 — Status effects and player setting (implemented in current feature)
 
-Scope: add/remove status effect and set game mode. The Simulation fixture gains a per-run effect map and player game-mode fact before these executors are registered. The implementation gate is an audited, explicit `VANILLA_UPDATE`/`REPLACE` transition table—including infinite existing effects—for the target Minecraft version.
+Scope: add/remove status effect and set game mode. The Simulation fixture now owns a per-run visible-effect map and player game-mode fact, and the three executors are registered. The audited `VANILLA_UPDATE`/`REPLACE` table above—including existing infinite effects—is the shared Simulation/Fabric contract, subject to Simulation's explicit no-clock/no-hidden-chain boundary.
 
-Recommended branch: `feature/player-entity-status-v1a`, based on merged Slice 2 so it reuses the finalized life-state fixture and result contract.
+Implementation branch: `feature/player-entity-status-game-mode-v1`, based on merged Slice 2 so it reuses the finalized life-state fixture and result contract.
 
-Suggested commits:
-
-1. `feat: add entity status effect actions`;
-2. `feat: add player game mode action`.
+The current implementation includes Catalog/Form Schema defaults, Graph validation, shared Runtime execution, per-run Simulation state, audited Fabric adapters and WebUI schema rendering. Automatic validation and the explicit Slice 3 user hand-test remain the release gates.
 
 ### Slice 4 — Condition capsules
 
@@ -466,7 +487,7 @@ Recommended branch: `feature/player-entity-conditions-v1a`, based on merged Slic
 
 Suggested commit: `feat: add player entity predicate capsules`.
 
-Each slice is independently reviewable and mergeable. Slice 3 follows merged Slice 2; Slice 4 depends on merged Slices 2 and 3. No slice should add future empty Catalog categories; only categories with its real blocks are registered.
+Each slice is independently reviewable and mergeable. Slice 3 follows merged Slice 2; Slice 4 remains unstarted and depends on merged Slices 2 and 3. No slice should add future empty Catalog categories; only categories with its real blocks are registered.
 
 ## User hand-test gates
 
@@ -509,11 +530,11 @@ Slice 4:
 - execute-at and position-context replication;
 - entity velocity until a Vector/Direction foundation is designed.
 
-## Open decisions
+## Resolved decisions
 
-1. **Remove entity and players:** recommended hard prohibition for players; otherwise remove is too easy to misuse and differs from kill in unsafe ways.
-2. **Damage kinds:** confirm the small closed v1 list after a Minecraft 1.21.11 adapter audit; do not expose arbitrary registry ids in v1.
-3. **Effect update policy:** recommended `VANILLA_UPDATE` and explicit `REPLACE`; confirm user wording and exact adapter behavior.
+1. **Remove entity and players:** players are permanently prohibited.
+2. **Damage kinds:** the audited v1 list is `GENERIC`, `MAGIC`, `FIRE`, `FALL`, `VOID`; arbitrary registry ids are not exposed.
+3. **Effect update policy:** `VANILLA_UPDATE` and explicit `REPLACE` use the frozen table above; Simulation's visible-only approximation is intentional.
 
 ## Acceptance boundary
 

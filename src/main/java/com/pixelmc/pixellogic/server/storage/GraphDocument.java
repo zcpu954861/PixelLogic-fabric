@@ -131,6 +131,9 @@ public record GraphDocument(
             case ENTITY_SET_HEALTH_ACTION -> "设置实体生命值";
             case ENTITY_KILL_ACTION -> "杀死实体";
             case ENTITY_REMOVE_ACTION -> "移除实体";
+            case ENTITY_ADD_STATUS_EFFECT_ACTION -> "给予状态效果";
+            case ENTITY_REMOVE_STATUS_EFFECT_ACTION -> "移除状态效果";
+            case PLAYER_SET_GAME_MODE_ACTION -> "设置玩家游戏模式";
             case STATE_SET_ACTION -> "记录开始状态";
             case STATE_ADD_ACTION -> "累计开始次数";
             case TIMER_START_ACTION -> "等待倒计时";

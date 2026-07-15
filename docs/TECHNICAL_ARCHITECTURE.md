@@ -39,7 +39,7 @@ It still does not implement arbitrary graph create/delete editing, Region, old T
 The v1 block catalog skeleton separates Block Catalog definitions from the current demo node families:
 
 - `core/catalog` owns the built-in registry records for packs, categories, concrete blocks, library visibility/search metadata, form fields, simulation capability, Minecraft capability, and safety flags.
-- The 30 current concrete block ids are: `trigger.manual_test`, `condition.state.equals`, `condition.entity.has_tag`, `condition.player.is_admin`, `condition.player.dimension_is`, `condition.player.in_region`, `condition.player.y_compare`, `condition.target_block.is_type`, `condition.target_block.in_region`, `condition.target_block.y_compare`, `condition.player.near_target_block`, `control.loop.count`, `control.loop.forever`, `control.loop.until`, `context.entity.execute_as`, `action.entity.add_tag`, `action.entity.remove_tag`, `action.entity.damage`, `action.entity.heal`, `action.entity.set_health`, `action.entity.kill`, `action.entity.remove`, `action.message.chat`, `action.message.title`, `action.message.subtitle`, `action.message.actionbar`, `state.set`, `state.add`, `timer.wait`, and `debug.log`.
+- The 33 current concrete block ids are: `trigger.manual_test`, `condition.state.equals`, `condition.entity.has_tag`, `condition.player.is_admin`, `condition.player.dimension_is`, `condition.player.in_region`, `condition.player.y_compare`, `condition.target_block.is_type`, `condition.target_block.in_region`, `condition.target_block.y_compare`, `condition.player.near_target_block`, `control.loop.count`, `control.loop.forever`, `control.loop.until`, `context.entity.execute_as`, `action.entity.add_tag`, `action.entity.remove_tag`, `action.entity.damage`, `action.entity.heal`, `action.entity.set_health`, `action.entity.kill`, `action.entity.remove`, `action.entity.add_status_effect`, `action.entity.remove_status_effect`, `action.player.set_game_mode`, `action.message.chat`, `action.message.title`, `action.message.subtitle`, `action.message.actionbar`, `state.set`, `state.add`, `timer.wait`, and `debug.log`.
 - Graph JSON keeps legacy `node.type` and adds `blockId`; old graph documents without `blockId` infer it from `node.type`.
 - GraphRuntime still dispatches on `NodeType` in this checkpoint. The catalog is a registry and compatibility layer, not a runtime rewrite.
 - `GET /api/pixellogic/catalog` exposes the readonly catalog to the independent WebUI.
@@ -247,9 +247,27 @@ The single-body C-shaped `context.entity.execute_as` block uses the same composi
 
 The execution cursor and continuation path carry stable identities for the optional target entity, optional current entity, current condition result, and entity-context frames alongside loop frames. This preserves the selected entity through nested context/loop combinations and `timer.wait`; completion unwinds the actual mixed scope order. Resume validates graph identity, subject/entity resolvability, frame membership, nesting, generation, cancellation and single consumption before restoring. No Minecraft entity object is stored across a continuation.
 
-Simulation Test Context may initialize the current entity, provide one optional target entity and expose one bounded online-player fixture. Mutable tags plus living/health/maximum/invulnerability facts are copied for each run. The Fabric adapter resolves current online players and exact currently loaded entities by UUID; online-player listing remains UUID/name-only through `GET /api/pixellogic/runtime/online-players`, and the adapter neither enumerates entity collections nor loads chunks.
+Simulation Test Context may initialize the current entity, provide one optional target entity and expose one bounded online-player fixture. Mutable tags, living/health/maximum/invulnerability facts and current visible status effects are copied for each run; player fixtures also carry game mode. The Test Context API/UI does not yet expose effect or game-mode inputs or dedicated result fields. The Fabric adapter resolves current online players and exact currently loaded entities by UUID; online-player listing remains UUID/name-only through `GET /api/pixellogic/runtime/online-players`, and the adapter neither enumerates entity collections nor loads chunks.
 
-Health and Termination now reuses this boundary for damage, heal, set-health, normal kill and non-player direct removal. This checkpoint still does not implement execute-at, unloaded/offline entity lookup, selectors, player/world scans, detectors, event listeners, entity fan-out, offline-player actions or cross-restart continuation. The feature remains at its explicit user hand-test gate before commit or any later slice.
+Health and Termination reuses this boundary for damage, heal, set-health, normal kill and non-player direct removal and is merged. Status Effects and Player Game Mode now reuses it for two effect actions and one player-only mode action. These checkpoints still do not implement execute-at, unloaded/offline entity lookup, selectors, player/world scans, detectors, event listeners, entity fan-out, offline-player actions or cross-restart continuation.
+
+## Status Effects + Player Game Mode v1
+
+The three Slice 3 blocks preserve the existing architecture layers:
+
+- `BuiltInBlockCatalog` owns block ids, categories, defaults, Form Schema, target requirements and capability/safety metadata;
+- `GraphValidator` validates the persisted typed config;
+- `GraphRuntime` keeps graph traversal and records one typed action outcome; shared entity status execution depends only on `RuntimeEntityAccess`;
+- Simulation copies per-run entity state and mutates only that isolated copy;
+- `FabricRuntimeEntityProvider` is the only layer that resolves Minecraft registries and calls target-version status-effect or server-player game-mode APIs.
+
+Graph validation checks the namespaced status-effect id shape but does not duplicate Minecraft's registry. At execution, `RuntimeEntityProvider.statusEffectExists` is authoritative: Fabric resolves `Registries.STATUS_EFFECT`, and Simulation delegates to its supplied provider and fails closed when none is available.
+
+`action.entity.add_status_effect` supports finite seconds, 1-based level, three visibility flags and the closed `VANILLA_UPDATE`/`REPLACE` policy. Vanilla update uses the ordinary add/update path. Replacement checks acceptance, uses ordinary add only when absent, otherwise installs with `setStatusEffect` and verifies the resulting visible state; it is never remove-then-add. `action.entity.remove_status_effect` removes one registry-known effect and treats absence as successful no-change. `action.player.set_game_mode` accepts the four vanilla modes and requires an online player.
+
+Simulation keeps a map of current visible effects and one player game-mode fact. It has no effect countdown, expiry processing or hidden fallback chain. Real Minecraft may retain a weaker-longer vanilla update behind the visible effect; Simulation deliberately reports only the unchanged visible record. The detailed transition table is owned by `PLAYER_ENTITY_FOUNDATION_V1A.md`.
+
+This slice does not add status-effect/game-mode condition capsules, a second Catalog, Minecraft classes in core, or effect/game-mode fields to the WebUI Test Context. The current feature remains gated by automatic checks and explicit user hand-testing before merge.
 
 ## WebUI Rule
 

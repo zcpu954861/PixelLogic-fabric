@@ -116,8 +116,8 @@ public final class EntityTargetReferenceSelfCheck {
         expectInvalidTarget("{\"source\":\"ONLINE_PLAYER\",\"playerUuid\":\"" + ONLINE_ID
                 + "\",\"playerNameHint\":\"bad\\nname\"}", "playerNameHint");
 
-        require(BuiltInBlockCatalog.catalog().blocks().size() == 30,
-                "catalog should contain 30 blocks after health and termination actions");
+        require(BuiltInBlockCatalog.catalog().blocks().size() == 33,
+                "catalog should contain 33 blocks after status effect and game mode actions");
         List<String> newIds = List.of(
                 BuiltInBlockCatalog.CONDITION_ENTITY_HAS_TAG,
                 BuiltInBlockCatalog.ACTION_ENTITY_ADD_TAG,

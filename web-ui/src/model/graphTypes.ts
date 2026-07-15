@@ -95,7 +95,7 @@ export type CatalogSubcategory = {
 
 export type CatalogFormField = {
   key: string;
-  type: 'string' | 'textarea' | 'number' | 'integer' | 'boolean' | 'select' | 'segmented' | 'readonly' | 'hidden' | 'scope' | 'rich_text_component' | 'entity_target';
+  type: 'string' | 'textarea' | 'number' | 'integer' | 'boolean' | 'select' | 'segmented' | 'readonly' | 'hidden' | 'scope' | 'rich_text_component' | 'entity_target' | 'status_effect';
   label: string;
   description: string;
   defaultValue: string;

@@ -59,7 +59,7 @@ public final class EntityHealthTerminationSelfCheck {
                 BuiltInBlockCatalog.ACTION_ENTITY_KILL,
                 BuiltInBlockCatalog.ACTION_ENTITY_REMOVE
         );
-        require(BuiltInBlockCatalog.catalog().blocks().size() == 30, "catalog should contain 30 blocks");
+        require(BuiltInBlockCatalog.catalog().blocks().size() == 33, "catalog should contain 33 blocks");
         for (String id : ids) {
             BlockDefinition block = block(id);
             require(block.inputSlots().size() == 1

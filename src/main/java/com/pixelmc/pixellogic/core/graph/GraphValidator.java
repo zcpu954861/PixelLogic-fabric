@@ -114,7 +114,8 @@ public final class GraphValidator {
                 case ENTITY_ADD_TAG_ACTION, ENTITY_REMOVE_TAG_ACTION -> validateTagConfig(node, issues);
                 case ENTITY_REMOVE_ACTION -> validateRemoveTarget(node, issues);
                 case ENTITY_DAMAGE_ACTION, ENTITY_HEAL_ACTION, ENTITY_SET_HEALTH_ACTION,
-                     ENTITY_KILL_ACTION -> {
+                     ENTITY_KILL_ACTION, ENTITY_ADD_STATUS_EFFECT_ACTION,
+                     ENTITY_REMOVE_STATUS_EFFECT_ACTION, PLAYER_SET_GAME_MODE_ACTION -> {
                 }
                 case STATE_SET_ACTION -> validateStateSetValue(node, issues);
                 case STATE_ADD_ACTION -> validateStateAddType(node, issues);
@@ -264,6 +265,13 @@ public final class GraphValidator {
                 case "select", "segmented" -> validateOptionValue(node, key, value, field, issues, "config_option_invalid");
                 case "scope" -> validateScopeValue(node, key, value, issues);
                 case "number", "integer" -> validateNumberValue(node, key, value, field, issues);
+                case "status_effect" -> validateNamespacedConfig(
+                        node,
+                        key,
+                        "status_effect_id_invalid",
+                        "状态效果 ID 必须类似 minecraft:speed：",
+                        issues
+                );
                 case "rich_text_component" -> {
                     if (RichTextComponentValue.plainText(value).isBlank() && field.required()) {
                         error(issues, "config_rich_text_empty", "富文本消息不能为空：" + node.id() + "." + key);

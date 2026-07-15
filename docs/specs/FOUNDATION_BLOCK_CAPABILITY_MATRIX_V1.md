@@ -2,7 +2,7 @@
 
 ## Purpose and scoring
 
-This document inventories the current Entity Target Reference plus Health and Termination implementation. The formal taxonomy is the existing `packs → categories → blocks` Catalog Snapshot; this document does not create a second catalog or register future empty packs.
+This document inventories the current Entity Target Reference, Health and Termination, Status Effects and Player Game Mode implementation. The formal taxonomy is the existing `packs → categories → blocks` Catalog Snapshot; this document does not create a second catalog or register future empty packs.
 
 Status means:
 
@@ -18,15 +18,15 @@ Status means:
 | Metric | Current value |
 |---|---:|
 | Registered packs | 7 |
-| Registered categories | 17 |
-| Built-in blocks | 30 |
-| `BROWSE / CONTEXT_ONLY / HIDDEN` | 30 / 0 / 0 |
-| `FULLY_SIMULATABLE / APPROXIMATE_SIMULATION` | 20 / 10 |
+| Registered categories | 19 |
+| Built-in blocks | 33 |
+| `BROWSE / CONTEXT_ONLY / HIDDEN` | 33 / 0 / 0 |
+| `FULLY_SIMULATABLE / APPROXIMATE_SIMULATION` | 20 / 13 |
 | `PREDICATE / PREDICATE_RACK` | 5 / 1 |
 | Legacy aliases | 1 (`manual.test.start`) |
-| Current block status | 6 COMPLETE / 24 PARTIAL |
+| Current block status | 9 COMPLETE / 24 PARTIAL |
 
-All 30 definitions have a description, Form Schema and summary metadata. They all declare `REQUIRES_MINECRAFT_RUNTIME`; that flag is a required-environment marker, not proof that every block has a Minecraft executor. Entity-target and health-action failures use stable structured codes; unaffected older paths may still expose readable-string runtime errors.
+All 33 definitions have a description, Form Schema and summary metadata. They all declare `REQUIRES_MINECRAFT_RUNTIME`; that flag is a required-environment marker, not proof that every block has a Minecraft executor. Entity-target, health, status-effect and game-mode action failures use stable structured codes; unaffected older paths may still expose readable-string runtime errors.
 
 ### Slice 1 result
 
@@ -41,7 +41,7 @@ Slice 1 is a breaking reform with no alias or migration:
 | retired player/context tag IDs | 6 | 0 |
 | generic entity tag IDs | 0 | 3 |
 
-The Slice 1 arithmetic is `28 - 6 + 3 = 25`. Slice 2 adds five real blocks and two non-empty categories, producing 30 blocks across 17 categories. It also adds exact loaded-world entity lookup in the Fabric adapter; offline/unloaded entity search remains out of scope. The five health/termination actions are complete within their declared single-entity boundary, producing the current score of 6 COMPLETE / 24 PARTIAL.
+The Slice 1 arithmetic is `28 - 6 + 3 = 25`. Merged Slice 2 adds five real blocks and two non-empty categories. Current Slice 3 adds three real blocks and two more non-empty categories, producing 33 blocks across 19 categories. The Fabric adapter now covers exact loaded-world entity lookup plus the declared health, termination, status-effect and player game-mode actions; offline/unloaded entity search remains out of scope. Those eight actions are complete within their single-entity boundaries, producing the current score of 9 COMPLETE / 24 PARTIAL.
 
 ## Eight-domain overview
 
@@ -49,7 +49,7 @@ The Slice 1 arithmetic is `28 - 6 + 3 = 25`. Slice 2 adds five real blocks and t
 |---|---|---:|---:|---:|---|---|
 | 事件与触发 | `events-triggers` | 1 | 1 | 0 | official gameplay event triggers | polling detectors and a general event bus |
 | 逻辑与流程 | `logic-flow` | 4 | 0 | 4 | durable scheduling and selected small control primitives | universal execute pipeline and collection loops |
-| 玩家与实体 | `player-entity` | 10 | 5 | 5 | effects, game mode and entity conditions | selectors, scans, AI and multi-entity fan-out |
+| 玩家与实体 | `player-entity` | 13 | 8 | 5 | entity condition capsules | selectors, scans, AI and multi-entity fan-out |
 | 物品与容器 | not registered | 0 | 0 | 0 | give/take/match simple item stacks | full components/NBT and arbitrary container automation |
 | 位置与区域 | `location-region` | 6 | 0 | 6 | Position Reference and teleport | nested coordinate expressions and world scans |
 | 方块与世界 | `block-world` | 1 | 0 | 1 | typed block state and safe setblock/fill | physics, lighting and structure simulation |
@@ -72,7 +72,7 @@ The Slice 1 arithmetic is `28 - 6 + 3 = 25`. Slice 2 adds five real blocks and t
 | 玩家与实体 | execute with one current entity | `context.entity.execute_as` | PARTIAL | `execute as` | explicit four-source target and stack-safe continuation without selector syntax | existing execution context | implemented foundation |
 | 玩家与实体 | administrator check | `condition.player.is_admin` | PARTIAL | OP/permission check | typed predicate and explicit permission provider | Player-only target constraint | later |
 | 玩家与实体 | health and termination | five `action.entity.*` health/termination blocks | COMPLETE | `damage`, `kill` | typed targets, structured results, Simulation and audited adapters | EntityTargetRef | implemented v1-A Slice 2 |
-| 玩家与实体 | effects and game mode | none | MISSING | `effect`, `gamemode` | typed effects/player settings, Simulation and errors | EffectSpec | later v1-A |
+| 玩家与实体 | effects and game mode | `action.entity.add_status_effect`, `action.entity.remove_status_effect`, `action.player.set_game_mode` | COMPLETE | `effect`, `gamemode` | typed effects/player settings, visible-state Simulation, structured errors and audited adapters | shared status-effect field | implemented v1-A Slice 3 |
 | 玩家与实体 | entity collections and scans | none | DEFERRED | `@e[...]` | bounded query and fan-out rather than selector text | query subsystem | deferred |
 | 物品与容器 | give/take/match simple items | none | MISSING | `give`, `clear`, `item` | typed id/count, atomic result and Simulation facts | ItemStackSpec, ItemMatchSpec | later foundation pack |
 | 物品与容器 | arbitrary slots/components/NBT | none | DEFERRED | `item replace/modify` | explicit slot ownership and safe component matching | SlotRef, component model | deferred |
@@ -96,7 +96,8 @@ Common boundaries for every row:
 
 - Graph persistence stores `blockId`, typed slots, config and membership; it does not store taxonomy or runtime subjects.
 - Save-time `GraphValidator` issues have severity, code and readable message.
-- There is no broad per-block Minecraft executor registry yet. `RuntimeServices` is the adapter boundary; the current Fabric adapter sends plain chat and provides exact online-player entity/tag access.
+- There is no broad per-block Minecraft executor registry yet. `RuntimeServices`/`RuntimeEntityAccess` remain the adapter boundary; the current Fabric adapter sends plain chat and provides exact entity tags, health/termination, status-effect and player game-mode access for the supported target types.
+- Graph validation checks status-effect id syntax; execution-time existence is provider-authoritative. Fabric uses `Registries.STATUS_EFFECT`, and Simulation delegates to the supplied provider rather than maintaining a second registry list.
 - Help currently means description, field descriptions/placeholders and summary; there is no separate example/help contract.
 
 ### Auditable field appendix
@@ -120,6 +121,9 @@ Rows that say `test actor` or `request player` describe block-specific fixtures 
 | `action.entity.set_health` | `player-entity` / `player-entity.health-attributes` | action | target, health 0..maximum | EntityTargetRef / LIVING_ENTITY | `target:entity_target`; `health:number` | APPROXIMATE_SIMULATION | shared executor; Fabric calls `setHealth(float)` after max check | above max/invalid structured errors | target-aware set summary | max-health mutation excluded | complete |
 | `action.entity.kill` | `player-entity` / `player-entity.entity-management` | action | target | EntityTargetRef / LIVING_ENTITY | `target:entity_target` | APPROXIMATE_SIMULATION | shared executor; Fabric calls `LivingEntity.kill(ServerWorld)` | rejected/dead structured errors | target-aware kill summary | Simulation records death intent, not loot/events | complete |
 | `action.entity.remove` | `player-entity` / `player-entity.entity-management` | action | target | EntityTargetRef / ANY_ENTITY + no player | `target:entity_target` | APPROXIMATE_SIMULATION | shared executor; Fabric guards player then calls `discard()` | player forbidden/execution structured errors | target-aware direct-remove summary | offline/unloaded removal excluded | complete |
+| `action.entity.add_status_effect` | `player-entity` / `player-entity.status-effects` | action | target, effect id, 1..1,000,000 seconds, level 1..256, policy and display flags | EntityTargetRef / LIVING_ENTITY | `target:entity_target`; `effectId:status_effect`; `durationSeconds/level:integer`; `ambient/showParticles/showIcon:boolean`; `updatePolicy:select` | APPROXIMATE_SIMULATION | shared executor; Fabric uses audited ordinary update or explicit replacement | unknown/rejected/dead target structured errors; visible before/after Trace | target-aware effect summary; display/advanced disclosures | Simulation has no expiry clock or hidden fallback chain | complete |
+| `action.entity.remove_status_effect` | `player-entity` / `player-entity.status-effects` | action | target, effect id | EntityTargetRef / LIVING_ENTITY | `target:entity_target`; `effectId:status_effect` | APPROXIMATE_SIMULATION | shared executor; Fabric removes one registry-resolved effect | absent known effect is success/no-change; unknown/rejected structured errors | target-aware remove-effect summary | Simulation stores visible effects only | complete |
+| `action.player.set_game_mode` | `player-entity` / `player-entity.player-settings` | action | target, four-value game mode | EntityTargetRef / PLAYER_ONLY | `target:entity_target`; `gameMode:segmented` | APPROXIMATE_SIMULATION | shared executor; Fabric calls audited server-player game-mode API | same mode is success/no-change; offline/type/rejected structured errors | target-aware game-mode summary | Simulation omits client/world side effects | complete |
 | `condition.player.is_admin` | `player-entity` / `player-entity.identity-permissions` | condition + PREDICATE | output mode | Simulation actor fixture | `outputMode:segmented` | APPROXIMATE_SIMULATION | Simulation operator flag; no permission adapter | boolean/subject Trace, string runtime errors | admin positive/negated summary | permission semantics | medium |
 | `context.entity.execute_as` | `player-entity` / `player-entity.execution-context` | control | four-source target, default condition subject | EntityTargetRef / ANY_ENTITY | `target:entity_target` | FULLY_SIMULATABLE | shared resolver + `GraphRuntime` context frame | structured target failures; switch/restore Trace | target-aware summary and warnings | no position context | high |
 | `condition.player.dimension_is` | `location-region` / `location-region.dimensions-heights` | condition + PREDICATE | output mode, dimension id | Simulation actor position | `outputMode:segmented`; `dimensionId:string` | FULLY_SIMULATABLE | Simulation world fact; no MC position adapter | false/Trace; no contextual subject | dimension summary | adapter + subject contract | medium |
@@ -158,17 +162,17 @@ condition.target_block.is_type
 |---|---|---|---|
 | `tp` / `teleport` | none | MISSING | separate EntityTargetRef from PositionRef; typed collision/dimension policy |
 | `give` / `clear` / `item` | none | MISSING | typed stack/match/slot with atomic affected-count result |
-| `effect` | none | MISSING | typed effect, duration, level and visibility settings in v1-A |
+| `effect` | add/remove status-effect actions | COMPLETE | typed id, duration, level, visibility, update policy and explicit visible-only Simulation boundary |
 | `damage` | `action.entity.damage` | COMPLETE | normal audited damage pipeline; Simulation is an explicit unmitigated approximation |
 | `summon` | none | DEFERRED | requires PositionRef, entity type, ownership and world lifecycle |
 | `setblock` / `fill` | one read-only block-type condition | MISSING | preview intent, permissions, chunks and structured affected count |
 | `title` / `tellraw` | four message blocks | PARTIAL | preserve rich Text and report delivery outcome in a real adapter |
 | `playsound` / `particle` | none | MISSING | typed spec plus target/position; Simulation records intent |
-| `gamemode` | none | MISSING | PLAYER_ONLY action and predicate in v1-A |
+| `gamemode` | `action.player.set_game_mode` | COMPLETE for mutation | PLAYER_ONLY action has Simulation and Fabric execution; predicate remains Slice 4 |
 | `kill` | `action.entity.kill`, `action.entity.remove` | COMPLETE | normal death and direct removal are explicit separate behaviors |
 | `spawnpoint` | none | MISSING | depends on PositionRef and player target |
 | `time` / `weather` | none | MISSING, lower priority | world-scoped typed actions, not command text |
-| `tag` | three generic EntityTargetRef blocks | PARTIAL | shared target, condition subject and typed outcomes are implemented; real non-player lookup remains adapter work |
+| `tag` | three generic EntityTargetRef blocks | PARTIAL | shared target, condition subject, typed outcomes and loaded-entity lookup are implemented; offline/unloaded lookup remains out of scope |
 
 One command does not imply one block. PixelLogic should expose one user behavior with typed parameters, validation, readable summary, Simulation intent, runtime contract, structured result and Trace—not raw command grammar.
 
@@ -191,7 +195,7 @@ These features are the product advantage. New blocks should compose with them ra
 
 | Component | Controlled status | Current evidence | Decision |
 |---|---|---|---|
-| Entity Target Reference | 已实现并复用 | four sources, composite Graph target, shared resolver/editor, tag and health/termination consumers | reuse for later effects, game mode and conditions |
+| Entity Target Reference | 已实现并复用 | four sources, composite Graph target, shared resolver/editor, tag, health/termination, effects and game-mode consumers | reuse for later conditions |
 | Player Target Reference | 暂缓 | message/admin blocks still have older request/test-player contracts | use `EntityTargetRef` with `PLAYER_ONLY`; request actor metadata is not a target fallback |
 | Position Reference | 后续 | only Simulation position facts exist | required before teleport/spawnpoint |
 | Direction / Rotation | 后续 | absent | design with PositionRef when movement is in scope |
@@ -200,7 +204,7 @@ These features are the product advantage. New blocks should compose with them ra
 | Inventory Slot Reference | 后续 | absent | design with the item/container pack |
 | Block State Specification | 已有但不足 | only plain block id and a Simulation fact exist | strengthen before world mutation |
 | Entity Type Reference | 已有但不足 | Simulation has `entityTypeId`; no shared editor/model | v1-A reuses a namespaced Resource ID field; do not extract a component for one consumer |
-| Status Effect Specification | 近期必须 | absent | small shared effect field reused by three v1-A blocks |
+| Status Effect Specification | 已实现共享字段 | namespaced `status_effect` Form Schema field used by add/remove; duration, level, flags and policy stay action-specific | reuse the same field for the later has-effect condition |
 | Sound Specification | 后续 | absent | later presentation pack |
 | Particle Specification | 后续 | absent | later presentation pack |
 | Resource ID Editor | 已有但不足 | backend namespaced validation; WebUI text input | reuse now; picker/autocomplete later |
@@ -210,7 +214,7 @@ These features are the product advantage. New blocks should compose with them ra
 
 ## Foundation decisions
 
-1. `EntityTargetRef` is the shared foundation already reused by tag, execute-as and health/termination blocks; effects and game mode should continue using it.
+1. `EntityTargetRef` is the shared foundation already reused by tag, execute-as, health/termination, status-effect and game-mode blocks; later conditions must continue using it.
 2. A player target is a type constraint on `EntityTargetRef`, not another reference universe.
 3. The existing optional Simulation target is a test fixture that populates the formal `TARGET_ENTITY` run input; it is not a separate `TEST_TARGET_ENTITY` source, and current production providers do not populate that input yet.
 4. The current runtime has a condition subject but no condition object. New specifications must not pretend otherwise.
@@ -222,7 +226,7 @@ These features are the product advantage. New blocks should compose with them ra
 - Catalog authority: `BLOCK_LIBRARY_TAXONOMY_V1.md` and `BuiltInBlockCatalog`.
 - Catalog validation: `BlockCatalog` and `GraphValidator`.
 - Runtime context and continuation: `RuntimeExecutionContext`, `RuntimeConditionResult`, `ExecutionCursor` and `GraphRuntime`.
-- Simulation context/executors: `SimulationContext`, `SimulationExecutionRegistry` and the shared entity-tag execution path.
-- Runtime adapter boundary: `RuntimeServices`.
+- Simulation context/executors: `SimulationContext`, `SimulationExecutionRegistry`, per-run visible status-effect maps and player game mode.
+- Runtime adapter boundary: `RuntimeServices`, `RuntimeEntityAccess`, `EntityStatusExecution` and `FabricRuntimeEntityProvider`.
 - Trace shape: `TraceStep` and `BoundedTraceBuffer`.
 - Current simulation boundary: `SIMULATION_CAPABILITY_MATRIX.md`.

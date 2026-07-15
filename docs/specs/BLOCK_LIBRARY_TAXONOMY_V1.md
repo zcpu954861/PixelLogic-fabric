@@ -30,11 +30,11 @@ Snapshot 在构造时验证引用、唯一性、可见归属、空分组、可�
 - `HIDDEN`：积木库任何模式都不显示。
 - `deprecated` 独立于 visibility；已弃用积木不能新建。
 
-当前 30 张 built-in 均为 `BROWSE`。当前没有 context-only 或 hidden built-in；相关语义由 synthetic self-check fixture 固定。
+当前 33 张 built-in 均为 `BROWSE`。当前没有 context-only 或 hidden built-in；相关语义由 synthetic self-check fixture 固定。
 
 ## 初始包与分类
 
-只注册当前确实有积木的 7 个 pack，不预建“物品与容器”等空领域：
+只注册当前确实有积木的 7 个 pack、19 个 category，不预建“物品与容器”等空领域：
 
 1. 事件与触发；
 2. 逻辑与流程；
@@ -70,6 +70,9 @@ Snapshot 在构造时验证引用、唯一性、可见归属、空分组、可�
 | `action.entity.set_health` | 设置实体生命值 | `ENTITY_SET_HEALTH_ACTION` | BROWSE | 玩家与实体 | 生命与属性 | 允许 0；超过最大值失败 |
 | `action.entity.kill` | 杀死实体 | `ENTITY_KILL_ACTION` | BROWSE | 玩家与实体 | 实体管理 | 正常死亡流程；允许玩家 |
 | `action.entity.remove` | 移除实体 | `ENTITY_REMOVE_ACTION` | BROWSE | 玩家与实体 | 实体管理 | 直接移除；永久禁止玩家 |
+| `action.entity.add_status_effect` | 给予状态效果 | `ENTITY_ADD_STATUS_EFFECT_ACTION` | BROWSE | 玩家与实体 | 状态效果 | 原版更新/强制替换；显示与高级字段折叠 |
+| `action.entity.remove_status_effect` | 移除状态效果 | `ENTITY_REMOVE_STATUS_EFFECT_ACTION` | BROWSE | 玩家与实体 | 状态效果 | 已知但不存在时成功且无变化 |
+| `action.player.set_game_mode` | 设置玩家游戏模式 | `PLAYER_SET_GAME_MODE_ACTION` | BROWSE | 玩家与实体 | 玩家设置 | `PLAYER_ONLY`；四种封闭模式 |
 | `control.loop.count` | 循环次数 | `CONTROL_LOOP_COUNT` | BROWSE | 逻辑与流程 | 循环 | 固定次数容器 |
 | `control.loop.forever` | 无限循环 | `CONTROL_LOOP_FOREVER` | BROWSE | 逻辑与流程 | 循环 | 有模拟安全上限 |
 | `control.loop.until` | 循环直到 | `CONTROL_LOOP_UNTIL` | BROWSE | 逻辑与流程 | 循环 | `PREDICATE_RACK` 宿主 |
@@ -80,6 +83,8 @@ Snapshot 在构造时验证引用、唯一性、可见归属、空分组、可�
 | `debug.log` | 调试记录 | `DEBUG_LOG_ACTION` | BROWSE | 表现与反馈 | 调试诊断 | 只写模拟 trace |
 
 未注册进 Catalog 的 `COMMAND_TRIGGER` 不是 hidden block；它继续保持无 built-in fallback 的 fail-closed 边界。
+
+`状态效果` 与 `玩家设置` 只因上述三张真实积木而注册；它们不是为后续条件胶囊预建的空分类。
 
 ## 搜索
 

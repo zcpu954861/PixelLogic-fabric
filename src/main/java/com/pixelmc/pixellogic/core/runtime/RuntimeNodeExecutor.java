@@ -61,7 +61,10 @@ final class RuntimeNodeExecutor {
                  ENTITY_HEAL_ACTION,
                  ENTITY_SET_HEALTH_ACTION,
                  ENTITY_KILL_ACTION,
-                 ENTITY_REMOVE_ACTION ->
+                 ENTITY_REMOVE_ACTION,
+                 ENTITY_ADD_STATUS_EFFECT_ACTION,
+                 ENTITY_REMOVE_STATUS_EFFECT_ACTION,
+                 PLAYER_SET_GAME_MODE_ACTION ->
                     throw new IllegalStateException("缺少模拟执行器：" + node.type());
         };
         return new RuntimeNodeExecutionResult(outputSlot, "");

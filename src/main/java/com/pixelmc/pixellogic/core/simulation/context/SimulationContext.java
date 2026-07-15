@@ -3,6 +3,7 @@ package com.pixelmc.pixellogic.core.simulation.context;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationActionResult;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationMessageResult;
 import com.pixelmc.pixellogic.core.simulation.result.SimulationStateChangeResult;
+import com.pixelmc.pixellogic.core.model.PlayerGameMode;
 import com.pixelmc.pixellogic.core.runtime.RuntimeEntityLookup;
 import com.pixelmc.pixellogic.core.runtime.RuntimeEntityProvider;
 import com.pixelmc.pixellogic.core.runtime.RuntimeOnlinePlayer;
@@ -153,7 +154,9 @@ public final class SimulationContext implements RuntimeEntityProvider {
                 SimulationPosition.overworldSpawn(),
                 entity.health(),
                 entity.maxHealth(),
-                entity.invulnerable()
+                entity.invulnerable(),
+                entity.statusEffects(),
+                entity.gameMode().orElse(PlayerGameMode.SURVIVAL)
         );
         return RuntimeEntityLookup.resolved(onlinePlayerFixture);
     }
@@ -171,6 +174,11 @@ public final class SimulationContext implements RuntimeEntityProvider {
                 true,
                 List.of(new RuntimeOnlinePlayer(actor.id(), actor.displayName()))
         );
+    }
+
+    @Override
+    public boolean statusEffectExists(String effectId) {
+        return onlinePlayerProvider.statusEffectExists(effectId);
     }
 
     public synchronized void addActionResult(SimulationActionResult result) {

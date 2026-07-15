@@ -5,6 +5,7 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonArray;
 import com.pixelmc.pixellogic.server.PixelLogicSpikeService;
 import com.pixelmc.pixellogic.server.storage.GraphStorageService;
+import com.pixelmc.pixellogic.core.runtime.RuntimeEntityProvider;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -25,9 +26,13 @@ public final class ApiWebUiSelfCheck {
     public static void main(String[] args) throws Exception {
         run("apiWebUiSelfCheck", () -> {
         Path storageRoot = Files.createTempDirectory("pixel-logic-api-self-check-");
+        RuntimeEntityProvider devProvider = ApiWebUiDevServer.devEntityProvider();
+        require(devProvider.statusEffectExists("minecraft:speed")
+                        && !devProvider.statusEffectExists("example:not_registered"),
+                "standalone dev server should expose an explicit fail-closed status-effect fixture");
         try (PixelLogicSpikeService service = new PixelLogicSpikeService((playerId, message) -> {
         }, Runnable::run, ignored -> {
-        }, Duration.ofSeconds(1), storageRoot);
+        }, Duration.ofSeconds(1), storageRoot, devProvider);
              PixelLogicApiServer server = PixelLogicApiServer.start(service, Runnable::run, PixelLogicApiServer.DEFAULT_HOST, 0)) {
             HttpClient client = HttpClient.newHttpClient();
             String base = "http://" + PixelLogicApiServer.DEFAULT_HOST + ":" + server.port();
@@ -69,6 +74,11 @@ public final class ApiWebUiSelfCheck {
                             && catalog.body().contains("\"capabilities\"")
                             && catalog.body().contains("control.loop.until"),
                     "catalog should expose form, predicate capability, summary metadata, and loop until");
+
+            CheckedResponse onlinePlayers = send(client, "GET", base + "/api/pixellogic/runtime/online-players?query=Dev&limit=20");
+            require(onlinePlayers.body().contains("DevPlayer")
+                            && onlinePlayers.body().contains(ApiWebUiDevServer.DEV_PLAYER_ID.toString()),
+                    "standalone dev server should expose its selectable online-player fixture");
 
             CheckedResponse graphResponse = send(client, "GET", base + "/api/pixellogic/graphs/demo-start-flow");
             requireJson(graphResponse, "graph should be JSON");

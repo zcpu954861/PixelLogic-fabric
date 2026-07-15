@@ -1,8 +1,11 @@
 package com.pixelmc.pixellogic.core.simulation.context;
 
+import com.pixelmc.pixellogic.core.model.EntityStatusEffect;
+import com.pixelmc.pixellogic.core.model.PlayerGameMode;
 import com.pixelmc.pixellogic.core.runtime.RuntimeSubjectReference;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -37,6 +40,23 @@ public final class SimulationActor extends SimulationEntity {
             double maxHealth,
             boolean invulnerable
     ) {
+        this(id, displayName, online, operator, tags, position, health, maxHealth, invulnerable,
+                Map.of(), PlayerGameMode.SURVIVAL);
+    }
+
+    public SimulationActor(
+            UUID id,
+            String displayName,
+            boolean online,
+            boolean operator,
+            Collection<String> tags,
+            SimulationPosition position,
+            double health,
+            double maxHealth,
+            boolean invulnerable,
+            Map<String, EntityStatusEffect> statusEffects,
+            PlayerGameMode gameMode
+    ) {
         super(
                 id,
                 "minecraft:player",
@@ -45,7 +65,9 @@ public final class SimulationActor extends SimulationEntity {
                 true,
                 health,
                 maxHealth,
-                invulnerable
+                invulnerable,
+                statusEffects,
+                gameMode
         );
         this.online = online;
         this.operator = operator;

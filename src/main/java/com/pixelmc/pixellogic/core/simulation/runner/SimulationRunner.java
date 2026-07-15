@@ -1,6 +1,7 @@
 package com.pixelmc.pixellogic.core.simulation.runner;
 
 import com.pixelmc.pixellogic.core.model.NodeDefinition;
+import com.pixelmc.pixellogic.core.model.PlayerGameMode;
 import com.pixelmc.pixellogic.core.runtime.GraphRuntime;
 import com.pixelmc.pixellogic.core.runtime.RuntimeResult;
 import com.pixelmc.pixellogic.core.runtime.RuntimeActionOutcome;
@@ -104,7 +105,9 @@ public final class SimulationRunner {
                 actor.position(),
                 actor.health(),
                 actor.maxHealth(),
-                actor.invulnerable()
+                actor.invulnerable(),
+                actor.statusEffects(),
+                actor.gameMode().orElse(PlayerGameMode.SURVIVAL)
         );
     }
 
@@ -120,7 +123,9 @@ public final class SimulationRunner {
                         target.living(),
                         target.health(),
                         target.maxHealth(),
-                        target.invulnerable()
+                        target.invulnerable(),
+                        target.statusEffects(),
+                        target.gameMode().orElse(null)
                 );
         return new SimulationWorld(world.defaultDimensionId(), world.targetBlock(), world.regions(), targetCopy);
     }

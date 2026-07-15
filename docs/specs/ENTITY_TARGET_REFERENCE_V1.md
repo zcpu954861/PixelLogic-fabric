@@ -16,7 +16,7 @@ The approved reform is intentionally breaking:
 - remove old block IDs, NodeTypes, aliases and implicit defaults;
 - do not add a migrator, deprecated Catalog entry or compatibility wrapper.
 
-Slice 1 produced a 25-block Catalog (`28 - 6 + 3`) and the shared target model/resolver. Health and Termination Slice 2 now reuses it for five additional actions, bringing the current feature Catalog to 30 blocks. User hand-testing remains the final release gate.
+Slice 1 produced a 25-block Catalog (`28 - 6 + 3`) and the shared target model/resolver. Merged Health and Termination Slice 2 adds five actions; current Status Effects and Player Game Mode Slice 3 adds three more, bringing the feature Catalog to 33 blocks. Slice 3 automatic validation and user hand-testing remain its release gates.
 
 ## Non-goals
 
@@ -294,7 +294,7 @@ Simulation follows the same four-source resolver and error codes.
 - a scenario may deliberately initialize no current entity;
 - the existing optional target fixture supplies `TARGET_ENTITY`;
 - an `ONLINE_PLAYER` UUID matching the test actor resolves to the existing per-run actor copy;
-- the first different UUID is resolved lazily through the delegate provider and binds the run's only additional online-player fixture; a successful lookup copies that exact player's identity, display name, tags, health, maximum health and invulnerability into Simulation;
+- the first different UUID is resolved lazily through the delegate provider and binds the run's only additional online-player fixture; a successful lookup copies that exact player's identity, display name, tags, health, maximum health, invulnerability, current visible status effects and game mode into Simulation;
 - later resolutions of that same UUID, including after an in-run Continuation, reuse the bound lookup and mutable simulation copy without querying or mutating the provider entity;
 - after that fixture slot is bound, a second different UUID is unresolvable and fails closed; no online-player collection or world scan is introduced.
 
@@ -375,7 +375,9 @@ Outside formal historical “removed ID” documentation, repository searches fo
 
 ## Current consumer slice
 
-**Health and Termination** now consumes this contract for damage, heal, set health, kill and non-player removal. It adds no target source or selector behavior. Status effects, player game mode and later entity conditions remain future slices and must continue reusing this reference instead of creating parallel target models.
+**Health and Termination** consumes this contract for damage, heal, set health, kill and non-player removal. **Status Effects and Player Game Mode** now consumes it for add/remove effect and set game mode. Neither slice adds a target source or selector behavior; later entity conditions must continue reusing this reference instead of creating a parallel target model.
+
+Target resolution and resource resolution remain separate boundaries. EntityTargetRef resolves the single entity; the execution provider then authoritatively resolves a status-effect id. Fabric uses the Minecraft status-effect registry, while Simulation delegates to its supplied provider and fails closed when that authority is unavailable.
 
 ## Implementation evidence
 

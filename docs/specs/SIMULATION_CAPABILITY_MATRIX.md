@@ -12,10 +12,11 @@ This matrix classifies current Simulation capabilities and the boundary of later
 | title/actionbar | title, subtitle, actionbar | `APPROXIMATE_SIMULATION` | yes | yes, for real display | Model visible output and channel summary; do not implement client rendering, timing, fade, or combo blocks yet. |
 | entity tag | target-aware has/add/remove tag | `FULLY_SIMULATABLE` | yes | yes, for real server tags | Uses the shared four-source EntityTargetRef and one generic execution path. |
 | entity health and termination | damage, heal, set health, kill, direct remove | `APPROXIMATE_SIMULATION` | yes | yes | Uses the same target resolver/outcome path. Simulation models unmitigated health math, death/removal and invulnerability; Fabric uses audited normal damage/heal/set/kill/discard APIs. |
+| entity status effects | add/update/remove one effect | `APPROXIMATE_SIMULATION` | yes | yes | Simulation keeps only each effect's current visible record; Fabric uses registry-backed status APIs and may retain Minecraft's hidden fallback chain. |
 | contextual condition result | checked subject + raw result + readable fact | `FULLY_SIMULATABLE` | yes | yes, for real-world subjects | True and false evaluations retain the checked object on the current run/path; the result is temporary cursor state, not graph or global state. |
 | entity execution context | execute as current/condition/target/online-player source | `FULLY_SIMULATABLE` | yes | yes, for real entities | Simulation switches one current entity and restores it across nesting/delay/loop; v1 is not execute-at and does not scan or fan out entities. |
 | simulated target entity | optional type id, display name, tags, living/health/max/invulnerable facts | `FULLY_SIMULATABLE` | yes | yes, for real entity lookup | Per-run Test Context fact only; mutable health, alive, killed and removed state remain isolated to the copied run fixture. |
-| player gamemode | check/set gamemode | `APPROXIMATE_SIMULATION` | maybe | yes | Check can be simulated; mutation must be clearly approximate until MC adapter. |
+| player game mode | set one online player's mode | `APPROXIMATE_SIMULATION` | yes | yes | Simulation mutates the per-run player fact; the Fabric adapter uses the audited server-player game-mode API. The condition remains Slice 4. |
 | player position | check position, teleport result | `APPROXIMATE_SIMULATION` | maybe | yes | Simulate dimension/coordinates and teleport result, not collision safety. |
 | inventory simple items | has/give/take item id + count | `APPROXIMATE_SIMULATION` | yes | yes | Use item id/count/display summary; defer NBT/data-component exactness. |
 | container slots | slot match, open/close/content change | `APPROXIMATE_SIMULATION` | later | yes | Simulate slot facts and events only; real container access is adapter work. |
@@ -58,7 +59,8 @@ The original skeleton implemented the first player-tag slice. Entity Target Refe
 - administrator flag: accepted and returned for future permission blocks; no OP-sensitive behavior exists yet.
 - health, maximum health and invulnerability: bounded per-run actor facts used by health actions and returned as initial/final state.
 - the generic add-tag action mutates only the resolved entity for the current run and returns final tags/outcome.
-- no scenario persistence, multiplayer, inventory, world, container, or game mode context is implemented.
+- status-effect and game-mode state exist only as internal per-run entity facts (empty effects and `SURVIVAL` by default); the Test Context API/UI does not expose inputs or dedicated result fields for them.
+- no scenario persistence, multiplayer collection, inventory, world map or container context is implemented.
 
 ## Simulation Context Expansion v1 Status
 
@@ -132,3 +134,14 @@ The original skeleton implemented the first player-tag slice. Entity Target Refe
 - `action.entity.set_health` accepts zero, rejects negative/non-finite/static-overflow values, and fails above the resolved maximum without clamping.
 - `action.entity.kill` marks the Simulation fixture killed/dead and calls the normal living-entity kill path in Fabric. `action.entity.remove` marks it removed/unresolvable and calls `discard()` only for non-players.
 - All five reuse the four-source target resolver, stable Continuation identities, typed outcomes and structured domain/target errors. They add no success/failure graph ports.
+
+## Status Effects and Player Game Mode v1 Status
+
+- `action.entity.add_status_effect` accepts a namespaced effect id, finite duration in seconds, user level 1..256, `ambient`/particles/icon flags and `VANILLA_UPDATE` or `REPLACE`. `action.entity.remove_status_effect` removes one known effect; a known absent effect succeeds with `changed=false`.
+- `VANILLA_UPDATE` follows the frozen target-version visible-state rules: stronger replaces visible level/duration, equal-and-longer extends, equal-and-not-longer preserves, and weaker does not replace the visible effect. Visible ambient/particle/icon updates follow the detailed table in `PLAYER_ENTITY_FOUNDATION_V1A.md`.
+- `REPLACE` fully covers visible level, duration, ambient, particles and icon. Identical state is a successful no-change; a finite v1 request replaces either a finite or infinite existing effect. Infinite incoming effects exist only in the audited lower-level transition model/self-check, not Graph v1 configuration.
+- Simulation stores only one current visible record per effect id. It has no duration countdown, expiry clock or Minecraft hidden fallback chain, so a weaker-longer vanilla update can leave the simulated visible record unchanged even though real Minecraft retains a fallback.
+- `action.player.set_game_mode` supports `SURVIVAL`, `CREATIVE`, `ADVENTURE` and `SPECTATOR`. Simulation mutates the isolated per-run player fixture; same-mode requests succeed with `changed=false`.
+- Graph validation checks the namespaced id shape, but the execution provider owns existence. The Fabric provider resolves `Registries.STATUS_EFFECT`; Simulation delegates to its supplied provider and fails closed without one. Fabric then uses audited update/replacement/removal APIs and changes game mode through the online server-player API. Unknown effects, rejected effects, dead/wrong targets, offline players and rejected mode changes fail with structured errors.
+- The standalone `ApiWebUiDevServer` is a deliberately narrow hand-test fixture: its online-player picker exposes only `DevPlayer`, and its effect authority recognizes only the Catalog default `minecraft:speed`; hand tests on that server must use Speed, while every other effect id fails closed. Production Fabric still uses the complete `Registries.STATUS_EFFECT` authority.
+- The current Test Context request/UI still has no status-effect or game-mode fields, and `SimulationExecutionResult` has no dedicated effect-map/game-mode result fields. These actions are observable through their typed action outcome, readable message and `changed` flag.

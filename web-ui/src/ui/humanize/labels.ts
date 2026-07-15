@@ -100,6 +100,12 @@ export function nodeTypeLabel(type: string): string {
       return '杀死实体';
     case 'ENTITY_REMOVE_ACTION':
       return '移除实体';
+    case 'ENTITY_ADD_STATUS_EFFECT_ACTION':
+      return '给予状态效果';
+    case 'ENTITY_REMOVE_STATUS_EFFECT_ACTION':
+      return '移除状态效果';
+    case 'PLAYER_SET_GAME_MODE_ACTION':
+      return '设置玩家游戏模式';
     case 'STATE_SET_ACTION':
       return '状态写入';
     case 'STATE_ADD_ACTION':
@@ -191,6 +197,15 @@ function catalogSummary(blockItem: CatalogBlock, nodeItem: GraphNode): string {
   }
   if (blockItem.id === 'action.entity.remove') {
     return `直接移除「${entityTargetLabel(entityTargetRef(nodeItem.config))}」。`;
+  }
+  if (blockItem.id === 'action.entity.add_status_effect') {
+    return `给予「${entityTargetLabel(entityTargetRef(nodeItem.config))}」${statusEffectLabel(graphConfigString(nodeItem.config, 'effectId', 'minecraft:speed'))} ${statusEffectLevelLabel(graphConfigString(nodeItem.config, 'level', '1'))}，持续 ${graphConfigString(nodeItem.config, 'durationSeconds', '30')} 秒。`;
+  }
+  if (blockItem.id === 'action.entity.remove_status_effect') {
+    return `移除「${entityTargetLabel(entityTargetRef(nodeItem.config))}」的${statusEffectLabel(graphConfigString(nodeItem.config, 'effectId', 'minecraft:speed'))}效果。`;
+  }
+  if (blockItem.id === 'action.player.set_game_mode') {
+    return `将「${entityTargetLabel(entityTargetRef(nodeItem.config))}」设置为${gameModeLabel(graphConfigString(nodeItem.config, 'gameMode', 'SURVIVAL'))}模式。`;
   }
   if (blockItem.id === 'condition.player.is_admin') {
     return playerAdminConditionSummary(nodeItem);
@@ -296,6 +311,12 @@ function legacyNodeTypeSummary(nodeItem: GraphNode): string {
       return `杀死「${entityTargetLabel(entityTargetRef(config))}」。`;
     case 'ENTITY_REMOVE_ACTION':
       return `直接移除「${entityTargetLabel(entityTargetRef(config))}」。`;
+    case 'ENTITY_ADD_STATUS_EFFECT_ACTION':
+      return `给予「${entityTargetLabel(entityTargetRef(config))}」${statusEffectLabel(value('effectId', 'minecraft:speed'))} ${statusEffectLevelLabel(value('level', '1'))}，持续 ${value('durationSeconds', '30')} 秒。`;
+    case 'ENTITY_REMOVE_STATUS_EFFECT_ACTION':
+      return `移除「${entityTargetLabel(entityTargetRef(config))}」的${statusEffectLabel(value('effectId', 'minecraft:speed'))}效果。`;
+    case 'PLAYER_SET_GAME_MODE_ACTION':
+      return `将「${entityTargetLabel(entityTargetRef(config))}」设置为${gameModeLabel(value('gameMode', 'SURVIVAL'))}模式。`;
     case 'STATE_SET_ACTION':
       return `把“${scopeLabel(value('scope'))}”的 ${value('key', '状态名')} 设置为“${stateValueLabel(value('value'), value('valueType', 'BOOLEAN'))}”。`;
     case 'STATE_ADD_ACTION':
@@ -319,6 +340,53 @@ export function booleanLabel(value = 'false'): string {
 
 function damageKindLabel(value: string): string {
   return ({ GENERIC: '普通', MAGIC: '魔法', FIRE: '火焰', FALL: '摔落', VOID: '虚空' } as Record<string, string>)[value] ?? value;
+}
+
+function statusEffectLabel(value: string): string {
+  return ({
+    'minecraft:speed': '速度',
+    'minecraft:slowness': '缓慢',
+    'minecraft:haste': '急迫',
+    'minecraft:mining_fatigue': '挖掘疲劳',
+    'minecraft:strength': '力量',
+    'minecraft:instant_health': '瞬间治疗',
+    'minecraft:instant_damage': '瞬间伤害',
+    'minecraft:jump_boost': '跳跃提升',
+    'minecraft:regeneration': '生命恢复',
+    'minecraft:resistance': '抗性提升',
+    'minecraft:fire_resistance': '防火',
+    'minecraft:water_breathing': '水下呼吸',
+    'minecraft:invisibility': '隐身',
+    'minecraft:blindness': '失明',
+    'minecraft:night_vision': '夜视',
+    'minecraft:hunger': '饥饿',
+    'minecraft:weakness': '虚弱',
+    'minecraft:poison': '中毒',
+    'minecraft:wither': '凋零',
+    'minecraft:glowing': '发光',
+    'minecraft:levitation': '飘浮',
+    'minecraft:slow_falling': '缓降',
+    'minecraft:darkness': '黑暗',
+  } as Record<string, string>)[value] ?? value;
+}
+
+function statusEffectLevelLabel(value: string): string {
+  let level = Number.parseInt(value, 10);
+  if (!Number.isInteger(level) || level < 1 || level > 256) {
+    return value;
+  }
+  let result = '';
+  for (const [amount, symbol] of [[100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']] as const) {
+    while (level >= amount) {
+      result += symbol;
+      level -= amount;
+    }
+  }
+  return result;
+}
+
+function gameModeLabel(value: string): string {
+  return ({ SURVIVAL: '生存', CREATIVE: '创造', ADVENTURE: '冒险', SPECTATOR: '旁观' } as Record<string, string>)[value] ?? value;
 }
 
 export { conditionOutputModeLabel };

@@ -30,13 +30,38 @@ export function renderNodeEditor(
     </section>
     <section class="form-card editor-section">
       <b>${escapeHtml(section.title)}</b>
-      ${fields.length > 0 ? `
-        <div class="field-grid">
-          ${fields.map((field) => renderEditableField(field, onlinePlayerDirectory)).join('')}
-        </div>
-      ` : '<p class="field-hint">这个积木当前只需要修改名称。</p>'}
+      ${fields.length > 0
+        ? renderFieldSections(fields, onlinePlayerDirectory)
+        : '<p class="field-hint">这个积木当前只需要修改名称。</p>'}
     </section>
   `;
+}
+
+function renderFieldSections(fields: EditableField[], onlinePlayerDirectory: OnlinePlayerDirectory): string {
+  const common = fields.filter((field) => fieldSection(field) === 'common');
+  const disclosures = [
+    { id: 'display', label: '显示设置' },
+    { id: 'advanced', label: '高级设置' },
+  ].map(({ id, label }) => {
+    const sectionFields = fields.filter((field) => fieldSection(field) === id);
+    return sectionFields.length === 0 ? '' : `
+      <details class="field-disclosure">
+        <summary>${label}</summary>
+        <div class="field-grid">
+          ${sectionFields.map((field) => renderEditableField(field, onlinePlayerDirectory)).join('')}
+        </div>
+      </details>
+    `;
+  }).join('');
+  return `
+    ${common.length > 0 ? `<div class="field-grid">${common.map((field) => renderEditableField(field, onlinePlayerDirectory)).join('')}</div>` : ''}
+    ${disclosures}
+  `;
+}
+
+function fieldSection(field: EditableField): 'common' | 'display' | 'advanced' {
+  const section = field.ui?.match(/(?:^|\s)section:(common|display|advanced)(?:\s|$)/)?.[1];
+  return section === 'display' || section === 'advanced' ? section : 'common';
 }
 
 export function renderEditableField(field: EditableField, onlinePlayerDirectory: OnlinePlayerDirectory = emptyOnlinePlayerDirectory): string {
@@ -403,10 +428,10 @@ export function displayFieldValue(field: EditableField): string {
   if (field.control === 'rich_text_component') {
     return richTextPlainText(value) || '未填写';
   }
-  if (field.control === 'boolean' || field.control === 'segmented') {
+  if (field.control === 'boolean') {
     return booleanLabel(value);
   }
-  if (field.control === 'select' || field.control === 'scope') {
+  if (field.control === 'select' || field.control === 'scope' || field.control === 'segmented') {
     return fieldOptions(field).find((option) => option.value === value)?.label ?? value;
   }
   return field.suffix ? `${value} ${field.suffix}` : value;

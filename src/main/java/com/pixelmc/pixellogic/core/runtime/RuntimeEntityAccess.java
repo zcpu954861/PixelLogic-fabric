@@ -1,7 +1,12 @@
 package com.pixelmc.pixellogic.core.runtime;
 
 import com.pixelmc.pixellogic.core.model.EntityDamageKind;
+import com.pixelmc.pixellogic.core.model.EntityStatusEffect;
+import com.pixelmc.pixellogic.core.model.PlayerGameMode;
+import com.pixelmc.pixellogic.core.model.StatusEffectUpdatePolicy;
 
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 public interface RuntimeEntityAccess {
@@ -59,6 +64,33 @@ public interface RuntimeEntityAccess {
         throw new UnsupportedOperationException("removing entity is unavailable");
     }
 
+    default Map<String, EntityStatusEffect> statusEffects() {
+        return Map.of();
+    }
+
+    default Optional<EntityStatusEffect> statusEffect(String effectId) {
+        return Optional.ofNullable(statusEffects().get(effectId));
+    }
+
+    default StatusEffectMutation addStatusEffect(
+            EntityStatusEffect effect,
+            StatusEffectUpdatePolicy policy
+    ) {
+        throw new UnsupportedOperationException("adding status effects is unavailable");
+    }
+
+    default StatusEffectMutation removeStatusEffect(String effectId) {
+        throw new UnsupportedOperationException("removing status effects is unavailable");
+    }
+
+    default Optional<PlayerGameMode> gameMode() {
+        return Optional.empty();
+    }
+
+    default boolean changeGameMode(PlayerGameMode gameMode) {
+        throw new UnsupportedOperationException("changing player game mode is unavailable");
+    }
+
     boolean hasTag(String tag);
 
     boolean addTag(String tag);
@@ -66,4 +98,11 @@ public interface RuntimeEntityAccess {
     boolean removeTag(String tag);
 
     Set<String> tags();
+
+    enum StatusEffectMutation {
+        CHANGED,
+        UNCHANGED,
+        UNKNOWN,
+        REJECTED
+    }
 }

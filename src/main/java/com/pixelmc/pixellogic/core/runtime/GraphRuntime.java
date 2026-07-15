@@ -623,10 +623,12 @@ public final class GraphRuntime {
         if (exception instanceof EntityTargetException targetException
                 && (node.type() == NodeType.ENTITY_ADD_TAG_ACTION
                 || node.type() == NodeType.ENTITY_REMOVE_TAG_ACTION
-                || EntityHealthExecution.supports(node.type()))) {
+                || EntityHealthExecution.supports(node.type())
+                || EntityStatusExecution.supports(node.type()))) {
             services.recordActionOutcome(node.id(), RuntimeActionOutcome.failure(node.blockId(), targetException.error()));
         } else if (exception instanceof EntityActionException actionException
-                && EntityHealthExecution.supports(node.type())) {
+                && (EntityHealthExecution.supports(node.type())
+                || EntityStatusExecution.supports(node.type()))) {
             services.recordActionOutcome(node.id(), RuntimeActionOutcome.failure(node.blockId(), actionException.error()));
         }
     }

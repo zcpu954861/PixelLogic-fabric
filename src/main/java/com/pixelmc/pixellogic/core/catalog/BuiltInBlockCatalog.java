@@ -37,6 +37,9 @@ public final class BuiltInBlockCatalog {
     public static final String ACTION_ENTITY_SET_HEALTH = "action.entity.set_health";
     public static final String ACTION_ENTITY_KILL = "action.entity.kill";
     public static final String ACTION_ENTITY_REMOVE = "action.entity.remove";
+    public static final String ACTION_ENTITY_ADD_STATUS_EFFECT = "action.entity.add_status_effect";
+    public static final String ACTION_ENTITY_REMOVE_STATUS_EFFECT = "action.entity.remove_status_effect";
+    public static final String ACTION_PLAYER_SET_GAME_MODE = "action.player.set_game_mode";
     public static final String CONTROL_LOOP_COUNT = "control.loop.count";
     public static final String CONTROL_LOOP_FOREVER = "control.loop.forever";
     public static final String CONTROL_LOOP_UNTIL = "control.loop.until";
@@ -72,6 +75,9 @@ public final class BuiltInBlockCatalog {
             Map.entry(NodeType.ENTITY_SET_HEALTH_ACTION, ACTION_ENTITY_SET_HEALTH),
             Map.entry(NodeType.ENTITY_KILL_ACTION, ACTION_ENTITY_KILL),
             Map.entry(NodeType.ENTITY_REMOVE_ACTION, ACTION_ENTITY_REMOVE),
+            Map.entry(NodeType.ENTITY_ADD_STATUS_EFFECT_ACTION, ACTION_ENTITY_ADD_STATUS_EFFECT),
+            Map.entry(NodeType.ENTITY_REMOVE_STATUS_EFFECT_ACTION, ACTION_ENTITY_REMOVE_STATUS_EFFECT),
+            Map.entry(NodeType.PLAYER_SET_GAME_MODE_ACTION, ACTION_PLAYER_SET_GAME_MODE),
             Map.entry(NodeType.CONTROL_LOOP_COUNT, CONTROL_LOOP_COUNT),
             Map.entry(NodeType.CONTROL_LOOP_FOREVER, CONTROL_LOOP_FOREVER),
             Map.entry(NodeType.CONTROL_LOOP_UNTIL, CONTROL_LOOP_UNTIL),
@@ -135,6 +141,8 @@ public final class BuiltInBlockCatalog {
                 category("player-entity.execution-context", "player-entity", "实体上下文", "切换内部积木操作的实体上下文。", "◎", 30),
                 category("player-entity.health-attributes", "player-entity", "生命与属性", "伤害、恢复或设置实体生命值。", "♥", 40),
                 category("player-entity.entity-management", "player-entity", "实体管理", "杀死实体或直接移除非玩家实体。", "×", 50),
+                category("player-entity.status-effects", "player-entity", "状态效果", "给予、更新或移除实体状态效果。", "✚", 60),
+                category("player-entity.player-settings", "player-entity", "玩家设置", "修改在线玩家的游戏模式。", "◇", 70),
                 category("location-region.dimensions-heights", "location-region", "维度与高度", "判断维度或垂直高度。", "↕", 10),
                 category("location-region.regions", "location-region", "区域", "判断玩家或目标方块是否位于区域内。", "▣", 20),
                 category("location-region.spatial-relations", "location-region", "空间关系", "判断玩家与目标对象的空间关系。", "⇄", 30),
@@ -627,6 +635,121 @@ public final class BuiltInBlockCatalog {
                         List.of(),
                         EntityTargetRequirement.ANY_ENTITY
                 ),
+                targetBlock(
+                        ACTION_ENTITY_ADD_STATUS_EFFECT,
+                        "给予状态效果",
+                        "给所选活体实体添加或更新一个状态效果；等级从 1 开始，持续时间按秒填写。",
+                        "player-entity.status-effects",
+                        "action",
+                        NodeType.ENTITY_ADD_STATUS_EFFECT_ACTION,
+                        Map.of(
+                                "target", EntityTargetRef.currentEntity().toJson(),
+                                "effectId", "minecraft:speed",
+                                "durationSeconds", "30",
+                                "level", "1",
+                                "updatePolicy", "VANILLA_UPDATE",
+                                "ambient", "false",
+                                "showParticles", "true",
+                                "showIcon", "true"
+                        ),
+                        List.of(
+                                section(entityTarget("目标", EntityTargetRef.currentEntity()), "common"),
+                                section(statusEffect("effectId", "状态效果", "例如 minecraft:speed"), "common"),
+                                section(integer("durationSeconds", "持续时间", "秒", "1", "1000000", "1"), "common"),
+                                section(integer("level", "等级", "级", "1", "256", "1"), "common"),
+                                section(bool("ambient", "环境效果"), "display"),
+                                section(bool("showParticles", "显示粒子"), "display"),
+                                section(bool("showIcon", "显示图标"), "display"),
+                                section(field(
+                                        "updatePolicy",
+                                        "select",
+                                        "更新策略",
+                                        "原版更新遵循 Minecraft 强弱与时长规则；强制替换会直接使用本次配置。",
+                                        true,
+                                        "VANILLA_UPDATE",
+                                        "",
+                                        List.of(option("VANILLA_UPDATE", "原版更新"), option("REPLACE", "强制替换")),
+                                        "", "", "", "", ""
+                                ), "advanced")
+                        ),
+                        "给予「{target}」{effectId} {level} 级，持续 {durationSeconds} 秒。",
+                        "action.entity.add_status_effect",
+                        List.of(),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.APPROXIMATE_SIMULATION,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
+                        List.of(),
+                        EntityTargetRequirement.LIVING_ENTITY
+                ),
+                targetBlock(
+                        ACTION_ENTITY_REMOVE_STATUS_EFFECT,
+                        "移除状态效果",
+                        "从所选活体实体移除一个指定状态效果；不存在时成功但不产生变化。",
+                        "player-entity.status-effects",
+                        "action",
+                        NodeType.ENTITY_REMOVE_STATUS_EFFECT_ACTION,
+                        Map.of(
+                                "target", EntityTargetRef.currentEntity().toJson(),
+                                "effectId", "minecraft:speed"
+                        ),
+                        List.of(
+                                entityTarget("目标", EntityTargetRef.currentEntity()),
+                                statusEffect("effectId", "状态效果", "例如 minecraft:speed")
+                        ),
+                        "移除「{target}」的 {effectId} 效果。",
+                        "action.entity.remove_status_effect",
+                        List.of(),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.APPROXIMATE_SIMULATION,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.ENTITY_MUTATING),
+                        List.of(),
+                        EntityTargetRequirement.LIVING_ENTITY
+                ),
+                targetBlock(
+                        ACTION_PLAYER_SET_GAME_MODE,
+                        "设置玩家游戏模式",
+                        "将所选在线玩家切换到生存、创造、冒险或旁观模式。",
+                        "player-entity.player-settings",
+                        "action",
+                        NodeType.PLAYER_SET_GAME_MODE_ACTION,
+                        Map.of(
+                                "target", EntityTargetRef.currentEntity().toJson(),
+                                "gameMode", "SURVIVAL"
+                        ),
+                        List.of(
+                                entityTarget("目标玩家", EntityTargetRef.currentEntity()),
+                                field(
+                                        "gameMode",
+                                        "segmented",
+                                        "游戏模式",
+                                        "目标必须是当前在线玩家。",
+                                        true,
+                                        "SURVIVAL",
+                                        "",
+                                        List.of(
+                                                option("SURVIVAL", "生存"),
+                                                option("CREATIVE", "创造"),
+                                                option("ADVENTURE", "冒险"),
+                                                option("SPECTATOR", "旁观")
+                                        ),
+                                        "", "", "", "segmented fullWidth", ""
+                                )
+                        ),
+                        "将「{target}」设置为 {gameMode}。",
+                        "action.player.set_game_mode",
+                        List.of(),
+                        List.of(in("input")),
+                        List.of(out("done")),
+                        BlockCapabilityLevel.APPROXIMATE_SIMULATION,
+                        BlockCapabilityLevel.REQUIRES_MINECRAFT_RUNTIME,
+                        List.of(BlockSafetyFlag.PLAYER_MUTATING, BlockSafetyFlag.REQUIRES_PLAYER),
+                        List.of(),
+                        EntityTargetRequirement.PLAYER_ONLY
+                ),
                 block(
                         CONTROL_LOOP_COUNT,
                         "循环次数",
@@ -1099,6 +1222,9 @@ public final class BuiltInBlockCatalog {
             case ACTION_ENTITY_SET_HEALTH -> List.of("设置生命", "血量", "set health");
             case ACTION_ENTITY_KILL -> List.of("杀死", "死亡", "kill");
             case ACTION_ENTITY_REMOVE -> List.of("移除实体", "清理", "remove", "discard");
+            case ACTION_ENTITY_ADD_STATUS_EFFECT -> List.of("状态效果", "药水效果", "给予效果", "effect", "potion");
+            case ACTION_ENTITY_REMOVE_STATUS_EFFECT -> List.of("状态效果", "移除效果", "清除效果", "effect");
+            case ACTION_PLAYER_SET_GAME_MODE -> List.of("游戏模式", "生存", "创造", "冒险", "旁观", "gamemode");
             case CONDITION_PLAYER_IS_ADMIN -> List.of("管理员", "权限");
             case CONDITION_PLAYER_DIMENSION_IS -> List.of("世界", "维度");
             case CONDITION_PLAYER_IN_REGION, CONDITION_TARGET_BLOCK_IN_REGION -> List.of("区域", "范围");
@@ -1231,6 +1357,28 @@ public final class BuiltInBlockCatalog {
                 "",
                 "fullWidth",
                 ""
+        );
+    }
+
+    private static BlockFormFieldDefinition statusEffect(String key, String label, String placeholder) {
+        return field(
+                key,
+                "status_effect",
+                label,
+                "填写命名空间状态效果 ID，由运行后端按当前注册表权威校验。",
+                true,
+                "",
+                placeholder,
+                List.of(),
+                "", "", "", "fullWidth", ""
+        );
+    }
+
+    private static BlockFormFieldDefinition section(BlockFormFieldDefinition field, String section) {
+        String ui = (field.ui() + " section:" + section).trim();
+        return new BlockFormFieldDefinition(
+                field.key(), field.type(), field.label(), field.description(), field.required(), field.defaultValue(),
+                field.placeholder(), field.options(), field.min(), field.max(), field.step(), ui, field.suffix()
         );
     }
 

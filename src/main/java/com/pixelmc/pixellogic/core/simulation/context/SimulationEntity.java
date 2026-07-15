@@ -3,10 +3,16 @@ package com.pixelmc.pixellogic.core.simulation.context;
 import com.pixelmc.pixellogic.core.runtime.RuntimeSubjectReference;
 import com.pixelmc.pixellogic.core.runtime.RuntimeEntityAccess;
 import com.pixelmc.pixellogic.core.model.EntityDamageKind;
+import com.pixelmc.pixellogic.core.model.EntityStatusEffect;
+import com.pixelmc.pixellogic.core.model.PlayerGameMode;
+import com.pixelmc.pixellogic.core.model.StatusEffectUpdatePolicy;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -15,9 +21,11 @@ public class SimulationEntity implements RuntimeEntityAccess {
     private final String entityTypeId;
     private final String displayName;
     private final Set<String> tags = new LinkedHashSet<>();
+    private final Map<String, EntityStatusEffect> statusEffects = new LinkedHashMap<>();
     private final boolean living;
     private final boolean invulnerable;
     private final double maxHealth;
+    private PlayerGameMode gameMode;
     private double health;
     private boolean killed;
     private boolean removed;
@@ -36,6 +44,35 @@ public class SimulationEntity implements RuntimeEntityAccess {
             double maxHealth,
             boolean invulnerable
     ) {
+        this(id, entityTypeId, displayName, tags, living, health, maxHealth, invulnerable, Map.of(), null);
+    }
+
+    public SimulationEntity(
+            UUID id,
+            String entityTypeId,
+            String displayName,
+            Collection<String> tags,
+            boolean living,
+            double health,
+            double maxHealth,
+            boolean invulnerable,
+            Map<String, EntityStatusEffect> statusEffects
+    ) {
+        this(id, entityTypeId, displayName, tags, living, health, maxHealth, invulnerable, statusEffects, null);
+    }
+
+    public SimulationEntity(
+            UUID id,
+            String entityTypeId,
+            String displayName,
+            Collection<String> tags,
+            boolean living,
+            double health,
+            double maxHealth,
+            boolean invulnerable,
+            Map<String, EntityStatusEffect> statusEffects,
+            PlayerGameMode gameMode
+    ) {
         this.id = id;
         this.entityTypeId = entityTypeId == null || entityTypeId.isBlank() ? "minecraft:pig" : entityTypeId;
         this.displayName = displayName == null || displayName.isBlank() ? "模拟实体" : displayName;
@@ -52,8 +89,19 @@ public class SimulationEntity implements RuntimeEntityAccess {
         this.health = runtimeHealth;
         this.maxHealth = runtimeMaxHealth;
         this.invulnerable = invulnerable;
+        this.gameMode = "minecraft:player".equals(this.entityTypeId)
+                ? (gameMode == null ? PlayerGameMode.SURVIVAL : gameMode)
+                : null;
         if (tags != null) {
             this.tags.addAll(tags.stream().filter(tag -> tag != null && !tag.isBlank()).toList());
+        }
+        if (statusEffects != null) {
+            statusEffects.forEach((effectId, effect) -> {
+                if (!living || effect == null || !effect.effectId().equals(effectId)) {
+                    throw new IllegalArgumentException("simulation status effect is invalid");
+                }
+                this.statusEffects.put(effectId, effect);
+            });
         }
     }
 
@@ -161,6 +209,59 @@ public class SimulationEntity implements RuntimeEntityAccess {
             return false;
         }
         removed = true;
+        return true;
+    }
+
+    @Override
+    public synchronized Map<String, EntityStatusEffect> statusEffects() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(statusEffects));
+    }
+
+    @Override
+    public synchronized StatusEffectMutation addStatusEffect(
+            EntityStatusEffect effect,
+            StatusEffectUpdatePolicy policy
+    ) {
+        if (!living || !alive() || effect == null || policy == null) {
+            return StatusEffectMutation.REJECTED;
+        }
+        EntityStatusEffect current = statusEffects.get(effect.effectId());
+        if (current == null) {
+            statusEffects.put(effect.effectId(), effect);
+            return StatusEffectMutation.CHANGED;
+        }
+        EntityStatusEffect updated = policy == StatusEffectUpdatePolicy.REPLACE
+                ? effect
+                : current.vanillaUpdatedBy(effect);
+        // ponytail: Simulation has no effect-expiry clock, so Vanilla's hidden fallback chain is not separately modelled.
+        if (updated.equals(current)) {
+            return StatusEffectMutation.UNCHANGED;
+        }
+        statusEffects.put(effect.effectId(), updated);
+        return StatusEffectMutation.CHANGED;
+    }
+
+    @Override
+    public synchronized StatusEffectMutation removeStatusEffect(String effectId) {
+        if (!living || !alive()) {
+            return StatusEffectMutation.REJECTED;
+        }
+        return statusEffects.remove(effectId) == null
+                ? StatusEffectMutation.UNCHANGED
+                : StatusEffectMutation.CHANGED;
+    }
+
+    @Override
+    public synchronized Optional<PlayerGameMode> gameMode() {
+        return Optional.ofNullable(gameMode);
+    }
+
+    @Override
+    public synchronized boolean changeGameMode(PlayerGameMode gameMode) {
+        if (this.gameMode == null || !online() || removed || gameMode == null || this.gameMode == gameMode) {
+            return false;
+        }
+        this.gameMode = gameMode;
         return true;
     }
 

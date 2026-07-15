@@ -188,6 +188,23 @@ select {
   gap: 12px;
 }
 
+.field-disclosure {
+  border: 1px solid #c9d6cc;
+  border-radius: 8px;
+  background: #f7faf7;
+}
+
+.field-disclosure > summary {
+  padding: 10px 12px;
+  color: #40534a;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.field-disclosure > .field-grid {
+  padding: 0 12px 12px;
+}
+
 .field-row.is-full {
   grid-column: 1 / -1;
 }
